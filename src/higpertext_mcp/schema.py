@@ -8,6 +8,7 @@ cubre el layout inconsistente entre `common.*` (definitions/) y `git.*`/`securit
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +24,24 @@ class ToolSpec:
     input_schema: dict[str, Any]
 
 
+def _infer_type(default: Any) -> str:
+    """Infiere el tipo JSON Schema a partir del default string de la capability.
+
+    Todas las capabilities declaran sus defaults como string (formato CLI), pero
+    el valor real que representan puede ser bool o int — ver `_parse_bool` en
+    grep_search.py, que acepta "True"/"true" indistintamente, así que anunciar
+    el tipo real acá no rompe el dispatch in-process (str(True) -> "True" sigue
+    siendo válido para el parser de la capability).
+    """
+    if not isinstance(default, str):
+        return "string"
+    if default.lower() in ("true", "false"):
+        return "boolean"
+    if re.fullmatch(r"-?\d+", default):
+        return "integer"
+    return "string"
+
+
 def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
     properties: dict[str, Any] = {}
     required: list[str] = []
@@ -30,12 +49,13 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
         name = param.get("name")
         if not name:
             continue
+        default = param.get("default")
         prop: dict[str, Any] = {
-            "type": "string",
+            "type": _infer_type(default) if default is not None else "string",
             "description": param.get("description", ""),
         }
-        if "default" in param:
-            prop["default"] = param["default"]
+        if default is not None:
+            prop["default"] = default
         properties[name] = prop
         if param.get("required", False):
             required.append(name)

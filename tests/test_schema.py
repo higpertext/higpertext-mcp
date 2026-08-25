@@ -18,6 +18,25 @@ def test_build_input_schema_no_required_omits_key():
     assert "required" not in result
 
 
+def test_build_input_schema_infers_boolean_type():
+    parameters = [{"name": "regex", "required": False, "default": "false"}]
+    result = schema._build_input_schema(parameters)
+    assert result["properties"]["regex"]["type"] == "boolean"
+    assert result["properties"]["regex"]["default"] == "false"
+
+
+def test_build_input_schema_infers_integer_type():
+    parameters = [{"name": "max_results", "required": False, "default": "100"}]
+    result = schema._build_input_schema(parameters)
+    assert result["properties"]["max_results"]["type"] == "integer"
+
+
+def test_build_input_schema_no_default_stays_string():
+    parameters = [{"name": "pattern", "required": True, "description": "patrón"}]
+    result = schema._build_input_schema(parameters)
+    assert result["properties"]["pattern"]["type"] == "string"
+
+
 def test_build_description_includes_contract_rules():
     definition = {
         "description": "Busca patrones.",
