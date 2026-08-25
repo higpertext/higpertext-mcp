@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "higpertext-mcp"
+version = "0.1.0"
+description = "Servidor MCP que expone capabilities de higpertext-cli como tools reales."
+requires-python = ">=3.10"
+license = {text = "Proprietary"}
+dependencies = [
+    # Pineado a la serie 1.x: verificado contra 1.29.1. mcp 2.x reestructuró
+    # server.fastmcp/server.lowlevel de forma incompatible (probado en este repo).
+    "mcp>=1.9.0,<2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[project.scripts]
+higpertext-mcp = "higpertext_mcp.server:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
