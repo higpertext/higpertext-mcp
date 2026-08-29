@@ -10,13 +10,14 @@ nivel (`list_tools`/`call_tool` como handlers explícitos) es el que soporta eso
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 
 import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
-from higpertext_mcp import discovery, dispatch, schema
+from higpertext_mcp import annotations, discovery, dispatch, resources, schema
 
 SERVER_NAME = "higpertext-mcp"
 
@@ -36,30 +37,91 @@ def _load_tools() -> dict[str, schema.ToolSpec]:
     return tools
 
 
+def _tool_annotations(capability_id: str) -> types.ToolAnnotations:
+    hints = annotations.hints_for(capability_id)
+    return types.ToolAnnotations(
+        readOnlyHint=hints.read_only,
+        destructiveHint=hints.destructive,
+        idempotentHint=hints.idempotent,
+    )
+
+
+def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
+    return types.Tool(
+        name=capability_id,
+        description=spec.description,
+        inputSchema=spec.input_schema,
+        annotations=_tool_annotations(capability_id),
+    )
+
+
 def build_server() -> Server:
     server = Server(SERVER_NAME)
-    tools = _load_tools()
+    state: dict[str, dict[str, schema.ToolSpec]] = {"tools": _load_tools()}
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
-        return [
-            types.Tool(
-                name=capability_id,
-                description=spec.description,
-                inputSchema=spec.input_schema,
-            )
-            for capability_id, spec in tools.items()
-        ]
+        # Siempre recalculado: si el perfil activo cambió a mitad de sesión,
+        # el cliente ve el set correcto apenas vuelve a pedir la lista.
+        state["tools"] = _load_tools()
+        return [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
 
     @server.call_tool()
-    async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+    async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        tools = state["tools"]
         if name not in tools:
-            return [types.TextContent(type="text", text=f"[ERROR] tool desconocida: {name}")]
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text=f"tool desconocida: {name}")],
+                isError=True,
+            )
         result = dispatch.call_capability(name, arguments)
-        prefix = "" if result.ok else "[ERROR] "
-        return [types.TextContent(type="text", text=f"{prefix}{result.output}")]
+        await _notify_if_tools_changed(server, state)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=result.output)],
+            isError=not result.ok,
+        )
+
+    @server.list_resources()
+    async def list_resources() -> list[types.Resource]:
+        return [
+            types.Resource(
+                uri=resources.USAGE_URI,
+                name="Uso de tokens/costo de la sesión",
+                description=(
+                    "Telemetría real acumulada por el motor higpertext "
+                    "(.higpertext/state/telemetry.jsonl), agregada por tool."
+                ),
+                mimeType="application/json",
+            )
+        ]
+
+    @server.read_resource()
+    async def read_resource(uri) -> str:
+        if str(uri) != resources.USAGE_URI:
+            raise ValueError(f"resource desconocido: {uri}")
+        root = discovery.resolve_project_root()
+        return json.dumps(resources.summarize_usage(root), ensure_ascii=False, indent=2)
 
     return server
+
+
+async def _notify_if_tools_changed(
+    server: Server, state: dict[str, dict[str, schema.ToolSpec]]
+) -> None:
+    """Si el perfil activo cambió desde el último list_tools, avisa al cliente.
+
+    No recomputa `state["tools"]` acá — list_tools() sigue siendo la única
+    fuente de verdad de lo que el cliente ve; esto solo le dice "volvé a
+    preguntar", evitando que quede desactualizado hasta el próximo reinicio.
+    """
+    root = discovery.resolve_project_root()
+    current_ids = set(discovery.allowed_capability_ids(root))
+    if current_ids == set(state["tools"].keys()):
+        return
+    try:
+        await server.request_context.session.send_tool_list_changed()
+    except LookupError:
+        pass
 
 
 async def _amain() -> None:
