@@ -1,9 +1,11 @@
 """Hints de seguridad/comportamiento por capability, para `Tool.annotations`.
 
-Estático y curado a mano (igual que V1_CAPABILITY_IDS en discovery.py) porque
-las capability JSON no declaran esta info hoy — inferirla del texto sería
-frágil. Si se agrega una capability nueva al set V1 sin entrada acá, se le
-asigna el hint más conservador (mutating, no idempotente) por defecto.
+Estático y curado a mano porque las capability JSON no declaran esta info hoy
+— inferirla del texto sería frágil. `discovery.py` ahora expone todas las
+capabilities que el perfil activo otorgue (no solo un set fijo curado); toda
+capability sin entrada acá recibe el hint más conservador (mutating, no
+idempotente) por defecto, así que ampliar estos sets es una mejora de UX, no
+un requisito de seguridad.
 """
 
 from __future__ import annotations

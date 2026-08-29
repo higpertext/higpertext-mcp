@@ -27,7 +27,7 @@ def test_no_active_profile_returns_empty():
     assert discovery.allowed_capability_ids(root) == []
 
 
-def test_intersects_profile_with_v1_set():
+def test_intersects_profile_with_real_capabilities():
     root = _make_project(
         active_profile="dev",
         capabilities=["common.grep-search", "git.diff", "common.unrelated-thing"],
@@ -36,16 +36,19 @@ def test_intersects_profile_with_v1_set():
     assert result == sorted(["common.grep-search", "git.diff"])
 
 
-def test_profile_without_matching_v1_capabilities_returns_empty():
+def test_profile_without_matching_capabilities_returns_empty():
     root = _make_project(active_profile="dev", capabilities=["common.unrelated-thing"])
     assert discovery.allowed_capability_ids(root) == []
 
 
-def test_all_v1_ids_granted_returns_full_set():
-    root = _make_project(
-        active_profile="dev", capabilities=list(discovery.V1_CAPABILITY_IDS)
-    )
-    assert set(discovery.allowed_capability_ids(root)) == discovery.V1_CAPABILITY_IDS
+def test_profile_grants_arbitrary_capabilities_beyond_old_fixed_ten():
+    """Cobertura completa: cualquier capability real del motor que el perfil otorgue
+    debe quedar expuesta, no solo la vieja lista fija de 10 (ver discovery.py)."""
+    engine_ids = discovery.list_all_capability_ids()
+    assert len(engine_ids) > 10, "el motor debería tener más de 10 capabilities reales"
+    granted = engine_ids[:15]
+    root = _make_project(active_profile="dev", capabilities=granted)
+    assert discovery.allowed_capability_ids(root) == sorted(granted)
 
 
 def test_project_root_override_env(monkeypatch):

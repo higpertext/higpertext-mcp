@@ -12,20 +12,10 @@ import json
 import os
 from pathlib import Path
 
-V1_CAPABILITY_IDS: frozenset[str] = frozenset(
-    {
-        "common.grep-search",
-        "git.diff",
-        "git.ls-files",
-        "common.smart-read",
-        "common.code-skeletonizer",
-        "common.knowledge-asker",
-        "common.memory-manager",
-        "git.committer",
-        "security.secret-scanner",
-        "common.quality-resolver",
-    }
+from higpertext.capabilities.common.scripts.core.governance.list_rules import (
+    list_all_capability_ids,
 )
+from higpertext.kernel.engine import HigpertextEngine
 
 _WORKSPACE_DIR = ".higpertext"
 
@@ -51,13 +41,24 @@ def active_profile(root: Path) -> str | None:
 
 
 def profile_capability_ids(root: Path, profile: str) -> list[str]:
-    profile_file = root / "src" / "config" / "profiles" / f"{profile}.json"
-    data = _read_json(profile_file)
-    return list(data.get("capabilities", []))
+    """Capabilities declaradas por el perfil, vía la misma resolución de rutas del motor.
+
+    `HigpertextEngine.profiles` resuelve `src/config/profiles/` (convención de
+    un agente externo creado con agent-builder) con fallback al paquete
+    instalado — que es también donde caen los perfiles propios del motor
+    (`src/higpertext_data/config/profiles/`) cuando `higpertext-cli` se testea
+    contra sí mismo. Antes esta función asumía solo la primera ruta y
+    devolvía [] silenciosamente para el segundo caso.
+    """
+    try:
+        data = HigpertextEngine(root).profiles.load_profile(profile)
+    except Exception:
+        data = {}
+    return list((data or {}).get("capabilities", []))
 
 
 def allowed_capability_ids(root: Path) -> list[str]:
-    """Intersección entre el set fijo de v1 y lo que el perfil activo permite.
+    """Intersección entre todas las capabilities del motor y lo que el perfil activo permite.
 
     Fail-closed: sin perfil activo o sin perfil legible, no se expone nada.
     """
@@ -65,4 +66,4 @@ def allowed_capability_ids(root: Path) -> list[str]:
     if not profile:
         return []
     granted = set(profile_capability_ids(root, profile))
-    return sorted(V1_CAPABILITY_IDS & granted)
+    return sorted(set(list_all_capability_ids()) & granted)
