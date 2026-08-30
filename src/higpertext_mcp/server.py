@@ -74,7 +74,7 @@ def build_server() -> Server:
                 content=[types.TextContent(type="text", text=f"tool desconocida: {name}")],
                 isError=True,
             )
-        result = dispatch.call_capability(name, arguments)
+        result = dispatch.call_capability(name, arguments, tools[name].raw)
         await _notify_if_tools_changed(server, state)
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=result.output)],

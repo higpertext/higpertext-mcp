@@ -22,6 +22,7 @@ class ToolSpec:
     capability_id: str
     description: str
     input_schema: dict[str, Any]
+    raw: dict[str, Any]
 
 
 def _infer_type(default: Any) -> str:
@@ -82,4 +83,5 @@ def load_tool_spec(capability_id: str) -> ToolSpec | None:
         capability_id=capability_id,
         description=_build_description(definition),
         input_schema=_build_input_schema(definition.get("parameters", [])),
+        raw=definition,
     )
