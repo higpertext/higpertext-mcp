@@ -70,15 +70,25 @@ def build_server() -> Server:
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
         tools = state["tools"]
         if name not in tools:
+            message = f"Unknown tool: {name}"
             return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f"tool desconocida: {name}")],
+                content=[types.TextContent(type="text", text=message)],
                 isError=True,
+                structuredContent={
+                    "ok": False,
+                    "summary": message,
+                    "data": {},
+                    "artifacts": [],
+                    "warnings": [],
+                    "error": message,
+                },
             )
         result = dispatch.call_capability(name, arguments, tools[name].raw)
         await _notify_if_tools_changed(server, state)
         return types.CallToolResult(
-            content=[types.TextContent(type="text", text=result.output)],
+            content=[types.TextContent(type="text", text=result.summary)],
             isError=not result.ok,
+            structuredContent=result.to_dict(),
         )
 
     @server.list_resources()

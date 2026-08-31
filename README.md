@@ -12,6 +12,26 @@ en un subprocess aparte y el comando original corría de todos modos — ruido s
 efecto real. Este servidor reemplaza esa capa con tools MCP genuinas: el modelo
 invoca la capability directamente, con schema validado, sin pasar por Bash.
 
+## Contrato de resultados
+
+Cada invocación devuelve `structuredContent`, no una transcripción de terminal:
+
+```json
+{
+  "ok": true,
+  "summary": "Resultado breve para el agente",
+  "data": {},
+  "artifacts": [],
+  "warnings": [],
+  "error": null
+}
+```
+
+Las capabilities que todavía escriben texto se encapsulan temporalmente en
+`data.text`; el mensaje visible del tool contiene sólo `summary`. El CLI `htx`
+sigue disponible para personas y CI, pero ya no imprime el `stdout` completo de
+una capability exitosa.
+
 ## Capabilities v1 (10, fijas)
 
 `common.grep-search`, `git.diff`, `git.ls-files`, `common.smart-read`,

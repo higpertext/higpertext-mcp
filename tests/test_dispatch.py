@@ -20,4 +20,6 @@ def test_call_capability_real_grep_search_on_this_repo():
         capability_data,
     )
     assert result.ok
-    assert "call_capability" in result.output
+    assert "call_capability" in result.summary
+    assert "text" in result.data
+    assert result.error is None

@@ -68,10 +68,14 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
 
 def _build_description(definition: dict) -> str:
     parts = [definition.get("description", "")]
-    rules = definition.get("contract", {}).get("rules", [])
+    contract = definition.get("contract", {})
+    rules = contract.get("rules", [])
     if rules:
         parts.append("Reglas:")
         parts.extend(f"- {rule}" for rule in rules)
+    on_empty = contract.get("on_empty")
+    if on_empty:
+        parts.append(f"Si no hay resultados: {on_empty}")
     return "\n".join(p for p in parts if p)
 
 

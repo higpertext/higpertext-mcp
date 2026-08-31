@@ -54,6 +54,24 @@ def test_build_description_without_contract():
     assert result == "Solo descripción."
 
 
+def test_build_description_includes_on_empty():
+    definition = {
+        "description": "Busca patrones.",
+        "contract": {"on_empty": "No encontrar nada es válido, no reintentes."},
+    }
+    result = schema._build_description(definition)
+    assert "Si no hay resultados: No encontrar nada es válido, no reintentes." in result
+
+
+def test_build_description_omits_on_empty_when_absent():
+    definition = {
+        "description": "Busca patrones.",
+        "contract": {"rules": ["Debe indicar coincidencias."]},
+    }
+    result = schema._build_description(definition)
+    assert "Si no hay resultados" not in result
+
+
 def test_load_tool_spec_unknown_capability_returns_none():
     assert schema.load_tool_spec("common.no-existe-esto") is None
 

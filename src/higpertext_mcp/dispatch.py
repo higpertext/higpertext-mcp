@@ -21,6 +21,8 @@ server compartido entre múltiples proyectos en el mismo proceso.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from typing import Any
 
 from higpertext.capabilities import capabilities_runner
 from higpertext.capabilities.common.scripts.core.governance.memory_manager import (
@@ -36,8 +38,30 @@ from higpertext.kernel.infrastructure.validation.contract_validator import Contr
 
 @dataclass
 class CapabilityResult:
+    """Resultado agnóstico de transporte de una capability.
+
+    ``output`` se conservaba como texto opaco porque el CLI heredó el contrato
+    stdin/stdout de los scripts. Los clientes agénticos no deben depender de
+    ese formato: reciben este sobre estable y pueden usar ``data`` sin
+    interpretar prefijos como ``[SUCCESS]`` o logs de consola.
+    """
+
     ok: bool
-    output: str
+    summary: str
+    data: dict[str, Any]
+    artifacts: list[str]
+    warnings: list[str]
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "summary": self.summary,
+            "data": self.data,
+            "artifacts": self.artifacts,
+            "warnings": self.warnings,
+            "error": self.error,
+        }
 
 
 def _params_to_argv(capability_id: str, params: dict) -> list[str]:
@@ -47,6 +71,27 @@ def _params_to_argv(capability_id: str, params: dict) -> list[str]:
             continue
         argv.extend([f"--{key}", str(value)])
     return argv
+
+
+def _result_data(output: str) -> dict[str, Any]:
+    """Convierte JSON emitido por una capability en datos; encapsula texto legado.
+
+    La envoltura ``text`` es una compatibilidad temporal para las capabilities
+    que aún imprimen texto. El protocolo MCP nunca expone ese texto como la
+    respuesta principal del tool.
+    """
+    try:
+        parsed = json.loads(output)
+    except json.JSONDecodeError:
+        return {"text": output} if output else {}
+    return parsed if isinstance(parsed, dict) else {"items": parsed}
+
+
+def _summary(output: str, ok: bool) -> str:
+    line = next((line.strip() for line in output.splitlines() if line.strip()), "")
+    if line:
+        return line[:240]
+    return "Capability completed." if ok else "Capability failed."
 
 
 def _save_memory_best_effort(
@@ -71,8 +116,11 @@ def call_capability(capability_id: str, params: dict, capability_data: dict) -> 
     if not validation.ok:
         return CapabilityResult(
             ok=False,
-            output="[ERROR] Parámetros inválidos:\n"
-            + "\n".join(f"- {e}" for e in validation.errors),
+            summary="Invalid capability parameters.",
+            data={},
+            artifacts=[],
+            warnings=[],
+            error="; ".join(validation.errors),
         )
 
     argv = _params_to_argv(capability_id, validation.params)
@@ -86,12 +134,21 @@ def call_capability(capability_id: str, params: dict, capability_data: dict) -> 
 
     ok = result.returncode == 0 and contract_ok
     output = result.stdout.strip() or result.stderr.strip()
+    error = None
     if not ok:
         if contract_errors:
             output = (output + "\n" if output else "") + "[CONTRATO] " + "; ".join(contract_errors)
         elif result.stderr.strip() and result.stderr.strip() not in output:
             output = f"{output}\n{result.stderr.strip()}".strip()
+        error = output or "Capability failed without diagnostic output."
 
     _save_memory_best_effort(capability_id, validation.params, result, contract_ok, contract_errors)
 
-    return CapabilityResult(ok=ok, output=output)
+    return CapabilityResult(
+        ok=ok,
+        summary=_summary(output, ok),
+        data=_result_data(result.stdout.strip()) if ok else {},
+        artifacts=[],
+        warnings=list(validation.warnings),
+        error=error,
+    )

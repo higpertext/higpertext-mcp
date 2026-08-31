@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import server as server_module
+from higpertext_mcp import dispatch, server as server_module
 
 
 def _make_project(active_profile: str, capabilities: list[str]) -> Path:
@@ -51,6 +51,31 @@ async def test_call_unknown_tool_returns_is_error(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.call_tool("common.no-existe", {})
         assert result.isError is True
+        assert result.structuredContent["ok"] is False
+
+
+@pytest.mark.anyio
+async def test_call_tool_returns_structured_content(monkeypatch):
+    root = _make_project("dev", ["common.grep-search"])
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    monkeypatch.setattr(
+        dispatch,
+        "call_capability",
+        lambda *_: dispatch.CapabilityResult(
+            ok=True,
+            summary="One match found.",
+            data={"matches": ["src/example.py:1"]},
+            artifacts=[],
+            warnings=[],
+        ),
+    )
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("common.grep-search", {"pattern": "example"})
+        assert result.isError is False
+        assert result.content[0].text == "One match found."
+        assert result.structuredContent["data"]["matches"] == ["src/example.py:1"]
 
 
 @pytest.mark.anyio
