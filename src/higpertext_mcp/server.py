@@ -17,7 +17,7 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
-from higpertext_mcp import annotations, discovery, dispatch, resources, schema
+from higpertext_mcp import annotations, discovery, dispatch, external, resources, schema
 
 SERVER_NAME = "higpertext-mcp"
 
@@ -55,21 +55,25 @@ def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
     )
 
 
-def build_server() -> Server:
+def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     server = Server(SERVER_NAME)
     state: dict[str, dict[str, schema.ToolSpec]] = {"tools": _load_tools()}
+    ext_pool = pool if pool is not None else external.ExternalServerPool([])
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         # Siempre recalculado: si el perfil activo cambió a mitad de sesión,
         # el cliente ve el set correcto apenas vuelve a pedir la lista.
         state["tools"] = _load_tools()
-        return [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
+        local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
+        return local + await ext_pool.list_tools_merged()
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
         tools = state["tools"]
         if name not in tools:
+            if ext_pool.has_tool(name):
+                return await ext_pool.call_tool(name, arguments)
             message = f"Unknown tool: {name}"
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=message)],
@@ -135,9 +139,12 @@ async def _notify_if_tools_changed(
 
 
 async def _amain() -> None:
-    server = build_server()
-    async with stdio_server() as (read_stream, write_stream):
-        await server.run(read_stream, write_stream, server.create_initialization_options())
+    root = discovery.resolve_project_root()
+    configs = external.load_external_servers(root)
+    async with external.ExternalServerPool(configs) as pool:
+        server = build_server(pool)
+        async with stdio_server() as (read_stream, write_stream):
+            await server.run(read_stream, write_stream, server.create_initialization_options())
 
 
 def run() -> None:
