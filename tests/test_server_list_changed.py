@@ -12,6 +12,7 @@ import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from higpertext_mcp import discovery, dispatch, server as server_module
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
 def _make_project(active_profile: str) -> Path:
@@ -29,12 +30,14 @@ async def test_profile_change_triggers_tool_list_changed_notification(monkeypatc
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
 
-    granted = ["common.grep-search"]
+    grep_search = profile_pb2.Capability(id="common.grep-search")
+    git_diff = profile_pb2.Capability(id="git.diff")
+    granted = [grep_search]
 
     async def fake_list_allowed(profile):
         return list(granted) if profile == "dev" else []
 
-    monkeypatch.setattr(discovery.profile_client, "list_allowed_capability_ids", fake_list_allowed)
+    monkeypatch.setattr(discovery.profile_client, "list_allowed_capabilities", fake_list_allowed)
 
     async def fake_call_capability(*_args):
         return dispatch.CapabilityResult(
@@ -57,7 +60,7 @@ async def test_profile_change_triggers_tool_list_changed_notification(monkeypatc
 
         # El perfil gana una capability nueva a mitad de sesión (el profile
         # server ahora refleja eso — acá lo simulamos mutando el stub).
-        granted.append("git.diff")
+        granted.append(git_diff)
 
         result = await client.call_tool("common-grep-search", {"pattern": "x"})
         assert result is not None

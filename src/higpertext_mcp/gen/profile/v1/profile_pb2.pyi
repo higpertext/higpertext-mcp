@@ -62,24 +62,28 @@ class Profile(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., system_prompt: _Optional[str] = ..., capabilities: _Optional[_Iterable[str]] = ..., subprofiles: _Optional[_Iterable[str]] = ..., rules: _Optional[_Iterable[str]] = ..., hooks_global: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Parameter(_message.Message):
-    __slots__ = ("name", "type", "required", "description")
+    __slots__ = ("name", "type", "required", "description", "default")
     NAME_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     REQUIRED_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    DEFAULT_FIELD_NUMBER: _ClassVar[int]
     name: str
     type: str
     required: bool
     description: str
-    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., required: _Optional[bool] = ..., description: _Optional[str] = ...) -> None: ...
+    default: str
+    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., required: _Optional[bool] = ..., description: _Optional[str] = ..., default: _Optional[str] = ...) -> None: ...
 
 class Contract(_message.Message):
-    __slots__ = ("rules", "success_pattern")
+    __slots__ = ("rules", "success_pattern", "on_empty")
     RULES_FIELD_NUMBER: _ClassVar[int]
     SUCCESS_PATTERN_FIELD_NUMBER: _ClassVar[int]
+    ON_EMPTY_FIELD_NUMBER: _ClassVar[int]
     rules: _containers.RepeatedScalarFieldContainer[str]
     success_pattern: str
-    def __init__(self, rules: _Optional[_Iterable[str]] = ..., success_pattern: _Optional[str] = ...) -> None: ...
+    on_empty: str
+    def __init__(self, rules: _Optional[_Iterable[str]] = ..., success_pattern: _Optional[str] = ..., on_empty: _Optional[str] = ...) -> None: ...
 
 class Capability(_message.Message):
     __slots__ = ("id", "version", "name", "description", "entrypoint", "language", "parameters", "requires_pat", "hook_task_id", "contract", "created_at", "updated_at")
@@ -304,6 +308,29 @@ class DeleteCapabilityRequest(_message.Message):
     ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class GetCapabilityScriptRequest(_message.Message):
+    __slots__ = ("id",)
+    ID_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class GetCapabilityScriptResponse(_message.Message):
+    __slots__ = ("source_code", "language", "extra_files")
+    class ExtraFilesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    SOURCE_CODE_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGE_FIELD_NUMBER: _ClassVar[int]
+    EXTRA_FILES_FIELD_NUMBER: _ClassVar[int]
+    source_code: str
+    language: str
+    extra_files: _containers.ScalarMap[str, str]
+    def __init__(self, source_code: _Optional[str] = ..., language: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class CreateRuleRequest(_message.Message):
     __slots__ = ("id", "description", "severity", "scopes", "automated", "capability", "source", "numeric_threshold")

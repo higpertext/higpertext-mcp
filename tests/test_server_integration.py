@@ -15,6 +15,7 @@ import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from higpertext_mcp import discovery, dispatch, server as server_module
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
 def _make_project(active_profile: str) -> Path:
@@ -27,18 +28,31 @@ def _make_project(active_profile: str) -> Path:
     return root
 
 
-def _stub_profile_catalog(monkeypatch, profile_to_capabilities: dict[str, list[str]]) -> None:
+_GREP_SEARCH = profile_pb2.Capability(
+    id="common.grep-search",
+    entrypoint="capabilities/common/scripts/core/search/grep_search.py",
+    language="python",
+    parameters=[profile_pb2.Parameter(name="pattern", required=False)],
+)
+_GIT_DIFF = profile_pb2.Capability(
+    id="git.diff", entrypoint="capabilities/git/scripts/git_diff.py", language="python"
+)
+
+
+def _stub_profile_catalog(
+    monkeypatch, profile_to_capabilities: dict[str, list[profile_pb2.Capability]]
+) -> None:
     async def fake_list_allowed(profile):
         return profile_to_capabilities.get(profile, [])
 
-    monkeypatch.setattr(discovery.profile_client, "list_allowed_capability_ids", fake_list_allowed)
+    monkeypatch.setattr(discovery.profile_client, "list_allowed_capabilities", fake_list_allowed)
 
 
 @pytest.mark.anyio
 async def test_list_tools_over_real_protocol(monkeypatch):
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
-    _stub_profile_catalog(monkeypatch, {"dev": ["common.grep-search", "git.diff"]})
+    _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH, _GIT_DIFF]})
 
     server = server_module.build_server()
     async with create_connected_server_and_client_session(server) as client:
@@ -54,7 +68,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
 async def test_call_unknown_tool_returns_is_error(monkeypatch):
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
-    _stub_profile_catalog(monkeypatch, {"dev": ["common.grep-search"]})
+    _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH]})
 
     server = server_module.build_server()
     async with create_connected_server_and_client_session(server) as client:
@@ -67,7 +81,7 @@ async def test_call_unknown_tool_returns_is_error(monkeypatch):
 async def test_call_tool_returns_structured_content(monkeypatch):
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
-    _stub_profile_catalog(monkeypatch, {"dev": ["common.grep-search"]})
+    _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH]})
 
     async def fake_call_capability(*_args):
         return dispatch.CapabilityResult(

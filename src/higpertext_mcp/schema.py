@@ -1,9 +1,8 @@
-"""Traduce el JSON de definición de una capability (parameters[]) a JSON Schema MCP.
+"""Traduce el `Capability` del profile server (parameters[]) a JSON Schema MCP.
 
-Reusa `list_rules.load_capability_meta`, ya presente en higpertext-cli, en vez de
-reimplementar el escaneo de `capabilities/<namespace>/**/*.json` — esa función ya
-cubre el layout inconsistente entre `common.*` (definitions/) y `git.*`/`security.*`
-(json plano en la raíz del namespace).
+La metadata de cada capability (descripción, parámetros, contrato) ya no se lee
+de JSON local en higpertext-cli: viene de `CapabilityService.ListCapabilities`
+del profile server (ver `discovery.allowed_capabilities` / `profile_client`).
 """
 
 from __future__ import annotations
@@ -12,9 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from higpertext.capabilities.common.scripts.core.governance.list_rules import (
-    load_capability_meta,
-)
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
 @dataclass
@@ -79,13 +76,45 @@ def _build_description(definition: dict) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def load_tool_spec(capability_id: str) -> ToolSpec | None:
-    definition = load_capability_meta(capability_id)
-    if not definition:
-        return None
+def _capability_to_raw(cap: profile_pb2.Capability) -> dict[str, Any]:
+    """Reconstruye el dict-shape que hoy consumen `normalize_and_validate_params`
+    y `ContractValidator` de higpertext-cli (mismas claves que el JSON de
+    definición original), a partir del `Capability` del profile server.
+
+    Un parámetro sin default declarado llega como `""` (proto3 no distingue
+    "campo vacío" de "campo ausente") — se omite la clave `default` en ese
+    caso, igual que cuando el JSON original no la traía.
+    """
+    parameters = []
+    for p in cap.parameters:
+        param: dict[str, Any] = {
+            "name": p.name,
+            "required": p.required,
+            "description": p.description,
+        }
+        if p.default:
+            param["default"] = p.default
+        parameters.append(param)
+    contract: dict[str, Any] = {"rules": list(cap.contract.rules)}
+    if cap.contract.success_pattern:
+        contract["success_pattern"] = cap.contract.success_pattern
+    if cap.contract.on_empty:
+        contract["on_empty"] = cap.contract.on_empty
+    return {
+        "id": cap.id,
+        "entrypoint": cap.entrypoint,
+        "language": cap.language,
+        "parameters": parameters,
+        "contract": contract,
+        "description": cap.description,
+    }
+
+
+def tool_spec_from_capability(cap: profile_pb2.Capability) -> ToolSpec:
+    raw = _capability_to_raw(cap)
     return ToolSpec(
-        capability_id=capability_id,
-        description=_build_description(definition),
-        input_schema=_build_input_schema(definition.get("parameters", [])),
-        raw=definition,
+        capability_id=cap.id,
+        description=_build_description(raw),
+        input_schema=_build_input_schema(raw["parameters"]),
+        raw=raw,
     )

@@ -13,6 +13,7 @@ from mcp.server.lowlevel import Server
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from higpertext_mcp import discovery, external, server as server_module
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
 def _make_project(active_profile: str) -> Path:
@@ -25,11 +26,16 @@ def _make_project(active_profile: str) -> Path:
     return root
 
 
-def _stub_profile_catalog(monkeypatch, profile_to_capabilities: dict[str, list[str]]) -> None:
+_GREP_SEARCH = profile_pb2.Capability(id="common.grep-search")
+
+
+def _stub_profile_catalog(
+    monkeypatch, profile_to_capabilities: dict[str, list[profile_pb2.Capability]]
+) -> None:
     async def fake_list_allowed(profile):
         return profile_to_capabilities.get(profile, [])
 
-    monkeypatch.setattr(discovery.profile_client, "list_allowed_capability_ids", fake_list_allowed)
+    monkeypatch.setattr(discovery.profile_client, "list_allowed_capabilities", fake_list_allowed)
 
 
 def _build_toy_external_server() -> Server:
@@ -68,7 +74,7 @@ def _build_toy_external_server() -> Server:
 async def test_external_tool_appears_prefixed_and_is_callable(monkeypatch):
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
-    _stub_profile_catalog(monkeypatch, {"dev": ["common.grep-search"]})
+    _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH]})
 
     toy_server = _build_toy_external_server()
     async with create_connected_server_and_client_session(toy_server) as toy_session:
@@ -93,7 +99,7 @@ async def test_external_tool_appears_prefixed_and_is_callable(monkeypatch):
 async def test_local_and_external_names_never_collide(monkeypatch):
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
-    _stub_profile_catalog(monkeypatch, {"dev": ["common.grep-search"]})
+    _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH]})
 
     toy_server = _build_toy_external_server()
     async with create_connected_server_and_client_session(toy_server) as toy_session:

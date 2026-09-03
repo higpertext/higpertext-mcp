@@ -1,4 +1,4 @@
-"""Ejecuta una capability in-process, reusando el dispatcher del motor.
+"""Ejecuta una capability in-process, reusando el harness genérico del motor.
 
 Da paridad real con el CLI ('htx task'): normaliza/valida parámetros, valida
 el contrato técnico (`contract.rules`) y registra la ejecución — reusando las
@@ -6,19 +6,17 @@ mismas funciones puras que `capability_task_service.py` del motor
 (`normalize_and_validate_params`, `ContractValidator`, `build_memory_notes`).
 El registro de la ejecución YA NO pasa por `save_memory()` del motor (que
 escribía a `.memory/` local): va a Redis (`memory.py`) y al profile server
-(`profile_client.py`), en paralelo, ambos best-effort. Deliberadamente NO pasa
-por `HigpertextHub`/`ROOT_DIR` de `router.py`: en modo desarrollo (paquete
-`higpertext` resuelto por `sys.path`, no instalado en site-packages) `ROOT_DIR`
-resuelve siempre al repo de higpertext-cli sin importar el cwd del proceso —
-exactamente el patrón que `discovery.py` documenta evitar para no romper el
-soporte multi-proyecto.
+(`profile_client.py`), en paralelo, ambos best-effort.
 
-Limitación conocida (documentada, no oculta): `capabilities_runner` resuelve rutas
-del proyecto (`_PROJECT_EXTERNAL_CAPS`, `_PROJECT_SOURCE_CAPS`) usando `Path.cwd()`
-evaluado en el momento del import del módulo. Esto es correcto siempre que el
-proceso del servidor MCP se lance una vez por proyecto con ese cwd ya fijo (el
-patrón estándar de un server MCP local declarado en `.mcp.json`); NO sirve para un
-server compartido entre múltiples proyectos en el mismo proceso.
+Qué script correr y su metadata (parámetros, contrato) ya NO se resuelven
+contra el JSON local de higpertext-cli: vienen del profile server (ver
+`schema.tool_spec_from_capability`, que arma `capability_data`, y `runner.py`,
+que trae+cachea el `.py` real vía `profile_client.get_capability_script`).
+Lo que sigue viniendo de higpertext-cli es el harness genérico y
+capability-agnóstico: el loader de módulos dinámicos (`runner._module_from_script`),
+el shim de ejecución in-process (`run_inprocess`), y la validación de
+parámetros/contrato (`normalize_and_validate_params`, `ContractValidator`) —
+ninguno de esos lee un JSON por-capability.
 """
 
 from __future__ import annotations
@@ -28,7 +26,6 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from higpertext.capabilities import capabilities_runner
 from higpertext.kernel.infrastructure.cli.execution_result import run_inprocess
 from higpertext.kernel.infrastructure.cli.parameter_contracts import (
     normalize_and_validate_params,
@@ -36,7 +33,7 @@ from higpertext.kernel.infrastructure.cli.parameter_contracts import (
 from higpertext.kernel.infrastructure.cli.task_result_reporter import build_memory_notes
 from higpertext.kernel.infrastructure.validation.contract_validator import ContractValidator
 
-from higpertext_mcp import discovery, memory, profile_client
+from higpertext_mcp import discovery, memory, profile_client, runner
 
 
 @dataclass
@@ -129,7 +126,18 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         )
 
     argv = _params_to_argv(capability_id, validation.params)
-    result = run_inprocess(lambda: capabilities_runner.main_inprocess(argv), args=argv)
+    try:
+        script_path = await runner.resolve_script(capability_id)
+    except Exception as exc:  # noqa: BLE001 — profile server caído/script inexistente
+        return CapabilityResult(
+            ok=False,
+            summary="Could not fetch capability script from the profile server.",
+            data={},
+            artifacts=[],
+            warnings=[],
+            error=str(exc),
+        )
+    result = run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
 
     contract_ok, contract_errors = True, []
     if result.returncode == 0:

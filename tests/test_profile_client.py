@@ -20,13 +20,30 @@ class _FakeProfileStub:
 
 
 class _FakeCapabilityStub:
-    def __init__(self, capability_ids: list[str]) -> None:
-        self._capability_ids = capability_ids
+    def __init__(
+        self,
+        capabilities: list[profile_pb2.Capability],
+        *,
+        script: tuple[str, str] | tuple[str, str, dict[str, str]] | None = None,
+    ) -> None:
+        self._capabilities = capabilities
+        self._script = script
 
     async def ListCapabilities(self, _request, timeout=None):
-        return profile_pb2.ListCapabilitiesResponse(
-            capabilities=[profile_pb2.Capability(id=cid) for cid in self._capability_ids]
+        return profile_pb2.ListCapabilitiesResponse(capabilities=self._capabilities)
+
+    async def GetCapabilityScript(self, _request, timeout=None):
+        if self._script is None:
+            raise AssertionError("GetCapabilityScript no esperado en este test")
+        source_code, language, *rest = self._script
+        extra_files = rest[0] if rest else {}
+        return profile_pb2.GetCapabilityScriptResponse(
+            source_code=source_code, language=language, extra_files=extra_files
         )
+
+
+def _caps(*ids: str) -> list[profile_pb2.Capability]:
+    return [profile_pb2.Capability(id=cid) for cid in ids]
 
 
 class _FakeActivityStub:
@@ -62,8 +79,8 @@ async def test_no_profile_returns_empty_without_dialing(monkeypatch):
 
     monkeypatch.setattr(profile_client.grpc.aio, "insecure_channel", fail_channel)
 
-    assert await profile_client.list_allowed_capability_ids(None) == []
-    assert await profile_client.list_allowed_capability_ids("") == []
+    assert await profile_client.list_allowed_capabilities(None) == []
+    assert await profile_client.list_allowed_capabilities("") == []
 
 
 @pytest.mark.anyio
@@ -74,11 +91,34 @@ async def test_intersects_profile_capabilities_with_catalog(monkeypatch):
     _patch_channel(
         monkeypatch,
         profile_stub=_FakeProfileStub(profiles),
-        capability_stub=_FakeCapabilityStub(["common.grep-search", "git.diff"]),
+        capability_stub=_FakeCapabilityStub(_caps("common.grep-search", "git.diff")),
     )
 
-    result = await profile_client.list_allowed_capability_ids("dev")
-    assert result == ["common.grep-search"]
+    result = await profile_client.list_allowed_capabilities("dev")
+    assert [c.id for c in result] == ["common.grep-search"]
+
+
+@pytest.mark.anyio
+async def test_intersection_returns_full_capability_metadata(monkeypatch):
+    profiles = [profile_pb2.Profile(name="dev", capabilities=["common.grep-search"])]
+    rich_cap = profile_pb2.Capability(
+        id="common.grep-search",
+        description="Busca patrones.",
+        entrypoint="capabilities/common/scripts/core/search/grep_search.py",
+        language="python",
+        parameters=[profile_pb2.Parameter(name="pattern", required=True)],
+    )
+    _patch_channel(
+        monkeypatch,
+        profile_stub=_FakeProfileStub(profiles),
+        capability_stub=_FakeCapabilityStub([rich_cap]),
+    )
+
+    result = await profile_client.list_allowed_capabilities("dev")
+    assert len(result) == 1
+    assert result[0].description == "Busca patrones."
+    assert result[0].entrypoint == "capabilities/common/scripts/core/search/grep_search.py"
+    assert result[0].parameters[0].name == "pattern"
 
 
 @pytest.mark.anyio
@@ -86,14 +126,14 @@ async def test_unknown_profile_name_returns_empty(monkeypatch):
     _patch_channel(
         monkeypatch,
         profile_stub=_FakeProfileStub([profile_pb2.Profile(name="other", capabilities=[])]),
-        capability_stub=_FakeCapabilityStub(["common.grep-search"]),
+        capability_stub=_FakeCapabilityStub(_caps("common.grep-search")),
     )
 
-    assert await profile_client.list_allowed_capability_ids("dev") == []
+    assert await profile_client.list_allowed_capabilities("dev") == []
 
 
 @pytest.mark.anyio
-async def test_list_allowed_capability_ids_fails_closed_on_rpc_error(monkeypatch):
+async def test_list_allowed_capabilities_fails_closed_on_rpc_error(monkeypatch):
     @asynccontextmanager
     async def fake_insecure_channel(_addr):
         raise ConnectionRefusedError("profile server down")
@@ -101,7 +141,43 @@ async def test_list_allowed_capability_ids_fails_closed_on_rpc_error(monkeypatch
 
     monkeypatch.setattr(profile_client.grpc.aio, "insecure_channel", fake_insecure_channel)
 
-    assert await profile_client.list_allowed_capability_ids("dev") == []
+    assert await profile_client.list_allowed_capabilities("dev") == []
+
+
+@pytest.mark.anyio
+async def test_get_capability_script_returns_source_and_language(monkeypatch):
+    _patch_channel(
+        monkeypatch,
+        capability_stub=_FakeCapabilityStub([], script=("cHJpbnQoMSk=", "python")),
+    )
+
+    result = await profile_client.get_capability_script("common.grep-search")
+    assert result == ("cHJpbnQoMSk=", "python", {})
+
+
+@pytest.mark.anyio
+async def test_get_capability_script_returns_extra_files(monkeypatch):
+    _patch_channel(
+        monkeypatch,
+        capability_stub=_FakeCapabilityStub(
+            [], script=("cHJpbnQoMSk=", "python", {"_report_paths.py": "aGVscGVy"})
+        ),
+    )
+
+    result = await profile_client.get_capability_script("common.commit-report")
+    assert result == ("cHJpbnQoMSk=", "python", {"_report_paths.py": "aGVscGVy"})
+
+
+@pytest.mark.anyio
+async def test_get_capability_script_is_best_effort_on_failure(monkeypatch):
+    @asynccontextmanager
+    async def fake_insecure_channel(_addr):
+        raise ConnectionRefusedError("profile server down")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(profile_client.grpc.aio, "insecure_channel", fake_insecure_channel)
+
+    assert await profile_client.get_capability_script("common.grep-search") is None
 
 
 @pytest.mark.anyio

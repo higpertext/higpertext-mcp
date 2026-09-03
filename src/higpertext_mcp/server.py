@@ -23,18 +23,15 @@ SERVER_NAME = "higpertext-mcp"
 
 
 async def _load_tools() -> dict[str, schema.ToolSpec]:
-    """Perfil activo (profile server) ∩ set fijo de v1 → specs cargadas desde sus JSON.
+    """Perfil activo ∩ catálogo del profile server → specs armadas desde esos Capability.
 
-    Fail-closed: una capability permitida por perfil pero sin JSON legible se
-    omite (no crashea el server ni expone una tool rota); si el profile server
-    no responde, `allowed_capability_ids` ya devuelve [] (ver discovery.py).
+    Fail-closed: si el profile server no responde, `allowed_capabilities` ya
+    devuelve [] (ver discovery.py).
     """
     root = discovery.resolve_project_root()
     tools: dict[str, schema.ToolSpec] = {}
-    for capability_id in await discovery.allowed_capability_ids(root):
-        spec = schema.load_tool_spec(capability_id)
-        if spec is not None:
-            tools[capability_id] = spec
+    for capability in await discovery.allowed_capabilities(root):
+        tools[capability.id] = schema.tool_spec_from_capability(capability)
     return tools
 
 
@@ -164,7 +161,7 @@ async def _notify_if_tools_changed(
     preguntar", evitando que quede desactualizado hasta el próximo reinicio.
     """
     root = discovery.resolve_project_root()
-    current_ids = set(await discovery.allowed_capability_ids(root))
+    current_ids = {c.id for c in await discovery.allowed_capabilities(root)}
     if current_ids == set(state["tools"].keys()):
         return
     try:

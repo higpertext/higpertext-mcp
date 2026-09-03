@@ -5,7 +5,7 @@ hooks (`hook_utils.get_project_root`) — NO `higpertext.kernel.config_paths.PRO
 que resuelve la raíz del *motor instalado*, no la del proyecto destino. Ver
 docs/architecture.md para el porqué de esta distinción.
 
-El catálogo de capabilities permitidas (`allowed_capability_ids`) ya NO se resuelve
+El catálogo de capabilities permitidas (`allowed_capabilities`) ya NO se resuelve
 contra JSON estático del motor instalado: se consulta en runtime al profile server
 (`profile_client`) — perfil + catálogo son ahora dinámicos, administrables sin
 redeploy de higpertext-mcp. `active_profile()` sigue local (lee
@@ -20,6 +20,7 @@ import os
 from pathlib import Path
 
 from higpertext_mcp import profile_client
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 _WORKSPACE_DIR = ".higpertext"
 
@@ -44,10 +45,14 @@ def active_profile(root: Path) -> str | None:
     return env.get("active_profile") or None
 
 
-async def allowed_capability_ids(root: Path) -> list[str]:
+async def allowed_capabilities(root: Path) -> list[profile_pb2.Capability]:
     """Intersección entre el catálogo del profile server y lo que el perfil activo permite.
 
+    Devuelve los `Capability` completos (metadata + parámetros + contrato),
+    no solo ids — son la fuente de verdad para armar cada ToolSpec (ver
+    `schema.tool_spec_from_capability`).
+
     Fail-closed: sin perfil activo, o si el profile server no responde, no se
-    expone nada (ver `profile_client.list_allowed_capability_ids`).
+    expone nada (ver `profile_client.list_allowed_capabilities`).
     """
-    return await profile_client.list_allowed_capability_ids(active_profile(root))
+    return await profile_client.list_allowed_capabilities(active_profile(root))

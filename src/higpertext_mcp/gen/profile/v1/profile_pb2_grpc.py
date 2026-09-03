@@ -305,6 +305,11 @@ class CapabilityServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.DeleteCapabilityRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
+        self.GetCapabilityScript = channel.unary_unary(
+                '/profile.v1.CapabilityService/GetCapabilityScript',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetCapabilityScriptRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetCapabilityScriptResponse.FromString,
+                _registered_method=True)
 
 
 class CapabilityServiceServicer:
@@ -334,6 +339,12 @@ class CapabilityServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetCapabilityScript(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CapabilityServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -356,6 +367,11 @@ def add_CapabilityServiceServicer_to_server(servicer, server):
                     servicer.DeleteCapability,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteCapabilityRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'GetCapabilityScript': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCapabilityScript,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetCapabilityScriptRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetCapabilityScriptResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -466,6 +482,33 @@ class CapabilityService:
             '/profile.v1.CapabilityService/DeleteCapability',
             profile_dot_v1_dot_profile__pb2.DeleteCapabilityRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetCapabilityScript(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.CapabilityService/GetCapabilityScript',
+            profile_dot_v1_dot_profile__pb2.GetCapabilityScriptRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetCapabilityScriptResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -1,4 +1,5 @@
 from higpertext_mcp import schema
+from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
 def test_build_input_schema_marks_required_params():
@@ -72,14 +73,37 @@ def test_build_description_omits_on_empty_when_absent():
     assert "Si no hay resultados" not in result
 
 
-def test_load_tool_spec_unknown_capability_returns_none():
-    assert schema.load_tool_spec("common.no-existe-esto") is None
+def test_tool_spec_from_capability_builds_schema_and_description():
+    cap = profile_pb2.Capability(
+        id="common.grep-search",
+        description="Busca patrones.",
+        entrypoint="capabilities/common/scripts/core/search/grep_search.py",
+        language="python",
+        parameters=[
+            profile_pb2.Parameter(name="pattern", required=True, description="patrón"),
+            profile_pb2.Parameter(name="path", required=False, default=".", description="ruta"),
+        ],
+        contract=profile_pb2.Contract(
+            rules=["Debe indicar coincidencias."], on_empty="No hay resultados."
+        ),
+    )
+    spec = schema.tool_spec_from_capability(cap)
 
-
-def test_load_tool_spec_real_grep_search():
-    """Requiere higpertext-cli instalado editable — valida contra el JSON real."""
-    spec = schema.load_tool_spec("common.grep-search")
-    assert spec is not None
     assert spec.capability_id == "common.grep-search"
     assert "pattern" in spec.input_schema["properties"]
-    assert "path" in spec.input_schema["properties"]
+    assert spec.input_schema["properties"]["path"]["default"] == "."
+    assert spec.input_schema["required"] == ["pattern"]
+    assert "Busca patrones." in spec.description
+    assert "Debe indicar coincidencias." in spec.description
+    assert "Si no hay resultados: No hay resultados." in spec.description
+    assert spec.raw["entrypoint"] == "capabilities/common/scripts/core/search/grep_search.py"
+    assert spec.raw["language"] == "python"
+
+
+def test_tool_spec_from_capability_empty_default_is_omitted():
+    cap = profile_pb2.Capability(
+        id="common.x",
+        parameters=[profile_pb2.Parameter(name="flag", required=False)],
+    )
+    spec = schema.tool_spec_from_capability(cap)
+    assert "default" not in spec.input_schema["properties"]["flag"]

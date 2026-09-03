@@ -3,7 +3,7 @@
 (reemplaza el rol de `save_memory()` del lado "registro central", complementario
 a `memory.py` que cubre el lado Redis).
 
-Fail-closed en discovery (mismo criterio que `discovery.allowed_capability_ids()`
+Fail-closed en discovery (mismo criterio que `discovery.allowed_capabilities()`
 tenía sin perfil legible: si el server no responde, no se expone nada en vez de
 exponer un catálogo potencialmente desactualizado). Fail-open/silencioso en el
 registro de actividad: un profile server caído nunca debe tumbar una respuesta MCP.
@@ -28,10 +28,12 @@ def _warn(message: str) -> None:
     print(f"[higpertext-mcp/profile_client] {message}", file=sys.stderr)
 
 
-async def list_allowed_capability_ids(profile: str | None) -> list[str]:
+async def list_allowed_capabilities(profile: str | None) -> list[profile_pb2.Capability]:
     """Intersección entre el perfil activo (ProfileService) y el catálogo
-    (CapabilityService) del profile server. [] si no hay perfil, o si el server
-    no responde — mismo fail-closed que la resolución estática que reemplaza.
+    (CapabilityService) del profile server, devolviendo los `Capability`
+    completos (metadata: descripción, parámetros, contrato) — no solo ids.
+    [] si no hay perfil, o si el server no responde — mismo fail-closed que
+    la resolución estática que reemplaza.
     """
     if not profile:
         return []
@@ -50,7 +52,6 @@ async def list_allowed_capability_ids(profile: str | None) -> list[str]:
             caps_resp = await capability_stub.ListCapabilities(
                 profile_pb2.ListCapabilitiesRequest(), timeout=_CALL_TIMEOUT_S
             )
-            catalog_ids = {c.id for c in caps_resp.capabilities}
     except grpc.aio.AioRpcError as exc:
         _warn(f"profile server no disponible, catálogo vacío: {exc.details()}")
         return []
@@ -59,7 +60,29 @@ async def list_allowed_capability_ids(profile: str | None) -> list[str]:
         return []
 
     granted = set(match.capabilities)
-    return sorted(catalog_ids & granted)
+    return sorted(
+        (c for c in caps_resp.capabilities if c.id in granted),
+        key=lambda c: c.id,
+    )
+
+
+async def get_capability_script(capability_id: str) -> tuple[str, str, dict[str, str]] | None:
+    """Código fuente (base64) + lenguaje + helpers hermanos (filename -> base64,
+    ver `Contract`/`Capability.extra_files`, ej. "_report_paths.py" para
+    common.commit-report) de una capability. Best-effort: `None` ante
+    cualquier fallo — igual criterio que `record_activity`, el caller decide
+    cómo reaccionar (ver `dispatch`/`runner`).
+    """
+    try:
+        async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+            stub = profile_pb2_grpc.CapabilityServiceStub(channel)
+            resp = await stub.GetCapabilityScript(
+                profile_pb2.GetCapabilityScriptRequest(id=capability_id), timeout=_CALL_TIMEOUT_S
+            )
+            return resp.source_code, resp.language, dict(resp.extra_files)
+    except Exception as exc:  # noqa: BLE001
+        _warn(f"no se pudo obtener el script de {capability_id}: {exc}")
+        return None
 
 
 async def record_activity(
