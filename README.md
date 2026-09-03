@@ -1,7 +1,12 @@
 # higpertext-mcp
 
-Servidor MCP que expone 10 capabilities de `higpertext-cli` como tools reales
+Servidor MCP que expone capabilities de `higpertext-cli` como tools reales
 (function-calling), en vez del interceptor de texto sobre Bash que usaba antes el motor.
+
+> Documentación completa: [docs/installation.md](./docs/installation.md)
+> (instalación, `.mcp.json`, cómo probarlo desde Postman) y
+> [docs/api/README.md](./docs/api/README.md) (contrato de respuesta y catálogo
+> de tools con ejemplos de `arguments`).
 
 ## Por qué existe
 
@@ -32,16 +37,21 @@ Las capabilities que todavía escriben texto se encapsulan temporalmente en
 sigue disponible para personas y CI, pero ya no imprime el `stdout` completo de
 una capability exitosa.
 
-## Capabilities v1 (10, fijas)
+## Qué capabilities se exponen
 
-`common.grep-search`, `git.diff`, `git.ls-files`, `common.smart-read`,
-`common.code-skeletonizer`, `common.knowledge-asker`, `common.memory-manager`,
-`git.committer`, `security.secret-scanner`, `common.quality-resolver`.
-
-Solo se registran como tool las que además estén listadas en `capabilities` del
-perfil activo del proyecto destino (`.higpertext/config/environment.json` →
-`active_profile` → `src/config/profiles/<perfil>.json`). Sin perfil activo o
+No es un set fijo: se registra como tool cualquier capability que (a) el
+motor `higpertext-cli` instalado traiga y (b) esté listada en `capabilities`
+del perfil activo del proyecto destino (`.higpertext/config/environment.json`
+→ `active_profile` → `src/config/profiles/<perfil>.json`). Sin perfil activo o
 legible, no se expone ninguna tool (fail-closed).
+
+El catálogo probado hasta ahora (9 capabilities reales, documentadas con
+ejemplos en [docs/api/tools.md](./docs/api/tools.md)):
+`common.grep-search`, `git.diff`, `git.ls-files`, `common.smart-read`,
+`common.code-skeletonizer`, `common.memory-manager`, `git.committer`,
+`security.secret-scanner`, `common.quality-resolver`. Un décimo id,
+`common.knowledge-asker`, sigue en `annotations.py` pero no tiene definición
+JSON en el motor instalado — nunca se expone hasta que exista.
 
 ## Instalación
 

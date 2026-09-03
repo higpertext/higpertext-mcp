@@ -20,6 +20,8 @@ server compartido entre múltiples proyectos en el mismo proceso.
 
 from __future__ import annotations
 
+import contextlib
+import io
 from dataclasses import dataclass
 import json
 from typing import Any
@@ -99,14 +101,17 @@ def _save_memory_best_effort(
 ) -> None:
     # Best-effort: un fallo al persistir memoria nunca debe tumbar la respuesta
     # al cliente MCP, y jamás debe escribir a stdout (rompería el protocolo
-    # stdio de MCP).
+    # stdio de MCP) — save_memory() loggea "[SUCCESS] ..." vía un logger que
+    # resuelve sys.stdout dinámicamente, así que hay que silenciarlo acá
+    # igual que run_inprocess() silencia el stdout de la capability misma.
     try:
         notes = build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
-        save_memory(
-            action=f"Auto-run (MCP): {capability_id}",
-            status="success" if result.returncode == 0 and contract_ok else "failure",
-            notes=notes,
-        )
+        with contextlib.redirect_stdout(io.StringIO()):
+            save_memory(
+                action=f"Auto-run (MCP): {capability_id}",
+                status="success" if result.returncode == 0 and contract_ok else "failure",
+                notes=notes,
+            )
     except (OSError, ValueError):
         pass
 

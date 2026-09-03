@@ -46,9 +46,21 @@ def _tool_annotations(capability_id: str) -> types.ToolAnnotations:
     )
 
 
+def _mcp_tool_name(capability_id: str) -> str:
+    """Sanea un capability_id ("common.grep-search") a un nombre de tool MCP válido.
+
+    Varios clientes (VS Code entre ellos) validan `Tool.name` contra
+    `^[a-z0-9_-]+$` y descartan silenciosamente cualquier tool que no matchee
+    — un id con "." (la convención real de higpertext-cli) invalida el 100%
+    del catálogo. capability_id sigue siendo la clave interna para dispatch;
+    esto solo afecta el nombre expuesto al protocolo.
+    """
+    return capability_id.replace(".", "-")
+
+
 def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
     return types.Tool(
-        name=capability_id,
+        name=_mcp_tool_name(capability_id),
         description=spec.description,
         inputSchema=spec.input_schema,
         annotations=_tool_annotations(capability_id),
@@ -65,13 +77,15 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         # Siempre recalculado: si el perfil activo cambió a mitad de sesión,
         # el cliente ve el set correcto apenas vuelve a pedir la lista.
         state["tools"] = _load_tools()
+        state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
         return local + await ext_pool.list_tools_merged()
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
         tools = state["tools"]
-        if name not in tools:
+        capability_id = state.get("name_to_id", {}).get(name)
+        if capability_id is None:
             if ext_pool.has_tool(name):
                 return await ext_pool.call_tool(name, arguments)
             message = f"Unknown tool: {name}"
@@ -87,7 +101,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     "error": message,
                 },
             )
-        result = dispatch.call_capability(name, arguments, tools[name].raw)
+        result = dispatch.call_capability(capability_id, arguments, tools[capability_id].raw)
         await _notify_if_tools_changed(server, state)
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=result.summary)],

@@ -1,0 +1,12 @@
+{
+    "session_id": "sess_1788344422_d70a",
+    "profile": "ado_admin",
+    "assistant": "antigravity",
+    "status": "active",
+    "created_at": "2026-09-02T04:20:22.500308",
+    "active_skills": [
+        "higpertext-guide"
+    ],
+    "active_subagents": [],
+    "tasks": []
+}

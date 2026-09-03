@@ -1,0 +1,917 @@
+{
+    "generated_at": null,
+    "files": {
+        "README.md": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "",
+            "type": "md",
+            "is_entry_point": false,
+            "size": 4096
+        },
+        "src/higpertext_mcp/__init__.py": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "higpertext-mcp: servidor MCP para las capabilities de higpertext-cli (v1: 10 tools).",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 91
+        },
+        "src/higpertext_mcp/resources.py": {
+            "imports": [
+                "__future__.annotations"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_read_telemetry_lines",
+                    "parameters": [
+                        "root"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "summarize_usage",
+                    "parameters": [
+                        "root"
+                    ],
+                    "docstring": "Agrega tokens/costo estimado por tool a partir de la telemetría en disco."
+                }
+            ],
+            "summary": "Expone telemetría real de uso (.higpertext/state/telemetry.jsonl) como MCP resource.\n\nEs dato de solo lectura que ya existe en disco (lo escribe hook_post_observer.py\ndel motor) — no tiene sentido envolverlo en una tool cuando el modelo puede\nleerlo pasivamente como resource, sin gastar un tool call.",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 1835
+        },
+        "src/higpertext_mcp/annotations.py": {
+            "imports": [
+                "__future__.annotations"
+            ],
+            "classes": [
+                {
+                    "name": "ToolHints",
+                    "docstring": "",
+                    "methods": []
+                }
+            ],
+            "functions": [
+                {
+                    "name": "hints_for",
+                    "parameters": [
+                        "capability_id"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Hints de seguridad/comportamiento por capability, para `Tool.annotations`.\n\nEstático y curado a mano porque las capability JSON no declaran esta info hoy\n— inferirla del texto sería frágil. `discovery.py` ahora expone todas las\ncapabilities que el perfil activo otorgue (no solo un set fijo curado); toda\ncapability sin entrada acá recibe el hint más conservador (mutating, no\nidempotente) por defecto, así que ampliar estos sets es una mejora de UX, no\nun requisito de seguridad.",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 1406
+        },
+        "src/higpertext_mcp/discovery.py": {
+            "imports": [
+                "__future__.annotations",
+                "higpertext.capabilities.common.scripts.core.governance.list_rules.list_all_capability_ids",
+                "higpertext.kernel.engine.HigpertextEngine",
+                "os"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "resolve_project_root",
+                    "parameters": [],
+                    "docstring": "Raíz del proyecto destino: override explícito o cwd del proceso servidor."
+                },
+                {
+                    "name": "_read_json",
+                    "parameters": [
+                        "path"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "active_profile",
+                    "parameters": [
+                        "root"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "profile_capability_ids",
+                    "parameters": [
+                        "root",
+                        "profile"
+                    ],
+                    "docstring": "Capabilities declaradas por el perfil, vía la misma resolución de rutas del motor.\n\n`HigpertextEngine.profiles` resuelve `src/config/profiles/` (convención de\nun agente externo creado con agent-builder) con fallback al paquete\ninstalado — que es también donde caen los perfiles propios del motor\n(`src/higpertext_data/config/profiles/`) cuando `higpertext-cli` se testea\ncontra sí mismo. Antes esta función asumía solo la primera ruta y\ndevolvía [] silenciosamente para el segundo caso."
+                },
+                {
+                    "name": "allowed_capability_ids",
+                    "parameters": [
+                        "root"
+                    ],
+                    "docstring": "Intersección entre todas las capabilities del motor y lo que el perfil activo permite.\n\nFail-closed: sin perfil activo o sin perfil legible, no se expone nada."
+                }
+            ],
+            "summary": "Resuelve raíz de proyecto, perfil activo y capabilities permitidas.\n\nUsa resolución basada en cwd — el mismo patrón que higpertext-cli usa para sus\nhooks (`hook_utils.get_project_root`) — NO `higpertext.kernel.config_paths.PROJECT_ROOT`,\nque resuelve la raíz del *motor instalado*, no la del proyecto destino. Ver\ndocs/architecture.md para el porqué de esta distinción.",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 2469
+        },
+        "src/higpertext_mcp/schema.py": {
+            "imports": [
+                "__future__.annotations",
+                "higpertext.capabilities.common.scripts.core.governance.list_rules.load_capability_meta"
+            ],
+            "classes": [
+                {
+                    "name": "ToolSpec",
+                    "docstring": "",
+                    "methods": []
+                }
+            ],
+            "functions": [
+                {
+                    "name": "_infer_type",
+                    "parameters": [
+                        "default"
+                    ],
+                    "docstring": "Infiere el tipo JSON Schema a partir del default string de la capability.\n\nTodas las capabilities declaran sus defaults como string (formato CLI), pero\nel valor real que representan puede ser bool o int — ver `_parse_bool` en\ngrep_search.py, que acepta \"True\"/\"true\" indistintamente, así que anunciar\nel tipo real acá no rompe el dispatch in-process (str(True) -> \"True\" sigue\nsiendo válido para el parser de la capability)."
+                },
+                {
+                    "name": "_build_input_schema",
+                    "parameters": [
+                        "parameters"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_build_description",
+                    "parameters": [
+                        "definition"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "load_tool_spec",
+                    "parameters": [
+                        "capability_id"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Traduce el JSON de definición de una capability (parameters[]) a JSON Schema MCP.\n\nReusa `list_rules.load_capability_meta`, ya presente en higpertext-cli, en vez de\nreimplementar el escaneo de `capabilities/<namespace>/**/*.json` — esa función ya\ncubre el layout inconsistente entre `common.*` (definitions/) y `git.*`/`security.*`\n(json plano en la raíz del namespace).",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 3040
+        },
+        "src/higpertext_mcp/external.py": {
+            "imports": [
+                "__future__.annotations",
+                "mcp.client.session.ClientSession",
+                "mcp.client.stdio.StdioServerParameters",
+                "mcp.client.stdio.stdio_client",
+                "mcp.types"
+            ],
+            "classes": [
+                {
+                    "name": "ExternalServerConfig",
+                    "docstring": "",
+                    "methods": []
+                },
+                {
+                    "name": "ExternalServerPool",
+                    "docstring": "Administra sesiones MCP a servidores externos y fusiona/reenvía sus tools.\n\n`configs=[]` (default) la vuelve un no-op total, así `build_server()` sin\npool sigue comportándose exactamente igual que antes de esta feature.",
+                    "methods": [
+                        {
+                            "name": "__init__",
+                            "parameters": [
+                                "self",
+                                "configs"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "from_sessions",
+                            "parameters": [
+                                "cls",
+                                "sessions"
+                            ],
+                            "docstring": "Constructor de testing: inyecta sesiones ya conectadas, sin spawnear nada."
+                        },
+                        {
+                            "name": "has_tool",
+                            "parameters": [
+                                "self",
+                                "name"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "_resolve",
+                            "parameters": [
+                                "self",
+                                "name"
+                            ],
+                            "docstring": "Resuelve `external.<server>.<real_name>` sin depender de un list_tools_merged() previo.\n\nLos nombres de servidor los definimos nosotros en la config (sin\npuntos garantizado en la práctica), así que partir con maxsplit=2\nes seguro incluso si `real_name` trae puntos propios."
+                        }
+                    ]
+                }
+            ],
+            "functions": [
+                {
+                    "name": "_warn",
+                    "parameters": [
+                        "message"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_read_json",
+                    "parameters": [
+                        "path"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "load_external_servers",
+                    "parameters": [
+                        "root"
+                    ],
+                    "docstring": "Lee y valida `.higpertext/config/mcp_external.json`. Fail-closed: [] en cualquier error."
+                },
+                {
+                    "name": "_prefixed_name",
+                    "parameters": [
+                        "server_name",
+                        "tool_name"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Proxy hacia otros servidores MCP externos (stdio) — federación v1.\n\n`higpertext-mcp` puede actuar simultáneamente como servidor MCP (hacia el\nasistente) y como cliente MCP (hacia otros servidores declarados en\n`.higpertext/config/mcp_external.json`), fusionando sus tools bajo el mismo\nendpoint con el prefijo `external.<server>.<tool>`.\n\nAlcance v1, deliberadamente acotado (ver plan): solo transporte stdio, sin\nreconexión automática ni hot-add a mitad de sesión, sin `ContractValidator`\nni registro en `.memory/` para tools externas (no son capabilities propias).\nUn servidor que falla al iniciar o revienta después nunca tumba el proceso\nde higpertext-mcp — se omite/desaparece de `list_tools()`, siempre logueando\na stderr (nunca a stdout, rompería el protocolo stdio).",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 7803
+        },
+        "src/higpertext_mcp/dispatch.py": {
+            "imports": [
+                "__future__.annotations",
+                "higpertext.capabilities.capabilities_runner",
+                "higpertext.capabilities.common.scripts.core.governance.memory_manager.save_memory",
+                "higpertext.kernel.infrastructure.cli.execution_result.run_inprocess",
+                "higpertext.kernel.infrastructure.cli.parameter_contracts.normalize_and_validate_params",
+                "higpertext.kernel.infrastructure.cli.task_result_reporter.build_memory_notes",
+                "higpertext.kernel.infrastructure.validation.contract_validator.ContractValidator"
+            ],
+            "classes": [
+                {
+                    "name": "CapabilityResult",
+                    "docstring": "Resultado agnóstico de transporte de una capability.\n\n``output`` se conservaba como texto opaco porque el CLI heredó el contrato\nstdin/stdout de los scripts. Los clientes agénticos no deben depender de\nese formato: reciben este sobre estable y pueden usar ``data`` sin\ninterpretar prefijos como ``[SUCCESS]`` o logs de consola.",
+                    "methods": [
+                        {
+                            "name": "to_dict",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        }
+                    ]
+                }
+            ],
+            "functions": [
+                {
+                    "name": "_params_to_argv",
+                    "parameters": [
+                        "capability_id",
+                        "params"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_result_data",
+                    "parameters": [
+                        "output"
+                    ],
+                    "docstring": "Convierte JSON emitido por una capability en datos; encapsula texto legado.\n\nLa envoltura ``text`` es una compatibilidad temporal para las capabilities\nque aún imprimen texto. El protocolo MCP nunca expone ese texto como la\nrespuesta principal del tool."
+                },
+                {
+                    "name": "_summary",
+                    "parameters": [
+                        "output",
+                        "ok"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_save_memory_best_effort",
+                    "parameters": [
+                        "capability_id",
+                        "params",
+                        "result",
+                        "contract_ok",
+                        "contract_errors"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "call_capability",
+                    "parameters": [
+                        "capability_id",
+                        "params",
+                        "capability_data"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Ejecuta una capability in-process, reusando el dispatcher del motor.\n\nDa paridad real con el CLI ('htx task'): normaliza/valida parámetros, valida\nel contrato técnico (`contract.rules`) y registra la ejecución en `.memory/` —\nreusando las mismas funciones puras que `capability_task_service.py` del motor\n(`normalize_and_validate_params`, `ContractValidator`, `save_memory`,\n`build_memory_notes`). Deliberadamente NO pasa por `HigpertextHub`/`ROOT_DIR`\nde `router.py`: en modo desarrollo (paquete `higpertext` resuelto por `sys.path`,\nno instalado en site-packages) `ROOT_DIR` resuelve siempre al repo de\nhigpertext-cli sin importar el cwd del proceso — exactamente el patrón que\n`discovery.py` documenta evitar para no romper el soporte multi-proyecto.\n\nLimitación conocida (documentada, no oculta): `capabilities_runner` resuelve rutas\ndel proyecto (`_PROJECT_EXTERNAL_CAPS`, `_PROJECT_SOURCE_CAPS`) usando `Path.cwd()`\nevaluado en el momento del import del módulo. Esto es correcto siempre que el\nproceso del servidor MCP se lance una vez por proyecto con ese cwd ya fijo (el\npatrón estándar de un server MCP local declarado en `.mcp.json`); NO sirve para un\nserver compartido entre múltiples proyectos en el mismo proceso.",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 6338
+        },
+        "src/higpertext_mcp/server.py": {
+            "imports": [
+                "__future__.annotations",
+                "asyncio",
+                "higpertext_mcp.annotations",
+                "higpertext_mcp.discovery",
+                "higpertext_mcp.dispatch",
+                "higpertext_mcp.external",
+                "higpertext_mcp.resources",
+                "higpertext_mcp.schema",
+                "mcp.server.lowlevel.Server",
+                "mcp.server.stdio.stdio_server",
+                "mcp.types"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_load_tools",
+                    "parameters": [],
+                    "docstring": "Perfil activo del proyecto ∩ set fijo de v1 → specs cargadas desde sus JSON.\n\nFail-closed: una capability permitida por perfil pero sin JSON legible se\nomite (no crashea el server ni expone una tool rota)."
+                },
+                {
+                    "name": "_tool_annotations",
+                    "parameters": [
+                        "capability_id"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_mcp_tool_name",
+                    "parameters": [
+                        "capability_id"
+                    ],
+                    "docstring": "Sanea un capability_id (\"common.grep-search\") a un nombre de tool MCP válido.\n\nVarios clientes (VS Code entre ellos) validan `Tool.name` contra\n`^[a-z0-9_-]+$` y descartan silenciosamente cualquier tool que no matchee\n— un id con \".\" (la convención real de higpertext-cli) invalida el 100%\ndel catálogo. capability_id sigue siendo la clave interna para dispatch;\nesto solo afecta el nombre expuesto al protocolo."
+                },
+                {
+                    "name": "_to_mcp_tool",
+                    "parameters": [
+                        "capability_id",
+                        "spec"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "build_server",
+                    "parameters": [
+                        "pool"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "run",
+                    "parameters": [],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Entrypoint del servidor MCP: registra una tool por cada capability permitida.\n\nUsa `mcp.server.lowlevel.Server`, no `mcp.server.fastmcp.FastMCP` — FastMCP deriva\nel inputSchema de los type hints de una función Python fija (`add_tool(fn, ...)`),\nlo cual no sirve acá: el schema de cada tool viene de un JSON externo (`schema.py`)\nresuelto en runtime, distinto por capability y por perfil activo. El API de bajo\nnivel (`list_tools`/`call_tool` como handlers explícitos) es el que soporta eso.",
+            "type": "python",
+            "is_entry_point": true,
+            "size": 6504
+        },
+        "tests/test_annotations.py": {
+            "imports": [
+                "higpertext_mcp.annotations"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "test_read_only_capability_hints",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_destructive_capability_hints",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_mutating_non_destructive_capability_hints",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_unknown_capability_defaults_to_conservative_hints",
+                    "parameters": [],
+                    "docstring": ""
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 873
+        },
+        "tests/test_resources.py": {
+            "imports": [
+                "higpertext_mcp.resources"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_make_project_with_telemetry",
+                    "parameters": [
+                        "entries"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_no_telemetry_file_returns_zeroed_summary",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_aggregates_tokens_and_cost_by_tool",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_ignores_non_tool_call_events",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_ignores_malformed_json_lines",
+                    "parameters": [],
+                    "docstring": ""
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 1859
+        },
+        "tests/test_server_integration.py": {
+            "imports": [
+                "higpertext_mcp.dispatch",
+                "higpertext_mcp.server",
+                "mcp.shared.memory.create_connected_server_and_client_session",
+                "pytest"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_make_project",
+                    "parameters": [
+                        "active_profile",
+                        "capabilities"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Valida el wire protocol real (no solo las funciones internas): levanta el\nServer en memoria y lo habla con un ClientSession de verdad, como haría un\ncliente MCP real (Claude Code u otro).",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 3687
+        },
+        "tests/test_server_list_changed.py": {
+            "imports": [
+                "higpertext_mcp.server",
+                "mcp.shared.memory.create_connected_server_and_client_session",
+                "mcp.types",
+                "pytest"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_make_project",
+                    "parameters": [
+                        "active_profile",
+                        "capabilities"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Valida que el server avisa tools/list_changed cuando el perfil activo\ncambia mid-session (por ejemplo, el usuario corre `htx profile load` a mitad\nde conversación) — sin esto el cliente se queda con la lista de tools vieja\nhasta que reinicia el server.",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 2153
+        },
+        "tests/test_discovery.py": {
+            "imports": [
+                "higpertext_mcp.discovery"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_make_project",
+                    "parameters": [
+                        "active_profile",
+                        "capabilities"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_no_active_profile_returns_empty",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_intersects_profile_with_real_capabilities",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_profile_without_matching_capabilities_returns_empty",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_profile_grants_arbitrary_capabilities_beyond_old_fixed_ten",
+                    "parameters": [],
+                    "docstring": "Cobertura completa: cualquier capability real del motor que el perfil otorgue\ndebe quedar expuesta, no solo la vieja lista fija de 10 (ver discovery.py)."
+                },
+                {
+                    "name": "test_project_root_override_env",
+                    "parameters": [
+                        "monkeypatch"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 2201
+        },
+        "tests/test_dispatch.py": {
+            "imports": [
+                "higpertext_mcp.dispatch",
+                "higpertext_mcp.schema"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "test_params_to_argv_skips_none_values",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_params_to_argv_stringifies_values",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_call_capability_real_grep_search_on_this_repo",
+                    "parameters": [],
+                    "docstring": "Requiere higpertext-cli instalado editable + correr desde un checkout real."
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 963
+        },
+        "tests/test_schema.py": {
+            "imports": [
+                "higpertext_mcp.schema"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "test_build_input_schema_marks_required_params",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_input_schema_no_required_omits_key",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_input_schema_infers_boolean_type",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_input_schema_infers_integer_type",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_input_schema_no_default_stays_string",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_description_includes_contract_rules",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_description_without_contract",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_description_includes_on_empty",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_build_description_omits_on_empty_when_absent",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_load_tool_spec_unknown_capability_returns_none",
+                    "parameters": [],
+                    "docstring": ""
+                },
+                {
+                    "name": "test_load_tool_spec_real_grep_search",
+                    "parameters": [],
+                    "docstring": "Requiere higpertext-cli instalado editable — valida contra el JSON real."
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": false,
+            "size": 3233
+        },
+        "tests/test_external.py": {
+            "imports": [
+                "higpertext_mcp.external",
+                "mcp.types",
+                "pytest"
+            ],
+            "classes": [
+                {
+                    "name": "TestLoadExternalServers",
+                    "docstring": "",
+                    "methods": [
+                        {
+                            "name": "test_missing_file_returns_empty",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_corrupt_json_returns_empty",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_reads_valid_server_entry",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_skips_entry_without_name",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_skips_entry_without_command",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_skips_non_dict_entry_but_keeps_valid_ones",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        },
+                        {
+                            "name": "test_servers_not_a_list_returns_empty",
+                            "parameters": [
+                                "self"
+                            ],
+                            "docstring": ""
+                        }
+                    ]
+                },
+                {
+                    "name": "_FakeSession",
+                    "docstring": "Sesión MCP falsa para testear ExternalServerPool sin subprocess real.",
+                    "methods": [
+                        {
+                            "name": "__init__",
+                            "parameters": [
+                                "self",
+                                "tools",
+                                "call_result",
+                                "fail_list",
+                                "fail_call"
+                            ],
+                            "docstring": ""
+                        }
+                    ]
+                },
+                {
+                    "name": "TestExternalServerPoolMerging",
+                    "docstring": "",
+                    "methods": []
+                },
+                {
+                    "name": "TestExternalServerPoolCallTool",
+                    "docstring": "",
+                    "methods": []
+                },
+                {
+                    "name": "TestExternalServerPoolNoop",
+                    "docstring": "",
+                    "methods": []
+                },
+                {
+                    "name": "TestExternalServerPoolStart",
+                    "docstring": "",
+                    "methods": []
+                }
+            ],
+            "functions": [
+                {
+                    "name": "_make_config_dir",
+                    "parameters": [
+                        "root",
+                        "servers"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_tool",
+                    "parameters": [
+                        "name",
+                        "description"
+                    ],
+                    "docstring": ""
+                }
+            ],
+            "summary": "",
+            "type": "python",
+            "is_entry_point": true,
+            "size": 8863
+        },
+        "tests/test_server_external_integration.py": {
+            "imports": [
+                "higpertext_mcp.external",
+                "higpertext_mcp.server",
+                "mcp.server.lowlevel.Server",
+                "mcp.shared.memory.create_connected_server_and_client_session",
+                "mcp.types",
+                "pytest"
+            ],
+            "classes": [],
+            "functions": [
+                {
+                    "name": "_make_project",
+                    "parameters": [
+                        "active_profile",
+                        "capabilities"
+                    ],
+                    "docstring": ""
+                },
+                {
+                    "name": "_build_toy_external_server",
+                    "parameters": [],
+                    "docstring": ""
+                }
+            ],
+            "summary": "Integración real de la federación MCP: un servidor 'externo' de juguete\n(hablado por un ClientSession real en memoria, sin subprocess) inyectado en\nuna ExternalServerPool, y el build_server() real de higpertext hablado por\notro ClientSession real — igual patrón que test_server_integration.py.",
+            "type": "python",
+            "is_entry_point": true,
+            "size": 4234
+        },
+        "docs/installation.md": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "",
+            "type": "md",
+            "is_entry_point": false,
+            "size": 8485
+        },
+        "docs/api/README.md": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "",
+            "type": "md",
+            "is_entry_point": false,
+            "size": 3819
+        },
+        "docs/api/resources.md": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "",
+            "type": "md",
+            "is_entry_point": false,
+            "size": 1003
+        },
+        "docs/api/tools.md": {
+            "imports": [],
+            "classes": [],
+            "functions": [],
+            "summary": "",
+            "type": "md",
+            "is_entry_point": false,
+            "size": 6323
+        }
+    },
+    "dependencies": [
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/annotations.py"
+        },
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/discovery.py"
+        },
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/dispatch.py"
+        },
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/external.py"
+        },
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/resources.py"
+        },
+        {
+            "from": "src/higpertext_mcp/server.py",
+            "to": "src/higpertext_mcp/schema.py"
+        },
+        {
+            "from": "tests/test_annotations.py",
+            "to": "src/higpertext_mcp/annotations.py"
+        },
+        {
+            "from": "tests/test_resources.py",
+            "to": "src/higpertext_mcp/resources.py"
+        },
+        {
+            "from": "tests/test_server_integration.py",
+            "to": "src/higpertext_mcp/dispatch.py"
+        },
+        {
+            "from": "tests/test_server_integration.py",
+            "to": "src/higpertext_mcp/server.py"
+        },
+        {
+            "from": "tests/test_server_list_changed.py",
+            "to": "src/higpertext_mcp/server.py"
+        },
+        {
+            "from": "tests/test_discovery.py",
+            "to": "src/higpertext_mcp/discovery.py"
+        },
+        {
+            "from": "tests/test_dispatch.py",
+            "to": "src/higpertext_mcp/dispatch.py"
+        },
+        {
+            "from": "tests/test_dispatch.py",
+            "to": "src/higpertext_mcp/schema.py"
+        },
+        {
+            "from": "tests/test_schema.py",
+            "to": "src/higpertext_mcp/schema.py"
+        },
+        {
+            "from": "tests/test_external.py",
+            "to": "src/higpertext_mcp/external.py"
+        },
+        {
+            "from": "tests/test_server_external_integration.py",
+            "to": "src/higpertext_mcp/external.py"
+        },
+        {
+            "from": "tests/test_server_external_integration.py",
+            "to": "src/higpertext_mcp/server.py"
+        }
+    ]
+}
