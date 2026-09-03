@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package profile.v1;
+
+option go_package = "github.com/aomerge/higpertext-server-profile/gen/profile/v1;profilev1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// ── Gobernanza ──────────────────────────────────────────────────────────────
+
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  LOW = 1;      // override bidireccional con justificación
+  MEDIUM = 2;   // solo puede endurecerse
+  HIGH = 3;     // solo puede endurecerse
+  CRITICAL = 4; // inmutable — no admite override
+}
+
+enum Scope {
+  SCOPE_UNSPECIFIED = 0;
+  COMMIT = 1;
+  PR = 2;
+  DEPLOY = 3;
+  ANY = 4; // aplica en todos los scopes
+}
+
+// ── Perfiles ────────────────────────────────────────────────────────────────
+
+message Profile {
+  string id = 1;
+  string name = 2; // slug único, ej. "agent_designer"
+  string description = 3;
+  string system_prompt = 4;
+  repeated string capabilities = 5;  // ids de Capability (referencia blanda, sin FK)
+  repeated string subprofiles = 6;   // nombres de otros Profile
+  repeated string rules = 7;         // reglas de comportamiento en texto libre
+  repeated string hooks_global = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+// ── Capabilities ────────────────────────────────────────────────────────────
+
+message Parameter {
+  string name = 1;
+  string type = 2;
+  bool required = 3;
+  string description = 4;
+}
+
+message Contract {
+  repeated string rules = 1;
+  string success_pattern = 2;
+}
+
+message Capability {
+  string id = 1; // natural key, ej. "common.session-start"
+  string version = 2;
+  string name = 3;
+  string description = 4;
+  string entrypoint = 5;
+  string language = 6;
+  repeated Parameter parameters = 7;
+  bool requires_pat = 8;
+  string hook_task_id = 9;
+  Contract contract = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// ── Reglas de gobernanza ──────────────────────────────────────────────────────
+
+message GovernanceRule {
+  string id = 1;
+  string description = 2;
+  Severity severity = 3;
+  repeated Scope scopes = 4;
+  bool automated = 5;
+  string capability = 6;             // referencia blanda a Capability.id, opcional
+  string source = 7;                 // "global" | nombre de perfil
+  optional double numeric_threshold = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message GovernanceException {
+  string id = 1;
+  string rule_id = 2;
+  string reason = 3;
+  string approver = 4;
+  string profile = 5;
+  optional string expires = 6; // fecha ISO-8601 (YYYY-MM-DD), ausente = sin expiración
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// ── Actividad (registro de ejecuciones) ───────────────────────────────────────
+
+message Activity {
+  string id = 1;
+  string capability_id = 2;
+  string profile = 3;         // vacío = sin perfil activo al momento del registro
+  string status = 4;          // "success" | "failure"
+  string summary = 5;
+  repeated string tags = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+// ── Requests / Responses ─────────────────────────────────────────────────────
+
+message CreateProfileRequest {
+  string name = 1;
+  string description = 2;
+  string system_prompt = 3;
+  repeated string capabilities = 4;
+  repeated string subprofiles = 5;
+  repeated string rules = 6;
+  repeated string hooks_global = 7;
+}
+message CreateProfileResponse { Profile profile = 1; }
+message GetProfileRequest { string id = 1; }
+message GetProfileResponse { Profile profile = 1; }
+message ListProfilesRequest {}
+message ListProfilesResponse { repeated Profile profiles = 1; }
+message UpdateProfileRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string system_prompt = 4;
+  repeated string capabilities = 5;
+  repeated string subprofiles = 6;
+  repeated string rules = 7;
+  repeated string hooks_global = 8;
+}
+message UpdateProfileResponse { Profile profile = 1; }
+message DeleteProfileRequest { string id = 1; }
+
+message CreateCapabilityRequest {
+  string id = 1;
+  string version = 2;
+  string name = 3;
+  string description = 4;
+  string entrypoint = 5;
+  string language = 6;
+  repeated Parameter parameters = 7;
+  bool requires_pat = 8;
+  string hook_task_id = 9;
+  Contract contract = 10;
+}
+message CreateCapabilityResponse { Capability capability = 1; }
+message GetCapabilityRequest { string id = 1; }
+message GetCapabilityResponse { Capability capability = 1; }
+message ListCapabilitiesRequest {}
+message ListCapabilitiesResponse { repeated Capability capabilities = 1; }
+message DeleteCapabilityRequest { string id = 1; }
+
+message CreateRuleRequest {
+  string id = 1; // natural key definido por el llamante, ej. "sec-001"
+  string description = 2;
+  Severity severity = 3;
+  repeated Scope scopes = 4;
+  bool automated = 5;
+  string capability = 6;
+  string source = 7;
+  optional double numeric_threshold = 8;
+}
+message CreateRuleResponse { GovernanceRule rule = 1; }
+message ListRulesRequest {
+  // scope sin especificar = todas las reglas, sin filtrar.
+  Scope scope = 1;
+}
+message ListRulesResponse { repeated GovernanceRule rules = 1; }
+message DeleteRuleRequest { string id = 1; }
+
+message CreateExceptionRequest {
+  string rule_id = 1;
+  string reason = 2;
+  string approver = 3;
+  string profile = 4;
+  optional string expires = 5;
+}
+message CreateExceptionResponse { GovernanceException exception = 1; }
+message ListExceptionsRequest {
+  string profile = 1;  // vacío = todas
+  bool active_only = 2; // true = excluye expiradas
+}
+message ListExceptionsResponse { repeated GovernanceException exceptions = 1; }
+message DeleteExceptionRequest { string id = 1; }
+
+message RecordActivityRequest {
+  string capability_id = 1;
+  string profile = 2;
+  string status = 3;
+  string summary = 4;
+  repeated string tags = 5;
+}
+message RecordActivityResponse { Activity activity = 1; }
+message ListActivitiesRequest {
+  string profile = 1; // vacío = todas
+  int32 limit = 2;    // <=0 = sin límite explícito (el server aplica un tope razonable)
+}
+message ListActivitiesResponse { repeated Activity activities = 1; }
+
+// ── Servicios ─────────────────────────────────────────────────────────────────
+
+service ProfileService {
+  rpc CreateProfile(CreateProfileRequest) returns (CreateProfileResponse);
+  rpc GetProfile(GetProfileRequest) returns (GetProfileResponse);
+  rpc ListProfiles(ListProfilesRequest) returns (ListProfilesResponse);
+  rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse);
+  rpc DeleteProfile(DeleteProfileRequest) returns (google.protobuf.Empty);
+}
+
+service CapabilityService {
+  rpc CreateCapability(CreateCapabilityRequest) returns (CreateCapabilityResponse);
+  rpc GetCapability(GetCapabilityRequest) returns (GetCapabilityResponse);
+  rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
+  rpc DeleteCapability(DeleteCapabilityRequest) returns (google.protobuf.Empty);
+}
+
+service GovernanceService {
+  rpc CreateRule(CreateRuleRequest) returns (CreateRuleResponse);
+  rpc ListRules(ListRulesRequest) returns (ListRulesResponse);
+  rpc DeleteRule(DeleteRuleRequest) returns (google.protobuf.Empty);
+
+  rpc CreateException(CreateExceptionRequest) returns (CreateExceptionResponse);
+  rpc ListExceptions(ListExceptionsRequest) returns (ListExceptionsResponse);
+  rpc DeleteException(DeleteExceptionRequest) returns (google.protobuf.Empty);
+}
+
+service ActivityService {
+  rpc RecordActivity(RecordActivityRequest) returns (RecordActivityResponse);
+  rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
+}

@@ -1,14 +1,17 @@
 """Ejecuta una capability in-process, reusando el dispatcher del motor.
 
 Da paridad real con el CLI ('htx task'): normaliza/valida parámetros, valida
-el contrato técnico (`contract.rules`) y registra la ejecución en `.memory/` —
-reusando las mismas funciones puras que `capability_task_service.py` del motor
-(`normalize_and_validate_params`, `ContractValidator`, `save_memory`,
-`build_memory_notes`). Deliberadamente NO pasa por `HigpertextHub`/`ROOT_DIR`
-de `router.py`: en modo desarrollo (paquete `higpertext` resuelto por `sys.path`,
-no instalado en site-packages) `ROOT_DIR` resuelve siempre al repo de
-higpertext-cli sin importar el cwd del proceso — exactamente el patrón que
-`discovery.py` documenta evitar para no romper el soporte multi-proyecto.
+el contrato técnico (`contract.rules`) y registra la ejecución — reusando las
+mismas funciones puras que `capability_task_service.py` del motor
+(`normalize_and_validate_params`, `ContractValidator`, `build_memory_notes`).
+El registro de la ejecución YA NO pasa por `save_memory()` del motor (que
+escribía a `.memory/` local): va a Redis (`memory.py`) y al profile server
+(`profile_client.py`), en paralelo, ambos best-effort. Deliberadamente NO pasa
+por `HigpertextHub`/`ROOT_DIR` de `router.py`: en modo desarrollo (paquete
+`higpertext` resuelto por `sys.path`, no instalado en site-packages) `ROOT_DIR`
+resuelve siempre al repo de higpertext-cli sin importar el cwd del proceso —
+exactamente el patrón que `discovery.py` documenta evitar para no romper el
+soporte multi-proyecto.
 
 Limitación conocida (documentada, no oculta): `capabilities_runner` resuelve rutas
 del proyecto (`_PROJECT_EXTERNAL_CAPS`, `_PROJECT_SOURCE_CAPS`) usando `Path.cwd()`
@@ -20,22 +23,20 @@ server compartido entre múltiples proyectos en el mismo proceso.
 
 from __future__ import annotations
 
-import contextlib
-import io
-from dataclasses import dataclass
+import asyncio
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from higpertext.capabilities import capabilities_runner
-from higpertext.capabilities.common.scripts.core.governance.memory_manager import (
-    save_memory,
-)
 from higpertext.kernel.infrastructure.cli.execution_result import run_inprocess
 from higpertext.kernel.infrastructure.cli.parameter_contracts import (
     normalize_and_validate_params,
 )
 from higpertext.kernel.infrastructure.cli.task_result_reporter import build_memory_notes
 from higpertext.kernel.infrastructure.validation.contract_validator import ContractValidator
+
+from higpertext_mcp import discovery, memory, profile_client
 
 
 @dataclass
@@ -96,27 +97,26 @@ def _summary(output: str, ok: bool) -> str:
     return "Capability completed." if ok else "Capability failed."
 
 
-def _save_memory_best_effort(
+async def _record_activity_best_effort(
     capability_id: str, params: dict, result, contract_ok: bool, contract_errors: list
 ) -> None:
-    # Best-effort: un fallo al persistir memoria nunca debe tumbar la respuesta
-    # al cliente MCP, y jamás debe escribir a stdout (rompería el protocolo
-    # stdio de MCP) — save_memory() loggea "[SUCCESS] ..." vía un logger que
-    # resuelve sys.stdout dinámicamente, así que hay que silenciarlo acá
-    # igual que run_inprocess() silencia el stdout de la capability misma.
-    try:
-        notes = build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
-        with contextlib.redirect_stdout(io.StringIO()):
-            save_memory(
-                action=f"Auto-run (MCP): {capability_id}",
-                status="success" if result.returncode == 0 and contract_ok else "failure",
-                notes=notes,
-            )
-    except (OSError, ValueError):
-        pass
+    # Best-effort en ambos destinos: ni Redis ni el profile server deben poder
+    # tumbar la respuesta al cliente MCP (cada uno ya maneja sus propios
+    # errores internamente — ver memory.py / profile_client.py).
+    root = discovery.resolve_project_root()
+    profile = discovery.active_profile(root) or ""
+    status = "success" if result.returncode == 0 and contract_ok else "failure"
+    notes = build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
+    action = f"Auto-run (MCP): {capability_id}"
+    await asyncio.gather(
+        memory.record_memory(root, action=action, status=status, notes=notes),
+        profile_client.record_activity(
+            capability_id=capability_id, profile=profile, status=status, summary=notes
+        ),
+    )
 
 
-def call_capability(capability_id: str, params: dict, capability_data: dict) -> CapabilityResult:
+async def call_capability(capability_id: str, params: dict, capability_data: dict) -> CapabilityResult:
     validation = normalize_and_validate_params(capability_data, params)
     if not validation.ok:
         return CapabilityResult(
@@ -147,7 +147,9 @@ def call_capability(capability_id: str, params: dict, capability_data: dict) -> 
             output = f"{output}\n{result.stderr.strip()}".strip()
         error = output or "Capability failed without diagnostic output."
 
-    _save_memory_best_effort(capability_id, validation.params, result, contract_ok, contract_errors)
+    await _record_activity_best_effort(
+        capability_id, validation.params, result, contract_ok, contract_errors
+    )
 
     return CapabilityResult(
         ok=ok,

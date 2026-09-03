@@ -1,16 +1,23 @@
-"""Expone telemetría real de uso (.higpertext/state/telemetry.jsonl) como MCP resource.
+"""Expone telemetría de uso y memoria de ejecución como MCP resources.
 
-Es dato de solo lectura que ya existe en disco (lo escribe hook_post_observer.py
-del motor) — no tiene sentido envolverlo en una tool cuando el modelo puede
-leerlo pasivamente como resource, sin gastar un tool call.
+`summarize_usage` es dato de solo lectura que ya existe en disco
+(.higpertext/state/telemetry.jsonl, escrito por hook_post_observer.py del
+motor) — no tiene sentido envolverlo en una tool cuando el modelo puede
+leerlo pasivamente como resource, sin gastar un tool call. `read_memory` es
+el mismo criterio aplicado a la memoria de ejecución, que ahora vive en Redis
+(`memory.py`) en vez de `.memory/journal.json`.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
+
+from higpertext_mcp import memory
 
 USAGE_URI = "higpertext://session/usage"
+MEMORY_URI = "higpertext://session/memory"
 
 _TELEMETRY_REL_PATH = Path(".higpertext") / "state" / "telemetry.jsonl"
 
@@ -55,3 +62,9 @@ def summarize_usage(root: Path) -> dict:
         "calls": len(entries),
         "by_tool": by_tool,
     }
+
+
+async def read_memory(root: Path) -> dict[str, Any]:
+    """Memoria de ejecución del proyecto (Redis), más reciente primero."""
+    entries = await memory.list_memory(root)
+    return {"entries": entries}

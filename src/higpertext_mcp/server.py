@@ -22,15 +22,16 @@ from higpertext_mcp import annotations, discovery, dispatch, external, resources
 SERVER_NAME = "higpertext-mcp"
 
 
-def _load_tools() -> dict[str, schema.ToolSpec]:
-    """Perfil activo del proyecto ∩ set fijo de v1 → specs cargadas desde sus JSON.
+async def _load_tools() -> dict[str, schema.ToolSpec]:
+    """Perfil activo (profile server) ∩ set fijo de v1 → specs cargadas desde sus JSON.
 
     Fail-closed: una capability permitida por perfil pero sin JSON legible se
-    omite (no crashea el server ni expone una tool rota).
+    omite (no crashea el server ni expone una tool rota); si el profile server
+    no responde, `allowed_capability_ids` ya devuelve [] (ver discovery.py).
     """
     root = discovery.resolve_project_root()
     tools: dict[str, schema.ToolSpec] = {}
-    for capability_id in discovery.allowed_capability_ids(root):
+    for capability_id in await discovery.allowed_capability_ids(root):
         spec = schema.load_tool_spec(capability_id)
         if spec is not None:
             tools[capability_id] = spec
@@ -69,20 +70,28 @@ def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
 
 def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     server = Server(SERVER_NAME)
-    state: dict[str, dict[str, schema.ToolSpec]] = {"tools": _load_tools()}
+    state: dict[str, dict[str, schema.ToolSpec]] = {"tools": {}}
     ext_pool = pool if pool is not None else external.ExternalServerPool([])
 
     @server.list_tools()
     async def list_tools() -> list[types.Tool]:
         # Siempre recalculado: si el perfil activo cambió a mitad de sesión,
         # el cliente ve el set correcto apenas vuelve a pedir la lista.
-        state["tools"] = _load_tools()
+        state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
         return local + await ext_pool.list_tools_merged()
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        if "name_to_id" not in state:
+            # Un cliente puede llamar call_tool() sin haber pedido list_tools()
+            # antes (o en tests, que hablan el server directo) — cargar acá
+            # evita depender de ese orden, mismo comportamiento que cuando
+            # _load_tools() se computaba una vez de forma síncrona al construir
+            # el server.
+            state["tools"] = await _load_tools()
+            state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         tools = state["tools"]
         capability_id = state.get("name_to_id", {}).get(name)
         if capability_id is None:
@@ -101,7 +110,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     "error": message,
                 },
             )
-        result = dispatch.call_capability(capability_id, arguments, tools[capability_id].raw)
+        result = await dispatch.call_capability(capability_id, arguments, tools[capability_id].raw)
         await _notify_if_tools_changed(server, state)
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=result.summary)],
@@ -120,15 +129,27 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     "(.higpertext/state/telemetry.jsonl), agregada por tool."
                 ),
                 mimeType="application/json",
-            )
+            ),
+            types.Resource(
+                uri=resources.MEMORY_URI,
+                name="Memoria de ejecución del proyecto",
+                description=(
+                    "Historial de ejecuciones de capability registrado en Redis "
+                    "(reemplaza el antiguo .memory/journal.json local)."
+                ),
+                mimeType="application/json",
+            ),
         ]
 
     @server.read_resource()
     async def read_resource(uri) -> str:
-        if str(uri) != resources.USAGE_URI:
-            raise ValueError(f"resource desconocido: {uri}")
         root = discovery.resolve_project_root()
-        return json.dumps(resources.summarize_usage(root), ensure_ascii=False, indent=2)
+        if str(uri) == resources.USAGE_URI:
+            return json.dumps(resources.summarize_usage(root), ensure_ascii=False, indent=2)
+        if str(uri) == resources.MEMORY_URI:
+            data = await resources.read_memory(root)
+            return json.dumps(data, ensure_ascii=False, indent=2)
+        raise ValueError(f"resource desconocido: {uri}")
 
     return server
 
@@ -143,7 +164,7 @@ async def _notify_if_tools_changed(
     preguntar", evitando que quede desactualizado hasta el próximo reinicio.
     """
     root = discovery.resolve_project_root()
-    current_ids = set(discovery.allowed_capability_ids(root))
+    current_ids = set(await discovery.allowed_capability_ids(root))
     if current_ids == set(state["tools"].keys()):
         return
     try:

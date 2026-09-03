@@ -4,6 +4,13 @@ Usa resolución basada en cwd — el mismo patrón que higpertext-cli usa para s
 hooks (`hook_utils.get_project_root`) — NO `higpertext.kernel.config_paths.PROJECT_ROOT`,
 que resuelve la raíz del *motor instalado*, no la del proyecto destino. Ver
 docs/architecture.md para el porqué de esta distinción.
+
+El catálogo de capabilities permitidas (`allowed_capability_ids`) ya NO se resuelve
+contra JSON estático del motor instalado: se consulta en runtime al profile server
+(`profile_client`) — perfil + catálogo son ahora dinámicos, administrables sin
+redeploy de higpertext-mcp. `active_profile()` sigue local (lee
+`.higpertext/config/environment.json`): decidir *qué* perfil está activo en este
+proyecto no es responsabilidad del profile server, solo *qué puede hacer* ese perfil.
 """
 
 from __future__ import annotations
@@ -12,10 +19,7 @@ import json
 import os
 from pathlib import Path
 
-from higpertext.capabilities.common.scripts.core.governance.list_rules import (
-    list_all_capability_ids,
-)
-from higpertext.kernel.engine import HigpertextEngine
+from higpertext_mcp import profile_client
 
 _WORKSPACE_DIR = ".higpertext"
 
@@ -40,30 +44,10 @@ def active_profile(root: Path) -> str | None:
     return env.get("active_profile") or None
 
 
-def profile_capability_ids(root: Path, profile: str) -> list[str]:
-    """Capabilities declaradas por el perfil, vía la misma resolución de rutas del motor.
+async def allowed_capability_ids(root: Path) -> list[str]:
+    """Intersección entre el catálogo del profile server y lo que el perfil activo permite.
 
-    `HigpertextEngine.profiles` resuelve `src/config/profiles/` (convención de
-    un agente externo creado con agent-builder) con fallback al paquete
-    instalado — que es también donde caen los perfiles propios del motor
-    (`src/higpertext_data/config/profiles/`) cuando `higpertext-cli` se testea
-    contra sí mismo. Antes esta función asumía solo la primera ruta y
-    devolvía [] silenciosamente para el segundo caso.
+    Fail-closed: sin perfil activo, o si el profile server no responde, no se
+    expone nada (ver `profile_client.list_allowed_capability_ids`).
     """
-    try:
-        data = HigpertextEngine(root).profiles.load_profile(profile)
-    except Exception:
-        data = {}
-    return list((data or {}).get("capabilities", []))
-
-
-def allowed_capability_ids(root: Path) -> list[str]:
-    """Intersección entre todas las capabilities del motor y lo que el perfil activo permite.
-
-    Fail-closed: sin perfil activo o sin perfil legible, no se expone nada.
-    """
-    profile = active_profile(root)
-    if not profile:
-        return []
-    granted = set(profile_capability_ids(root, profile))
-    return sorted(set(list_all_capability_ids()) & granted)
+    return await profile_client.list_allowed_capability_ids(active_profile(root))

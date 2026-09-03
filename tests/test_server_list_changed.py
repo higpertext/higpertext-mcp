@@ -11,28 +11,37 @@ import mcp.types as types
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import server as server_module
+from higpertext_mcp import discovery, dispatch, server as server_module
 
 
-def _make_project(active_profile: str, capabilities: list[str]) -> Path:
+def _make_project(active_profile: str) -> Path:
     root = Path(tempfile.mkdtemp())
     config_dir = root / ".higpertext" / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "environment.json").write_text(
         json.dumps({"active_profile": active_profile}), encoding="utf-8"
     )
-    profiles_dir = root / "src" / "config" / "profiles"
-    profiles_dir.mkdir(parents=True)
-    (profiles_dir / f"{active_profile}.json").write_text(
-        json.dumps({"capabilities": capabilities}), encoding="utf-8"
-    )
     return root
 
 
 @pytest.mark.anyio
 async def test_profile_change_triggers_tool_list_changed_notification(monkeypatch):
-    root = _make_project("dev", ["common.grep-search"])
+    root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+
+    granted = ["common.grep-search"]
+
+    async def fake_list_allowed(profile):
+        return list(granted) if profile == "dev" else []
+
+    monkeypatch.setattr(discovery.profile_client, "list_allowed_capability_ids", fake_list_allowed)
+
+    async def fake_call_capability(*_args):
+        return dispatch.CapabilityResult(
+            ok=True, summary="ok", data={}, artifacts=[], warnings=[]
+        )
+
+    monkeypatch.setattr(dispatch, "call_capability", fake_call_capability)
 
     received: list[object] = []
 
@@ -46,14 +55,11 @@ async def test_profile_change_triggers_tool_list_changed_notification(monkeypatc
     ) as client:
         await client.list_tools()
 
-        # El perfil gana una capability nueva a mitad de sesión.
-        profiles_dir = root / "src" / "config" / "profiles"
-        (profiles_dir / "dev.json").write_text(
-            json.dumps({"capabilities": ["common.grep-search", "git.diff"]}),
-            encoding="utf-8",
-        )
+        # El perfil gana una capability nueva a mitad de sesión (el profile
+        # server ahora refleja eso — acá lo simulamos mutando el stub).
+        granted.append("git.diff")
 
-        result = await client.call_tool("common.grep-search", {"pattern": "x"})
+        result = await client.call_tool("common-grep-search", {"pattern": "x"})
         assert result is not None
 
     kinds = [type(n).__name__ for n in received]

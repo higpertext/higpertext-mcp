@@ -12,11 +12,18 @@ dependencies = [
     # Pineado a la serie 1.x: verificado contra 1.29.1. mcp 2.x reestructuró
     # server.fastmcp/server.lowlevel de forma incompatible (probado en este repo).
     "mcp>=1.12.0,<2.0.0",
+    # Memoria (higpertext:memory:*): reemplaza los archivos estáticos .memory/*.
+    "redis>=5.0,<6.0",
+    # Cliente al profile server (gRPC): catálogo dinámico de capabilities + registro
+    # de actividad. grpcio-tools solo se usa para regenerar gen/profile/v1/*_pb2*.py
+    # (ver Makefile/generate), no hace falta en runtime.
+    "grpcio>=1.66",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "grpcio-tools>=1.66",
 ]
 
 [project.scripts]
