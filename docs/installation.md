@@ -31,6 +31,20 @@ Verificar que quedó instalado:
 
 ## 3. Configurar el cliente MCP
 
+Al conectarse por primera vez, la tool `higpertext-configure-project` está
+siempre disponible incluso si todavía no hay perfil activo. Invocala con el
+nombre de un perfil que ya exista en `higpertext-server-profile`, por ejemplo:
+
+```json
+{ "profile": "agent_designer" }
+```
+
+Genera `.higpertext/config/environment.json`,
+`.higpertext/config/mcp_external.json` y una entrada `higpertext` en
+`.mcp.json`. Conserva los campos y servidores ya existentes y nunca los
+sobrescribe. Reconectá el cliente MCP al terminar para que lea el perfil y
+publique sus capabilities.
+
 El server resuelve la raíz del proyecto destino por el **cwd del proceso** en
 el que se lanza (no por el cwd de `higpertext-mcp`). Dos formas de fijarla:
 

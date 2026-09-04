@@ -17,9 +17,39 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
-from higpertext_mcp import annotations, discovery, dispatch, external, resources, schema
+from higpertext_mcp import (
+    annotations,
+    discovery,
+    dispatch,
+    external,
+    project_config,
+    resources,
+    schema,
+)
 
 SERVER_NAME = "higpertext-mcp"
+CONFIGURE_TOOL_NAME = "higpertext-configure-project"
+
+_CONFIGURE_TOOL = types.Tool(
+    name=CONFIGURE_TOOL_NAME,
+    description=(
+        "Crea la configuración mínima de higpertext en el proyecto actual: "
+        ".higpertext/config/environment.json, mcp_external.json y .mcp.json. "
+        "No sobrescribe una configuración existente."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "profile": {
+                "type": "string",
+                "description": "Nombre de un perfil ya registrado en higpertext-server-profile.",
+            }
+        },
+        "required": ["profile"],
+        "additionalProperties": False,
+    },
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
+)
 
 
 async def _load_tools() -> dict[str, schema.ToolSpec]:
@@ -77,10 +107,28 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return local + await ext_pool.list_tools_merged()
+        return [_CONFIGURE_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        if name == CONFIGURE_TOOL_NAME:
+            try:
+                profile = arguments.get("profile") if isinstance(arguments, dict) else None
+                changes = project_config.create_project_configuration(
+                    discovery.resolve_project_root(), profile
+                )
+                summary = "Configuración de higpertext generada."
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=summary)],
+                    structuredContent={"ok": True, "summary": summary, "data": changes},
+                )
+            except (TypeError, ValueError, OSError) as exc:
+                message = f"No se pudo generar la configuración: {exc}"
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=message)],
+                    isError=True,
+                    structuredContent={"ok": False, "summary": message, "data": {}},
+                )
         if "name_to_id" not in state:
             # Un cliente puede llamar call_tool() sin haber pedido list_tools()
             # antes (o en tests, que hablan el server directo) — cargar acá

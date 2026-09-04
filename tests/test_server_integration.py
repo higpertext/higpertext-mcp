@@ -58,10 +58,29 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
+
+
+@pytest.mark.anyio
+async def test_configure_project_creates_missing_files(monkeypatch):
+    root = Path(tempfile.mkdtemp())
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {})
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("higpertext-configure-project", {"profile": "dev"})
+
+    assert result.isError is False
+    assert json.loads((root / ".higpertext/config/environment.json").read_text()) == {
+        "active_profile": "dev"
+    }
+    assert json.loads((root / ".higpertext/config/mcp_external.json").read_text()) == {"servers": []}
+    generated_mcp = json.loads((root / ".mcp.json").read_text())
+    assert generated_mcp["mcpServers"]["higpertext"]["args"] == ["-m", "higpertext_mcp.server"]
 
 
 @pytest.mark.anyio
