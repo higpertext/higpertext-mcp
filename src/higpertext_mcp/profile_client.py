@@ -85,6 +85,32 @@ async def get_capability_script(capability_id: str) -> tuple[str, str, dict[str,
         return None
 
 
+async def codex_rules(profile: str) -> tuple[list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:
+    """Obtiene las capabilities y reglas efectivas para materializarlas en AGENTS.md."""
+    if not profile:
+        raise ValueError("no hay perfil activo")
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        profiles = profile_pb2_grpc.ProfileServiceStub(channel)
+        capabilities = profile_pb2_grpc.CapabilityServiceStub(channel)
+        governance = profile_pb2_grpc.GovernanceServiceStub(channel)
+        listed = await profiles.ListProfiles(profile_pb2.ListProfilesRequest(), timeout=_CALL_TIMEOUT_S)
+        selected = next((item for item in listed.profiles if item.name == profile), None)
+        if selected is None:
+            raise ValueError(f"el perfil {profile!r} no existe en el profile server")
+        all_caps = await capabilities.ListCapabilities(profile_pb2.ListCapabilitiesRequest(), timeout=_CALL_TIMEOUT_S)
+        granted = {item.id for item in all_caps.capabilities if item.id in set(selected.capabilities)}
+        all_rules = await governance.ListRules(profile_pb2.ListRulesRequest(), timeout=_CALL_TIMEOUT_S)
+        exceptions = await governance.ListExceptions(
+            profile_pb2.ListExceptionsRequest(profile=profile, active_only=True), timeout=_CALL_TIMEOUT_S
+        )
+    excepted = {item.rule_id for item in exceptions.exceptions}
+    rules = [
+        item for item in all_rules.rules
+        if item.id not in excepted and (item.source in {"global", profile} or item.capability in granted)
+    ]
+    return sorted((item for item in all_caps.capabilities if item.id in granted), key=lambda item: item.id), sorted(rules, key=lambda item: item.id)
+
+
 async def record_activity(
     *, capability_id: str, profile: str, status: str, summary: str = "", tags: list[str] | None = None
 ) -> None:

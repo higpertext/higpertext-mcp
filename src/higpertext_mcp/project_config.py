@@ -8,7 +8,7 @@ configuración que el usuario ya tuviera.
 from __future__ import annotations
 
 import json
-import sys
+import os
 from pathlib import Path
 from typing import Any
 
@@ -92,12 +92,36 @@ def create_project_configuration(root: Path, profile: str) -> dict[str, list[str
     if "higpertext" in servers:
         skipped.append(str(mcp_path.relative_to(root)))
     else:
+        # El despliegue soportado es Streamable HTTP en Docker. Esto evita
+        # requerir una CLI o un virtualenv del MCP en cada proyecto cliente.
         servers["higpertext"] = {
-            "command": sys.executable,
-            "args": ["-m", "higpertext_mcp.server"],
-            "env": {"HIGPERTEXT_PROJECT_ROOT": str(root)},
+            "type": "http",
+            "url": os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/"),
         }
         _write_json(mcp_path, mcp_config)
         (created if not mcp_existed else updated).append(str(mcp_path.relative_to(root)))
 
     return {"created": created, "updated": updated, "skipped": skipped}
+
+
+def write_codex_rules(root: Path, profile: str, capabilities: list, rules: list) -> str:
+    """Inserta una sección administrada por higpertext en el AGENTS.md de Codex."""
+    path = root / "AGENTS.md"
+    start, end = "<!-- higpertext:rules:start -->", "<!-- higpertext:rules:end -->"
+    lines = [start, "", f"## Perfil higpertext: {profile}", "", "### Capabilities permitidas", ""]
+    lines.extend(f"- `{item.id}` — {item.description}" for item in capabilities)
+    lines.extend(["", "### Reglas de gobernanza", ""])
+    lines.extend(f"- [{item.severity}] **{item.id}** — {item.description}" for item in rules)
+    if not rules:
+        lines.append("- No hay reglas de gobernanza activas para este perfil.")
+    lines.extend(["", end, ""])
+    section = "\n".join(lines)
+    original = path.read_text(encoding="utf-8") if path.exists() else "# Instrucciones del proyecto\n"
+    if start in original and end in original:
+        prefix, remainder = original.split(start, 1)
+        _old, suffix = remainder.split(end, 1)
+        content = prefix.rstrip() + "\n\n" + section + suffix.lstrip()
+    else:
+        content = original.rstrip() + "\n\n" + section
+    path.write_text(content, encoding="utf-8")
+    return str(path.relative_to(root))

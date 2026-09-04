@@ -10,16 +10,43 @@ ningún JSON por-capability, así que no hay razón para duplicarla.
 from __future__ import annotations
 
 import base64
+import importlib.util
 import inspect
 import sys
 from pathlib import Path
-
-from higpertext.capabilities.capabilities_runner import _module_from_script
 
 from higpertext_mcp import discovery, profile_client
 
 _CACHE_DIR_NAME = ".higpertext/cache/capabilities"
 _script_cache: dict[str, Path] = {}
+
+
+def _module_from_script(script_path: Path):
+    """Carga un script cacheado con un paquete sintético para imports relativos.
+
+    Implementación local deliberada: el MCP ya no requiere higpertext-cli para
+    ejecutar los scripts que el profile server le entrega.
+    """
+    parent = script_path.parent
+    package = f"higpertext_mcp_dynamic_{parent.name}"
+    if package not in sys.modules:
+        spec = importlib.util.spec_from_loader(package, loader=None, is_package=True)
+        if spec is None:
+            raise ImportError(f"no se pudo crear paquete para {parent}")
+        module = importlib.util.module_from_spec(spec)
+        module.__path__ = [str(parent)]
+        sys.modules[package] = module
+    full_name = f"{package}.{script_path.stem}"
+    spec = importlib.util.spec_from_file_location(
+        full_name, script_path, submodule_search_locations=[str(parent)]
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"no se pudo cargar {script_path}")
+    module = importlib.util.module_from_spec(spec)
+    module.__package__ = package
+    sys.modules[full_name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _cache_path(root: Path, capability_id: str) -> Path:

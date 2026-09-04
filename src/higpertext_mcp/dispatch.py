@@ -26,14 +26,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from higpertext.kernel.infrastructure.cli.execution_result import run_inprocess
-from higpertext.kernel.infrastructure.cli.parameter_contracts import (
-    normalize_and_validate_params,
-)
-from higpertext.kernel.infrastructure.cli.task_result_reporter import build_memory_notes
-from higpertext.kernel.infrastructure.validation.contract_validator import ContractValidator
-
-from higpertext_mcp import discovery, memory, profile_client, runner
+from higpertext_mcp import discovery, execution, memory, profile_client, runner
 
 
 @dataclass
@@ -103,7 +96,7 @@ async def _record_activity_best_effort(
     root = discovery.resolve_project_root()
     profile = discovery.active_profile(root) or ""
     status = "success" if result.returncode == 0 and contract_ok else "failure"
-    notes = build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
+    notes = execution.build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
     action = f"Auto-run (MCP): {capability_id}"
     await asyncio.gather(
         memory.record_memory(root, action=action, status=status, notes=notes),
@@ -114,7 +107,7 @@ async def _record_activity_best_effort(
 
 
 async def call_capability(capability_id: str, params: dict, capability_data: dict) -> CapabilityResult:
-    validation = normalize_and_validate_params(capability_data, params)
+    validation = execution.normalize_and_validate_params(capability_data, params)
     if not validation.ok:
         return CapabilityResult(
             ok=False,
@@ -137,11 +130,11 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
             warnings=[],
             error=str(exc),
         )
-    result = run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
+    result = execution.run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
 
     contract_ok, contract_errors = True, []
     if result.returncode == 0:
-        contract_ok, contract_errors = ContractValidator.validate(
+        contract_ok, contract_errors = execution.validate_contract(
             validation.params, result.stdout, result.stderr, result.returncode, capability_data
         )
 

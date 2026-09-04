@@ -19,16 +19,20 @@ from mcp.server.stdio import stdio_server
 
 from higpertext_mcp import (
     annotations,
+    adapter_renderer,
     discovery,
     dispatch,
     external,
     project_config,
+    profile_client,
     resources,
     schema,
 )
 
 SERVER_NAME = "higpertext-mcp"
 CONFIGURE_TOOL_NAME = "higpertext-configure-project"
+CODEX_RULES_TOOL_NAME = "higpertext-generate-codex-rules"
+RENDER_ADAPTERS_TOOL_NAME = "higpertext-render-adapters"
 
 _CONFIGURE_TOOL = types.Tool(
     name=CONFIGURE_TOOL_NAME,
@@ -48,6 +52,18 @@ _CONFIGURE_TOOL = types.Tool(
         "required": ["profile"],
         "additionalProperties": False,
     },
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
+)
+_CODEX_RULES_TOOL = types.Tool(
+    name=CODEX_RULES_TOOL_NAME,
+    description="Genera o actualiza la sección de reglas del perfil activo en AGENTS.md para Codex.",
+    inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
+)
+_RENDER_ADAPTERS_TOOL = types.Tool(
+    name=RENDER_ADAPTERS_TOOL_NAME,
+    description="Genera los archivos nativos de Codex, Claude, Gemini, Copilot, Antigravity y OpenCode desde el perfil activo.",
+    inputSchema={"type": "object", "properties": {"assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_renderer.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."}}, "additionalProperties": False},
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
 )
 
@@ -107,10 +123,33 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return [_CONFIGURE_TOOL, *local, *(await ext_pool.list_tools_merged())]
+        return [_CONFIGURE_TOOL, _CODEX_RULES_TOOL, _RENDER_ADAPTERS_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        if name == RENDER_ADAPTERS_TOOL_NAME:
+            try:
+                root = discovery.resolve_project_root()
+                profile = discovery.active_profile(root) or ""
+                caps, rules = await profile_client.codex_rules(profile)
+                selected = arguments.get("assistants", []) if isinstance(arguments, dict) else []
+                data = adapter_renderer.render(root, selected, profile, caps, rules)
+                summary = f"Configuración renderizada para: {', '.join(data['assistants'])}."
+                return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudieron renderizar los adapters: {exc}"
+                return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
+        if name == CODEX_RULES_TOOL_NAME:
+            try:
+                root = discovery.resolve_project_root()
+                profile = discovery.active_profile(root)
+                capabilities, rules = await profile_client.codex_rules(profile or "")
+                path = project_config.write_codex_rules(root, profile or "", capabilities, rules)
+                summary = f"Reglas de Codex generadas en {path}."
+                return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": {"path": path, "rules": len(rules)}})
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudieron generar las reglas de Codex: {exc}"
+                return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == CONFIGURE_TOOL_NAME:
             try:
                 profile = arguments.get("profile") if isinstance(arguments, dict) else None

@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import discovery, dispatch, server as server_module
+from higpertext_mcp import adapter_renderer, discovery, dispatch, server as server_module
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
@@ -58,7 +58,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-generate-codex-rules", "higpertext-render-adapters", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
@@ -80,7 +80,41 @@ async def test_configure_project_creates_missing_files(monkeypatch):
     }
     assert json.loads((root / ".higpertext/config/mcp_external.json").read_text()) == {"servers": []}
     generated_mcp = json.loads((root / ".mcp.json").read_text())
-    assert generated_mcp["mcpServers"]["higpertext"]["args"] == ["-m", "higpertext_mcp.server"]
+    assert generated_mcp["mcpServers"]["higpertext"] == {
+        "type": "http", "url": "http://127.0.0.1:8790/mcp/"
+    }
+
+
+def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
+    """La migración conserva playbooks y archivos nativos, no agentes delegados.
+
+    Esta prueba es deliberadamente de estructura: impide que futuras ediciones
+    vuelvan a crear los directorios ``agents``/``subagents`` de la CLI.
+    """
+    result = adapter_renderer.render(
+        tmp_path,
+        ["codex", "claude", "gemini", "copilot", "antigravity", "opencode"],
+        "dev",
+        [_GREP_SEARCH],
+        [],
+    )
+
+    expected = {
+        "AGENTS.md", "CLAUDE.md", ".clauderules", "GEMINI.md", "opencode.json",
+        ".codex/rules/higpertext_rules.md", ".claude/rules/dev.md",
+        ".gemini/workflows/plan.md", ".gemini/skills/plan/SKILL.md",
+        ".github/copilot-instructions.md", ".agents/mcp_config.json",
+        ".agents/settings.json", ".agents/workflows/spec.md",
+        ".agents/skills/spec/SKILL.md", ".opencode/rules/dev.md",
+    }
+    assert expected <= set(result["files"])
+    assert "common.graph-query" in (tmp_path / ".agents/workflows/plan.md").read_text()
+    assert "Active subagents" not in (tmp_path / ".agents/workflows/plan.md").read_text()
+    assert not (tmp_path / ".agents/agents").exists()
+    assert not (tmp_path / ".agents/subagents").exists()
+    assert not (tmp_path / ".gemini/subagents").exists()
+    assert not (tmp_path / ".github/agents").exists()
+    assert not (tmp_path / ".opencode/agents").exists()
 
 
 @pytest.mark.anyio
