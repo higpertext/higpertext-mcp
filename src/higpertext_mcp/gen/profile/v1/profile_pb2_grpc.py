@@ -520,6 +520,336 @@ class CapabilityService:
             _registered_method=True)
 
 
+class HookServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.CreateHook = channel.unary_unary(
+                '/profile.v1.HookService/CreateHook',
+                request_serializer=profile_dot_v1_dot_profile__pb2.CreateHookRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.CreateHookResponse.FromString,
+                _registered_method=True)
+        self.GetHook = channel.unary_unary(
+                '/profile.v1.HookService/GetHook',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetHookRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetHookResponse.FromString,
+                _registered_method=True)
+        self.ListHooks = channel.unary_unary(
+                '/profile.v1.HookService/ListHooks',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListHooksRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListHooksResponse.FromString,
+                _registered_method=True)
+        self.DeleteHook = channel.unary_unary(
+                '/profile.v1.HookService/DeleteHook',
+                request_serializer=profile_dot_v1_dot_profile__pb2.DeleteHookRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+        self.GetHookScript = channel.unary_unary(
+                '/profile.v1.HookService/GetHookScript',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetHookScriptRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetHookScriptResponse.FromString,
+                _registered_method=True)
+        self.SetSharedHookAssets = channel.unary_unary(
+                '/profile.v1.HookService/SetSharedHookAssets',
+                request_serializer=profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsResponse.FromString,
+                _registered_method=True)
+        self.GetSharedHookAssets = channel.unary_unary(
+                '/profile.v1.HookService/GetSharedHookAssets',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsResponse.FromString,
+                _registered_method=True)
+
+
+class HookServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def CreateHook(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetHook(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListHooks(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteHook(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetHookScript(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetSharedHookAssets(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSharedHookAssets(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_HookServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'CreateHook': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateHook,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.CreateHookRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.CreateHookResponse.SerializeToString,
+            ),
+            'GetHook': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHook,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetHookRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetHookResponse.SerializeToString,
+            ),
+            'ListHooks': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListHooks,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListHooksRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListHooksResponse.SerializeToString,
+            ),
+            'DeleteHook': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteHook,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteHookRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'GetHookScript': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHookScript,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetHookScriptRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetHookScriptResponse.SerializeToString,
+            ),
+            'SetSharedHookAssets': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetSharedHookAssets,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsResponse.SerializeToString,
+            ),
+            'GetSharedHookAssets': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSharedHookAssets,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.HookService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.HookService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class HookService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def CreateHook(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/CreateHook',
+            profile_dot_v1_dot_profile__pb2.CreateHookRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.CreateHookResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHook(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/GetHook',
+            profile_dot_v1_dot_profile__pb2.GetHookRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetHookResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListHooks(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/ListHooks',
+            profile_dot_v1_dot_profile__pb2.ListHooksRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListHooksResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteHook(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/DeleteHook',
+            profile_dot_v1_dot_profile__pb2.DeleteHookRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHookScript(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/GetHookScript',
+            profile_dot_v1_dot_profile__pb2.GetHookScriptRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetHookScriptResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetSharedHookAssets(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/SetSharedHookAssets',
+            profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.SetSharedHookAssetsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSharedHookAssets(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/GetSharedHookAssets',
+            profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetSharedHookAssetsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
 class GovernanceServiceStub:
     """Missing associated documentation comment in .proto file."""
 

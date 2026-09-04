@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+import asyncio
 
 import uvicorn
 from starlette.applications import Starlette
@@ -19,7 +20,7 @@ from starlette.routing import Mount, Route
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 
-from higpertext_mcp import external, server as higpertext_server
+from higpertext_mcp import discovery, external, platform_logs, server as higpertext_server
 
 # Dentro de Docker debe escuchar en todas las interfaces para que el puerto
 # publicado sea accesible desde el host. La protección DNS/CSRF de abajo sigue
@@ -55,7 +56,20 @@ def build_app() -> Starlette:
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette):
         async with session_manager.run():
-            yield
+            stop = asyncio.Event()
+            async def collect() -> None:
+                while not stop.is_set():
+                    await platform_logs.ingest(discovery.resolve_project_root())
+                    try:
+                        await asyncio.wait_for(stop.wait(), timeout=10)
+                    except TimeoutError:
+                        pass
+            task = asyncio.create_task(collect())
+            try:
+                yield
+            finally:
+                stop.set()
+                await task
 
     async def health(_request) -> JSONResponse:
         return JSONResponse({"ok": True, "service": "higpertext-mcp"})

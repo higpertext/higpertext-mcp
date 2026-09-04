@@ -148,14 +148,29 @@ permission:
 }
 
 
-def _rules(profile: str, caps: list, rules: list) -> str:
-    lines = [f"# Perfil higpertext: {profile}", "", "## Capabilities permitidas", ""]
-    lines += [f"- `{c.id}` — {c.description}" for c in caps]
-    lines += ["", "## Reglas de gobernanza", ""]
+def _rules(profile, caps: list, rules: list) -> str:
+    """Instrucciones estables; las capabilities se descubren por MCP, no aquí."""
+    name = getattr(profile, "name", profile)
+    description = getattr(profile, "description", "")
+    system_prompt = getattr(profile, "system_prompt", "")
+    profile_rules = list(getattr(profile, "rules", []))
+    lines = [f"# Perfil higpertext: {name}", ""]
+    if description:
+        lines += [description, ""]
+    if system_prompt:
+        lines += ["## Mandato del perfil", "", system_prompt, ""]
+    lines += ["## Gobernanza efectiva", ""]
+    lines += [f"- {rule}" for rule in profile_rules]
     lines += [f"- [{r.severity}] **{r.id}** — {r.description}" for r in rules]
-    if not rules:
+    if not rules and not profile_rules:
         lines.append("- No hay reglas de gobernanza activas para este perfil.")
-    lines += ["", "## Operación", "", "- Usa las tools MCP higpertext antes de recurrir a comandos equivalentes.", "- No inventes parámetros ni capabilities.", ""]
+    lines += [
+        "", "## Descubrimiento y permisos", "",
+        "- El servidor MCP es la fuente de verdad de capabilities disponibles y permisos efectivos.",
+        "- Antes de elegir una capability, consulta las tools MCP disponibles en esta sesión.",
+        "- Invoca sólo tools expuestas por el MCP; no infieras capabilities desde este archivo.",
+        "- El servidor aplica el perfil activo y rechaza operaciones no autorizadas.", "",
+    ]
     return "\n".join(lines)
 
 
@@ -171,11 +186,12 @@ def _workflows(root: Path, base: Path, written: list[str]) -> None:
         _write(base / "skills" / name / "SKILL.md", f"---\nname: {name}\n---\n\n{content}", written, root)
 
 
-def render(root: Path, assistants: list[str], profile: str, caps: list, rules: list) -> dict:
+def render(root: Path, assistants: list[str], profile, caps: list, rules: list) -> dict:
     invalid = sorted(set(assistants) - set(SUPPORTED))
     if invalid:
         raise ValueError(f"adapters no soportados: {', '.join(invalid)}")
     selected = list(dict.fromkeys(assistants)) or list(SUPPORTED)
+    profile_name = getattr(profile, "name", profile)
     content = _rules(profile, caps, rules)
     written: list[str] = []
     for assistant in selected:
@@ -188,8 +204,8 @@ def render(root: Path, assistants: list[str], profile: str, caps: list, rules: l
             _write(root / ".agents" / "rules" / "higpertext_rules.md", content, written, root)
             _write(root / ".agents" / "mcp_config.json", json.dumps({"mcpServers": {"higpertext": {"type": "http", "url": "http://127.0.0.1:8790/mcp/"}}}, indent=2) + "\n", written, root)
         elif assistant == "claude":
-            _write(root / ".claude" / "rules" / f"{profile}.md", content, written, root)
-            _write(root / "CLAUDE.md", f"# {profile}\n\nVer `.claude/rules/{profile}.md`.\n", written, root)
+            _write(root / ".claude" / "rules" / f"{profile_name}.md", content, written, root)
+            _write(root / "CLAUDE.md", f"# {profile_name}\n\nVer `.claude/rules/{profile_name}.md`.\n", written, root)
             _write(root / ".clauderules", content, written, root)
         elif assistant == "gemini":
             _write(root / "GEMINI.md", content, written, root)
@@ -202,10 +218,10 @@ def render(root: Path, assistants: list[str], profile: str, caps: list, rules: l
         elif assistant == "antigravity":
             _write(root / "AGENTS.md", content, written, root)
             _write(root / ".agents" / "rules" / "higpertext_rules.md", content, written, root)
-            _write(root / ".agents" / "settings.json", json.dumps({"mcp": "higpertext", "profile": profile}, indent=2) + "\n", written, root)
+            _write(root / ".agents" / "settings.json", json.dumps({"mcp": "higpertext", "profile": profile_name}, indent=2) + "\n", written, root)
             _workflows(root, root / ".agents", written)
         elif assistant == "opencode":
-            _write(root / ".opencode" / "rules" / f"{profile}.md", content, written, root)
-            _write(root / "AGENTS.md", f"# {profile}\n\nVer `.opencode/rules/{profile}.md`.\n", written, root)
+            _write(root / ".opencode" / "rules" / f"{profile_name}.md", content, written, root)
+            _write(root / "AGENTS.md", f"# {profile_name}\n\nVer `.opencode/rules/{profile_name}.md`.\n", written, root)
             _write(root / "opencode.json", json.dumps({"instructions": ["AGENTS.md", ".opencode/rules/*.md"], "mcp": {"higpertext": {"type": "remote", "url": "http://127.0.0.1:8790/mcp/"}}}, indent=2) + "\n", written, root)
     return {"assistants": selected, "files": written, "capabilities": len(caps), "rules": len(rules)}

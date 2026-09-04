@@ -23,6 +23,7 @@ from higpertext_mcp import (
     discovery,
     dispatch,
     external,
+    hook_renderer,
     project_config,
     profile_client,
     resources,
@@ -131,9 +132,10 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             try:
                 root = discovery.resolve_project_root()
                 profile = discovery.active_profile(root) or ""
-                caps, rules = await profile_client.codex_rules(profile)
+                profile_data, caps, rules = await profile_client.profile_context(profile)
                 selected = arguments.get("assistants", []) if isinstance(arguments, dict) else []
-                data = adapter_renderer.render(root, selected, profile, caps, rules)
+                data = adapter_renderer.render(root, selected, profile_data, caps, rules)
+                data["hooks"] = await hook_renderer.render(root, profile, data["assistants"])
                 summary = f"Configuración renderizada para: {', '.join(data['assistants'])}."
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
@@ -143,8 +145,8 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             try:
                 root = discovery.resolve_project_root()
                 profile = discovery.active_profile(root)
-                capabilities, rules = await profile_client.codex_rules(profile or "")
-                path = project_config.write_codex_rules(root, profile or "", capabilities, rules)
+                profile_data, capabilities, rules = await profile_client.profile_context(profile or "")
+                path = project_config.write_codex_rules(root, profile_data, capabilities, rules)
                 summary = f"Reglas de Codex generadas en {path}."
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": {"path": path, "rules": len(rules)}})
             except Exception as exc:  # noqa: BLE001

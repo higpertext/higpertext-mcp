@@ -26,7 +26,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from higpertext_mcp import discovery, execution, memory, profile_client, runner
+from higpertext_mcp import discovery, execution, memory, profile_client, runner, tracing
 
 
 @dataclass
@@ -45,6 +45,7 @@ class CapabilityResult:
     artifacts: list[str]
     warnings: list[str]
     error: str | None = None
+    trace_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -54,6 +55,7 @@ class CapabilityResult:
             "artifacts": self.artifacts,
             "warnings": self.warnings,
             "error": self.error,
+            "trace_id": self.trace_id,
         }
 
 
@@ -119,6 +121,9 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         )
 
     argv = _params_to_argv(capability_id, validation.params)
+    root = discovery.resolve_project_root()
+    trace_id = tracing.current()
+    await memory.record_trace_event(root, trace_id=trace_id, event="capability.started", data={"capability_id": capability_id, "params": validation.params})
     try:
         script_path = await runner.resolve_script(capability_id)
     except Exception as exc:  # noqa: BLE001 — profile server caído/script inexistente
@@ -151,6 +156,7 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
     await _record_activity_best_effort(
         capability_id, validation.params, result, contract_ok, contract_errors
     )
+    await memory.record_trace_event(root, trace_id=trace_id, event="capability.finished", data={"capability_id": capability_id, "ok": ok, "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "contract_errors": contract_errors})
 
     return CapabilityResult(
         ok=ok,
@@ -159,4 +165,5 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         artifacts=[],
         warnings=list(validation.warnings),
         error=error,
+        trace_id=trace_id,
     )

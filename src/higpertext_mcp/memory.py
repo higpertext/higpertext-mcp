@@ -24,6 +24,8 @@ from higpertext_mcp import config
 
 _MAX_ENTRIES = 500
 _KEY_PREFIX = "higpertext:memory"
+_TRACE_PREFIX = "higpertext:trace"
+_MAX_TRACE_EVENTS = 2_000
 
 _client: redis.Redis | None = None
 
@@ -42,6 +44,42 @@ def _get_client() -> redis.Redis:
 def _project_key(root: Path) -> str:
     digest = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:16]
     return f"{_KEY_PREFIX}:{digest}:journal"
+
+
+def _trace_key(root: Path, trace_id: str) -> str:
+    digest = hashlib.sha256(str(root).encode("utf-8")).hexdigest()[:16]
+    return f"{_TRACE_PREFIX}:{digest}:{trace_id}:events"
+
+
+def _safe(value: Any) -> Any:
+    """Evita persistir secretos o payloads/salidas ilimitados."""
+    if isinstance(value, str):
+        return "[REDACTED]" if any(token in value.lower() for token in ("password=", "token=", "secret=", "authorization:")) else value[:8_000]
+    if isinstance(value, dict):
+        return {key: "[REDACTED]" if any(word in key.lower() for word in ("password", "secret", "token", "authorization")) else _safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_safe(item) for item in value[:100]]
+    return value
+
+
+async def record_trace_event(root: Path, *, trace_id: str, event: str, data: dict[str, Any] | None = None) -> None:
+    """Añade un evento correlacionado; best-effort igual que la memoria."""
+    entry = {"trace_id": trace_id, "event": event, "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "data": _safe(data or {})}
+    try:
+        client = _get_client()
+        await client.rpush(_trace_key(root, trace_id), json.dumps(entry, ensure_ascii=False))
+        await client.ltrim(_trace_key(root, trace_id), -_MAX_TRACE_EVENTS, -1)
+    except Exception as exc:  # noqa: BLE001
+        _warn(f"no se pudo registrar traza en Redis: {exc}")
+
+
+async def trace_events(root: Path, trace_id: str) -> list[dict[str, Any]]:
+    try:
+        raw = await _get_client().lrange(_trace_key(root, trace_id), 0, -1)
+        return [json.loads(item) for item in raw]
+    except Exception as exc:  # noqa: BLE001
+        _warn(f"no se pudo leer traza en Redis: {exc}")
+        return []
 
 
 async def record_memory(

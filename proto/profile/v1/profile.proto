@@ -47,11 +47,13 @@ message Parameter {
   string type = 2;
   bool required = 3;
   string description = 4;
+  string default = 5; // valor por defecto declarado en el JSON de higpertext-cli (formato CLI, siempre string)
 }
 
 message Contract {
   repeated string rules = 1;
   string success_pattern = 2;
+  string on_empty = 3; // mensaje/acción sugerida cuando la capability no encuentra resultados
 }
 
 message Capability {
@@ -67,6 +69,33 @@ message Capability {
   Contract contract = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
+}
+
+// ── Hooks ────────────────────────────────────────────────────────────────────
+
+// HookDefinition espeja hooks_catalog.json + las capas de override en
+// config/hooks/{global,profiles/<perfil>,custom}/*.json de higpertext-cli:
+// un hook dispara un script nativo del asistente (Claude Code, etc.) en un
+// evento concreto (PreToolUse, PostToolUse, UserPromptSubmit, Stop,
+// PreCompact), opcionalmente acotado a un matcher de tool y a una lista de
+// perfiles/asistentes. capability_id es una referencia blanda opcional
+// (documental: la mayoría de los hooks — guardrails, telemetría, gestión de
+// sesión — no ejecutan ninguna capability).
+message HookDefinition {
+  string id = 1;
+  string event = 2;               // PreToolUse | PostToolUse | UserPromptSubmit | Stop | PreCompact
+  string matcher = 3;              // "Bash", "Write|Edit", "" = todos los tools
+  string script = 4;               // ruta del script fuente en el checkout de origen (referencia, no de runtime)
+  string description = 5;
+  int32 timeout = 6;               // segundos
+  bool enabled = 7;
+  repeated string assistants = 8;  // vacío = todos los asistentes
+  repeated string profiles = 9;    // vacío = todos los perfiles (equivalente a la capa "global")
+  string capability_id = 10;       // referencia blanda opcional a Capability.id
+  int32 priority = 11;             // desempate entre capas al mergear por id; mayor pisa a menor
+  string source_code = 12;         // contenido del script fuente, base64 (mismo patrón que Capability.SourceCode)
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
 }
 
 // ── Reglas de gobernanza ──────────────────────────────────────────────────────
@@ -146,6 +175,8 @@ message CreateCapabilityRequest {
   bool requires_pat = 8;
   string hook_task_id = 9;
   Contract contract = 10;
+  string source_code = 11;             // contenido del script fuente, base64 (opcional en el RPC, obligatorio para poder ejecutarla)
+  map<string, string> extra_files = 12; // filename -> contenido base64, helpers hermanos importados por el entrypoint
 }
 message CreateCapabilityResponse { Capability capability = 1; }
 message GetCapabilityRequest { string id = 1; }
@@ -153,6 +184,56 @@ message GetCapabilityResponse { Capability capability = 1; }
 message ListCapabilitiesRequest {}
 message ListCapabilitiesResponse { repeated Capability capabilities = 1; }
 message DeleteCapabilityRequest { string id = 1; }
+
+message GetCapabilityScriptRequest { string id = 1; }
+message GetCapabilityScriptResponse {
+  string source_code = 1; // contenido del script fuente, base64
+  string language = 2;
+  map<string, string> extra_files = 3; // filename -> contenido base64, helpers hermanos importados por el entrypoint (ej. "_report_paths.py")
+}
+
+message CreateHookRequest {
+  string id = 1;
+  string event = 2;
+  string matcher = 3;
+  string script = 4;
+  string description = 5;
+  int32 timeout = 6;
+  bool enabled = 7;
+  repeated string assistants = 8;
+  repeated string profiles = 9;
+  string capability_id = 10;
+  int32 priority = 11;
+  string source_code = 12;
+}
+message CreateHookResponse { HookDefinition hook = 1; }
+message GetHookRequest { string id = 1; }
+message GetHookResponse { HookDefinition hook = 1; }
+message ListHooksRequest {
+  string profile = 1;    // vacío = todos los perfiles (incluye siempre los hooks "global", profiles=[])
+  string assistant = 2;  // vacío = todos los asistentes
+}
+message ListHooksResponse { repeated HookDefinition hooks = 1; }
+message DeleteHookRequest { string id = 1; }
+
+message GetHookScriptRequest { string id = 1; }
+message GetHookScriptResponse {
+  string source_code = 1; // base64
+}
+
+// SharedHookAssets son las dependencias compartidas por *todos* los hooks de
+// Claude Code — hook_utils.py, hook_io.py, _rules/*.py en higpertext-cli —
+// que HookRenderer._deploy_hook_utils copia siempre a .claude/hooks/, sin
+// importar qué hooks estén activos. No son parte de ningún HookDefinition
+// individual: es un solo bundle, reemplazado entero en cada set.
+message SharedHookAssets {
+  map<string, string> files = 1; // ruta relativa (ej. "hook_utils.py", "_rules/bash_rules.py") -> base64
+  google.protobuf.Timestamp updated_at = 2;
+}
+message SetSharedHookAssetsRequest { map<string, string> files = 1; }
+message SetSharedHookAssetsResponse { SharedHookAssets assets = 1; }
+message GetSharedHookAssetsRequest {}
+message GetSharedHookAssetsResponse { SharedHookAssets assets = 1; }
 
 message CreateRuleRequest {
   string id = 1; // natural key definido por el llamante, ej. "sec-001"
@@ -216,6 +297,18 @@ service CapabilityService {
   rpc GetCapability(GetCapabilityRequest) returns (GetCapabilityResponse);
   rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
   rpc DeleteCapability(DeleteCapabilityRequest) returns (google.protobuf.Empty);
+  rpc GetCapabilityScript(GetCapabilityScriptRequest) returns (GetCapabilityScriptResponse);
+}
+
+service HookService {
+  rpc CreateHook(CreateHookRequest) returns (CreateHookResponse);
+  rpc GetHook(GetHookRequest) returns (GetHookResponse);
+  rpc ListHooks(ListHooksRequest) returns (ListHooksResponse);
+  rpc DeleteHook(DeleteHookRequest) returns (google.protobuf.Empty);
+  rpc GetHookScript(GetHookScriptRequest) returns (GetHookScriptResponse);
+
+  rpc SetSharedHookAssets(SetSharedHookAssetsRequest) returns (SetSharedHookAssetsResponse);
+  rpc GetSharedHookAssets(GetSharedHookAssetsRequest) returns (GetSharedHookAssetsResponse);
 }
 
 service GovernanceService {

@@ -8,13 +8,14 @@ levantar un profile server real, mismo criterio que `ExternalServerPool.
 from_sessions` usa para no depender de red real en tests."""
 
 import json
+import base64
 import tempfile
 from pathlib import Path
 
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import adapter_renderer, discovery, dispatch, server as server_module
+from higpertext_mcp import adapter_renderer, discovery, dispatch, hook_renderer, server as server_module
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
@@ -115,6 +116,43 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
     assert not (tmp_path / ".gemini/subagents").exists()
     assert not (tmp_path / ".github/agents").exists()
     assert not (tmp_path / ".opencode/agents").exists()
+
+
+def test_adapter_rules_use_profile_identity_and_mcp_discovery(tmp_path):
+    profile = profile_pb2.Profile(
+        name="secure-dev",
+        description="Entrega cambios seguros y verificables.",
+        system_prompt="Prioriza evidencia antes de editar.",
+        rules=["No revelar secretos."],
+    )
+    adapter_renderer.render(tmp_path, ["codex"], profile, [_GREP_SEARCH], [])
+    content = (tmp_path / "AGENTS.md").read_text()
+    assert "Entrega cambios seguros y verificables." in content
+    assert "Prioriza evidencia antes de editar." in content
+    assert "No revelar secretos." in content
+    assert "common.grep-search" not in content
+    assert "consulta las tools MCP disponibles" in content
+
+
+@pytest.mark.anyio
+async def test_hook_renderer_writes_claude_effective_hooks(monkeypatch, tmp_path):
+    hook = profile_pb2.HookDefinition(
+        id="guard", event="PreToolUse", matcher="Bash", script="hooks/guard.py", timeout=5
+    )
+
+    async def fake_bundle(profile, assistant):
+        assert (profile, assistant) == ("dev", "claude")
+        return [hook], {"guard": base64.b64encode(b"print('guard')\n").decode()}, {
+            "hook_utils.py": base64.b64encode(b"VALUE = 1\n").decode()
+        }
+
+    monkeypatch.setattr(hook_renderer.profile_client, "hook_bundle", fake_bundle)
+    output = await hook_renderer.render(tmp_path, "dev", ["claude"])
+    settings = json.loads((tmp_path / ".claude/settings.json").read_text())
+    assert "PreToolUse" in settings["hooks"]
+    assert (tmp_path / ".claude/hooks/guard.py").exists()
+    assert (tmp_path / ".claude/hooks/hook_utils.py").exists()
+    assert ".claude/settings.json" in output["claude"]
 
 
 @pytest.mark.anyio

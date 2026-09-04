@@ -85,8 +85,8 @@ async def get_capability_script(capability_id: str) -> tuple[str, str, dict[str,
         return None
 
 
-async def codex_rules(profile: str) -> tuple[list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:
-    """Obtiene las capabilities y reglas efectivas para materializarlas en AGENTS.md."""
+async def profile_context(profile: str) -> tuple[profile_pb2.Profile, list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:
+    """Obtiene identidad, permisos efectivos y gobernanza del perfil activo."""
     if not profile:
         raise ValueError("no hay perfil activo")
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
@@ -108,7 +108,38 @@ async def codex_rules(profile: str) -> tuple[list[profile_pb2.Capability], list[
         item for item in all_rules.rules
         if item.id not in excepted and (item.source in {"global", profile} or item.capability in granted)
     ]
-    return sorted((item for item in all_caps.capabilities if item.id in granted), key=lambda item: item.id), sorted(rules, key=lambda item: item.id)
+    return selected, sorted((item for item in all_caps.capabilities if item.id in granted), key=lambda item: item.id), sorted(rules, key=lambda item: item.id)
+
+
+async def codex_rules(profile: str) -> tuple[list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:
+    """Compatibilidad para consumidores que sólo necesitan permisos y reglas."""
+    _profile, capabilities, rules = await profile_context(profile)
+    return capabilities, rules
+
+
+async def hook_bundle(profile: str, assistant: str) -> tuple[list[profile_pb2.HookDefinition], dict[str, str], dict[str, str]]:
+    """Hooks efectivos y sus fuentes para materializarlos en el proyecto.
+
+    El filtrado de perfil/asistente/capability sucede en HookService: el MCP
+    no replica esa política localmente.
+    """
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        hooks_stub = profile_pb2_grpc.HookServiceStub(channel)
+        response = await hooks_stub.ListHooks(
+            profile_pb2.ListHooksRequest(profile=profile, assistant=assistant),
+            timeout=_CALL_TIMEOUT_S,
+        )
+        hooks = list(response.hooks)
+        scripts: dict[str, str] = {}
+        for hook in hooks:
+            source = await hooks_stub.GetHookScript(
+                profile_pb2.GetHookScriptRequest(id=hook.id), timeout=_CALL_TIMEOUT_S
+            )
+            scripts[hook.id] = source.source_code
+        shared = await hooks_stub.GetSharedHookAssets(
+            profile_pb2.GetSharedHookAssetsRequest(), timeout=_CALL_TIMEOUT_S
+        )
+    return hooks, scripts, dict(shared.assets.files)
 
 
 async def record_activity(
