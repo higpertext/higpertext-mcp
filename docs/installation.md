@@ -4,6 +4,12 @@
 HTTP/SSE): un cliente MCP lo lanza como subproceso y le habla por
 stdin/stdout, no hay puerto ni URL involucrados.
 
+> Si usás el `deploy/docker-compose.yml` de `higpertext-server-profile`, se
+> publica además el transporte Streamable HTTP en
+> `http://127.0.0.1:8790/mcp/`. Ese despliegue incluye Redis, profile server,
+> importación de capabilities y perfil inicial automático; es la vía
+> recomendada para evitar configurar un venv o stdio en cada cliente.
+
 ## 1. Requisitos
 
 - Python ≥ 3.10.

@@ -18,6 +18,12 @@ dependencies = [
     # de actividad. grpcio-tools solo se usa para regenerar gen/profile/v1/*_pb2*.py
     # (ver Makefile/generate), no hace falta en runtime.
     "grpcio>=1.66",
+    # Los stubs gRPC versionados en gen/ importan google.protobuf directamente.
+    "protobuf>=7.35.1,<8.0",
+    # Transporte HTTP para clientes que no pueden lanzar un MCP stdio desde
+    # fuera de su sandbox (por ejemplo Postman Flatpak).
+    "starlette>=0.37,<1.0",
+    "uvicorn>=0.30,<1.0",
 ]
 
 [project.optional-dependencies]

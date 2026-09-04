@@ -13,14 +13,18 @@ import os
 
 import uvicorn
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
 
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 
 from higpertext_mcp import external, server as higpertext_server
 
-HOST = "127.0.0.1"
+# Dentro de Docker debe escuchar en todas las interfaces para que el puerto
+# publicado sea accesible desde el host. La protección DNS/CSRF de abajo sigue
+# limitando los encabezados Host aceptados a los nombres locales esperados.
+HOST = os.environ.get("HIGPERTEXT_MCP_HTTP_HOST", "0.0.0.0")
 PORT = int(os.environ.get("HIGPERTEXT_MCP_HTTP_PORT", "8790"))
 
 # DNS-rebinding / CSRF hardening: solo acepta requests cuyo Host coincida
@@ -28,7 +32,7 @@ PORT = int(os.environ.get("HIGPERTEXT_MCP_HTTP_PORT", "8790"))
 # pestaña del navegador podría hacer fetch() a este puerto local.
 SECURITY_SETTINGS = TransportSecuritySettings(
     enable_dns_rebinding_protection=True,
-    allowed_hosts=[f"{HOST}:{PORT}"],
+    allowed_hosts=[f"127.0.0.1:{PORT}", f"localhost:{PORT}", f"{HOST}:{PORT}"],
     allowed_origins=[],
 )
 
@@ -53,7 +57,12 @@ def build_app() -> Starlette:
         async with session_manager.run():
             yield
 
-    return Starlette(routes=[Mount("/mcp", app=asgi_app)], lifespan=lifespan)
+    async def health(_request) -> JSONResponse:
+        return JSONResponse({"ok": True, "service": "higpertext-mcp"})
+
+    return Starlette(
+        routes=[Route("/health", health), Mount("/mcp", app=asgi_app)], lifespan=lifespan
+    )
 
 
 app = build_app()
