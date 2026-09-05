@@ -1,23 +1,7 @@
-import base64
-from pathlib import Path
-
-import pytest
+dmport pytest
 
 from higpertext_mcp import dispatch, schema
 from higpertext_mcp.gen.profile.v1 import profile_pb2
-
-_GREP_SEARCH_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "higpertext-cli"
-    / "src"
-    / "higpertext"
-    / "capabilities"
-    / "common"
-    / "scripts"
-    / "core"
-    / "search"
-    / "grep_search.py"
-)
 
 
 def test_params_to_argv_skips_none_values():
@@ -32,13 +16,11 @@ def test_params_to_argv_stringifies_values():
 
 @pytest.mark.anyio
 async def test_call_capability_real_grep_search_on_this_repo(monkeypatch, tmp_path):
-    """Requiere higpertext-cli instalado editable + correr desde un checkout real.
-
-    Redis/profile server se stubean acá: el registro de actividad es una
-    preocupación aparte, ya cubierta por test_memory.py/test_profile_client.py.
-    El script en sí ya no viene del JSON local — se simula la respuesta del
-    profile server (`get_capability_script`) con el .py real leído de disco,
-    igual que haría el import tool contra higpertext-cli.
+    """common.grep-search ya no tiene fuente en disco en ningún checkout — vive
+    100% en la DB del profile server (ver higpertext-capability). Este test
+    necesita un profile server real corriendo (localhost:50051 por defecto)
+    con esa capability importada; solo se stubea memory/activity, que es una
+    preocupación aparte ya cubierta por test_memory.py/test_profile_client.py.
     """
     recorded: list[tuple] = []
 
@@ -48,13 +30,8 @@ async def test_call_capability_real_grep_search_on_this_repo(monkeypatch, tmp_pa
     async def fake_record_activity(**kwargs):
         recorded.append(("activity", kwargs))
 
-    async def fake_get_capability_script(capability_id):
-        source_code = base64.b64encode(_GREP_SEARCH_SCRIPT.read_bytes()).decode()
-        return source_code, "python", {}
-
     monkeypatch.setattr(dispatch.memory, "record_memory", fake_record_memory)
     monkeypatch.setattr(dispatch.profile_client, "record_activity", fake_record_activity)
-    monkeypatch.setattr(dispatch.profile_client, "get_capability_script", fake_get_capability_script)
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(tmp_path))
 
     cap = profile_pb2.Capability(

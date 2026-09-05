@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from higpertext_mcp.gen.profile.v1 import profile_pb2
+
 SUPPORTED = ("codex", "claude", "gemini", "copilot", "antigravity", "opencode")
 WORKFLOWS = {
     "build": """---
@@ -161,7 +163,7 @@ def _rules(profile, caps: list, rules: list) -> str:
         lines += ["## Mandato del perfil", "", system_prompt, ""]
     lines += ["## Gobernanza efectiva", ""]
     lines += [f"- {rule}" for rule in profile_rules]
-    lines += [f"- [{r.severity}] **{r.id}** — {r.description}" for r in rules]
+    lines += [f"- [{profile_pb2.Severity.Name(r.severity)}] **{r.id}** — {r.description}" for r in rules]
     if not rules and not profile_rules:
         lines.append("- No hay reglas de gobernanza activas para este perfil.")
     lines += [

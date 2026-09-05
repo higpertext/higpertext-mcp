@@ -1,23 +1,23 @@
-"""Materializa hooks nativos desde HookService, sin higpertext-cli."""
+"""Materializa el wiring nativo de hooks (settings.json/hooks.json) para
+claude/codex/gemini a partir de HookService — sin copiar ningún script: el
+`command` generado es siempre `higpertext-hook <id>`, un console_script que
+resuelve y cachea el hook real contra el profile server en runtime (ver
+`hook_invoker.py`/`hook_runner.py`). Así una actualización del catálogo (o de
+un hook individual) llega a todos los proyectos sin tener que re-renderizar
+cada uno para refrescar copias de archivos.
+"""
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 
 from higpertext_mcp import profile_client
 
-HOOK_DIRS = {
-    "claude": ".claude/hooks",
-    "codex": ".codex/hooks",
-    "gemini": ".gemini/hooks",
-    "opencode": ".opencode/hooks",
+_SETTINGS_PATH = {
+    "claude": ".claude/settings.json",
+    "codex": ".codex/hooks.json",
+    "gemini": ".gemini/settings.json",
 }
-
-
-def _write(path: Path, raw: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(raw)
 
 
 def _load_json(path: Path) -> dict:
@@ -34,59 +34,46 @@ def _save_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _hook_command(hook_id: str) -> str:
+    return f"higpertext-hook {hook_id}"
+
+
 async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, list[str]]:
-    """Escribe hooks aplicables; devuelve archivos por adapter para auditoría."""
+    """Escribe el wiring de hooks aplicable; devuelve archivos por adapter para auditoría."""
     result: dict[str, list[str]] = {}
     for assistant in assistants:
-        if assistant not in HOOK_DIRS:
+        if assistant not in _SETTINGS_PATH:
             continue
-        hooks, sources, assets = await profile_client.hook_bundle(profile, assistant)
-        directory = root / HOOK_DIRS[assistant]
-        written: list[str] = []
-        scripts: list[tuple[object, Path]] = []
-        for hook in hooks:
-            filename = Path(hook.script).name or f"{hook.id}.py"
-            destination = directory / filename
-            _write(destination, base64.b64decode(sources[hook.id]))
-            scripts.append((hook, destination))
-            written.append(str(destination.relative_to(root)))
-        for relative, source in assets.items():
-            destination = directory / relative
-            _write(destination, base64.b64decode(source))
-            written.append(str(destination.relative_to(root)))
+        hooks = await profile_client.list_hooks(profile, assistant)
+        path = root / _SETTINGS_PATH[assistant]
+        config = _load_json(path)
+
         if assistant == "claude":
-            path = root / ".claude/settings.json"
-            config = _load_json(path)
             grouped: dict[str, list[dict]] = {}
-            for hook, script in scripts:
+            for hook in hooks:
                 grouped.setdefault(hook.event, []).append({
                     "matcher": hook.matcher or ".*",
-                    "hooks": [{"type": "command", "command": f"python3 {script}", "timeout": hook.timeout}],
+                    "hooks": [{"type": "command", "command": _hook_command(hook.id), "timeout": hook.timeout}],
                 })
             config["hooks"] = grouped
-            _save_json(path, config)
-            written.append(str(path.relative_to(root)))
         elif assistant == "codex":
-            path = root / ".codex/hooks.json"
-            config = _load_json(path)
-            grouped: dict[str, list[dict]] = {}
-            for hook, script in scripts:
-                entry = {"type": "command", "command": f"python3 {script}", "timeout": hook.timeout}
+            grouped = {}
+            for hook in hooks:
+                entry = {"type": "command", "command": _hook_command(hook.id), "timeout": hook.timeout}
                 group = {"hooks": [entry]}
                 if hook.matcher and hook.event not in {"UserPromptSubmit", "Stop"}:
                     group["matcher"] = hook.matcher
                 grouped.setdefault(hook.event, []).append(group)
             config["hooks"] = grouped
-            _save_json(path, config)
-            written.append(str(path.relative_to(root)))
         elif assistant == "gemini":
-            path = root / ".gemini/settings.json"
-            config = _load_json(path)
             config["hooks"] = {
-                hook.event: [{"matcher": hook.matcher or ".*", "hooks": [{"name": hook.id, "type": "command", "command": f"python3 {script}", "timeout": hook.timeout * 1000}]}]
-                for hook, script in scripts
+                hook.event: [{
+                    "matcher": hook.matcher or ".*",
+                    "hooks": [{"name": hook.id, "type": "command", "command": _hook_command(hook.id), "timeout": hook.timeout * 1000}],
+                }]
+                for hook in hooks
             }
-            _save_json(path, config)
-            written.append(str(path.relative_to(root)))
-        result[assistant] = written
+
+        _save_json(path, config)
+        result[assistant] = [str(path.relative_to(root))]
     return result

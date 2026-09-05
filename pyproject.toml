@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "higpertext-mcp"
 version = "0.1.0"
-description = "Servidor MCP que expone capabilities de higpertext-cli como tools reales."
+description = "Servidor MCP que expone capabilities y hooks nativos como tools/scripts reales."
 requires-python = ">=3.10"
 license = {text = "Proprietary"}
 dependencies = [
@@ -24,6 +24,11 @@ dependencies = [
     # fuera de su sandbox (por ejemplo Postman Flatpak).
     "starlette>=0.37,<1.0",
     "uvicorn>=0.30,<1.0",
+    # security.secret-set: guarda API keys en el keyring nativo del SO
+    # (Keychain/Secret Service/Credential Manager). Opcional en runtime — si
+    # el backend del SO no está disponible, get/status degradan; set/delete
+    # fallan explícito (ver capability security.secret-set).
+    "keyring>=25.0",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +39,7 @@ dev = [
 
 [project.scripts]
 higpertext-mcp = "higpertext_mcp.server:run"
+higpertext-hook = "higpertext_mcp.hook_invoker:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

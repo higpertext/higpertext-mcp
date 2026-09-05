@@ -8,7 +8,6 @@ levantar un profile server real, mismo criterio que `ExternalServerPool.
 from_sessions` usa para no depender de red real en tests."""
 
 import json
-import base64
 import tempfile
 from pathlib import Path
 
@@ -59,7 +58,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "higpertext-generate-codex-rules", "higpertext-render-adapters", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
@@ -140,18 +139,16 @@ async def test_hook_renderer_writes_claude_effective_hooks(monkeypatch, tmp_path
         id="guard", event="PreToolUse", matcher="Bash", script="hooks/guard.py", timeout=5
     )
 
-    async def fake_bundle(profile, assistant):
+    async def fake_list_hooks(profile, assistant):
         assert (profile, assistant) == ("dev", "claude")
-        return [hook], {"guard": base64.b64encode(b"print('guard')\n").decode()}, {
-            "hook_utils.py": base64.b64encode(b"VALUE = 1\n").decode()
-        }
+        return [hook]
 
-    monkeypatch.setattr(hook_renderer.profile_client, "hook_bundle", fake_bundle)
+    monkeypatch.setattr(hook_renderer.profile_client, "list_hooks", fake_list_hooks)
     output = await hook_renderer.render(tmp_path, "dev", ["claude"])
     settings = json.loads((tmp_path / ".claude/settings.json").read_text())
     assert "PreToolUse" in settings["hooks"]
-    assert (tmp_path / ".claude/hooks/guard.py").exists()
-    assert (tmp_path / ".claude/hooks/hook_utils.py").exists()
+    command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
+    assert command == "higpertext-hook guard"
     assert ".claude/settings.json" in output["claude"]
 
 

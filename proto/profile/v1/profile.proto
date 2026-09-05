@@ -71,6 +71,21 @@ message Capability {
   google.protobuf.Timestamp updated_at = 12;
 }
 
+// ── Skills ─────────────────────────────────────────────────────────────────
+
+// Skill almacena un documento SKILL.md completo. Content incluye el front
+// matter YAML para preservar metadatos específicos de cada asistente.
+message Skill {
+  string id = 1; // clave natural estable, ej. "build"
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  string version = 5;
+  bool enabled = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
 // HookDefinition espeja hooks_catalog.json + las capas de override en
@@ -111,6 +126,11 @@ message GovernanceRule {
   optional double numeric_threshold = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Regex opcional: si está seteado, la regla también aplica en runtime como
+  // intercepción de comando (hook_bash_guard.check_profile_rules la evalúa
+  // contra el comando Bash, además de contar como gobernanza CI/PR/deploy).
+  // Vacío = regla de gobernanza pura, sin efecto en hooks.
+  string pattern = 11;
 }
 
 message GovernanceException {
@@ -133,6 +153,27 @@ message Activity {
   string summary = 5;
   repeated string tags = 6;
   google.protobuf.Timestamp created_at = 7;
+}
+
+// ── Aprendizaje en vivo (Redis) ─────────────────────────────────────────────
+
+message LearningEvent {
+  string id = 1;
+  string capability_id = 2;
+  string profile = 3;
+  string outcome = 4; // success | failure
+  string summary = 5;
+  repeated string tags = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message LearningStat {
+  string capability_id = 1;
+  int64 successes = 2;
+  int64 failures = 3;
+  int64 total = 4;
+  double success_rate = 5; // successes / total; 0 when total == 0
+  google.protobuf.Timestamp updated_at = 6;
 }
 
 // ── Requests / Responses ─────────────────────────────────────────────────────
@@ -192,6 +233,30 @@ message GetCapabilityScriptResponse {
   map<string, string> extra_files = 3; // filename -> contenido base64, helpers hermanos importados por el entrypoint (ej. "_report_paths.py")
 }
 
+message CreateSkillRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  string version = 5;
+  bool enabled = 6;
+}
+message CreateSkillResponse { Skill skill = 1; }
+message GetSkillRequest { string id = 1; }
+message GetSkillResponse { Skill skill = 1; }
+message ListSkillsRequest { bool enabled_only = 1; }
+message ListSkillsResponse { repeated Skill skills = 1; }
+message UpdateSkillRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string content = 4;
+  string version = 5;
+  bool enabled = 6;
+}
+message UpdateSkillResponse { Skill skill = 1; }
+message DeleteSkillRequest { string id = 1; }
+
 message CreateHookRequest {
   string id = 1;
   string event = 2;
@@ -244,6 +309,7 @@ message CreateRuleRequest {
   string capability = 6;
   string source = 7;
   optional double numeric_threshold = 8;
+  string pattern = 9; // ver GovernanceRule.pattern
 }
 message CreateRuleResponse { GovernanceRule rule = 1; }
 message ListRulesRequest {
@@ -282,6 +348,22 @@ message ListActivitiesRequest {
 }
 message ListActivitiesResponse { repeated Activity activities = 1; }
 
+message RecordLearningRequest {
+  string capability_id = 1;
+  string profile = 2;
+  string outcome = 3; // success | failure
+  string summary = 4;
+  repeated string tags = 5;
+}
+message RecordLearningResponse { LearningEvent event = 1; }
+message ListLearningEventsRequest {
+  string profile = 1; // vacío = todos
+  int32 limit = 2;    // <=0 = 200; máximo 1000
+}
+message ListLearningEventsResponse { repeated LearningEvent events = 1; }
+message GetLearningStatsRequest {}
+message GetLearningStatsResponse { repeated LearningStat stats = 1; }
+
 // ── Servicios ─────────────────────────────────────────────────────────────────
 
 service ProfileService {
@@ -298,6 +380,14 @@ service CapabilityService {
   rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
   rpc DeleteCapability(DeleteCapabilityRequest) returns (google.protobuf.Empty);
   rpc GetCapabilityScript(GetCapabilityScriptRequest) returns (GetCapabilityScriptResponse);
+}
+
+service SkillService {
+  rpc CreateSkill(CreateSkillRequest) returns (CreateSkillResponse);
+  rpc GetSkill(GetSkillRequest) returns (GetSkillResponse);
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse);
+  rpc UpdateSkill(UpdateSkillRequest) returns (UpdateSkillResponse);
+  rpc DeleteSkill(DeleteSkillRequest) returns (google.protobuf.Empty);
 }
 
 service HookService {
@@ -324,4 +414,10 @@ service GovernanceService {
 service ActivityService {
   rpc RecordActivity(RecordActivityRequest) returns (RecordActivityResponse);
   rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
+}
+
+service LearningService {
+  rpc RecordLearning(RecordLearningRequest) returns (RecordLearningResponse);
+  rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
+  rpc GetLearningStats(GetLearningStatsRequest) returns (GetLearningStatsResponse);
 }

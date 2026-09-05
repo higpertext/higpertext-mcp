@@ -72,13 +72,15 @@ async def resolve_script(capability_id: str) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(base64.b64decode(source_code_b64))
 
-    # Helpers hermanos (ej. "_report_paths.py") van al mismo directorio flat
-    # de cache — el import relativo del entrypoint (`from ._report_paths
-    # import ...`) los busca junto a sí mismo, sin importar qué otra
-    # capability los haya escrito ahí primero (mismo contenido, se pisan sin
-    # problema).
+    # Helpers hermanos (ej. "_report_paths.py", o subpaquetes como
+    # "_parser_language/base.py") van al mismo directorio flat de cache — el
+    # import relativo del entrypoint (`from ._report_paths import ...`) los
+    # busca junto a sí mismo, sin importar qué otra capability los haya
+    # escrito ahí primero (mismo contenido, se pisan sin problema).
     for filename, content_b64 in extra_files.items():
-        (path.parent / filename).write_bytes(base64.b64decode(content_b64))
+        dest = path.parent / filename
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(base64.b64decode(content_b64))
 
     _script_cache[capability_id] = path
     return path

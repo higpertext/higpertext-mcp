@@ -520,6 +520,250 @@ class CapabilityService:
             _registered_method=True)
 
 
+class SkillServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.CreateSkill = channel.unary_unary(
+                '/profile.v1.SkillService/CreateSkill',
+                request_serializer=profile_dot_v1_dot_profile__pb2.CreateSkillRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.CreateSkillResponse.FromString,
+                _registered_method=True)
+        self.GetSkill = channel.unary_unary(
+                '/profile.v1.SkillService/GetSkill',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetSkillRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetSkillResponse.FromString,
+                _registered_method=True)
+        self.ListSkills = channel.unary_unary(
+                '/profile.v1.SkillService/ListSkills',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListSkillsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListSkillsResponse.FromString,
+                _registered_method=True)
+        self.UpdateSkill = channel.unary_unary(
+                '/profile.v1.SkillService/UpdateSkill',
+                request_serializer=profile_dot_v1_dot_profile__pb2.UpdateSkillRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.UpdateSkillResponse.FromString,
+                _registered_method=True)
+        self.DeleteSkill = channel.unary_unary(
+                '/profile.v1.SkillService/DeleteSkill',
+                request_serializer=profile_dot_v1_dot_profile__pb2.DeleteSkillRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+
+
+class SkillServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def CreateSkill(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSkill(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListSkills(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateSkill(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteSkill(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_SkillServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'CreateSkill': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateSkill,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.CreateSkillRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.CreateSkillResponse.SerializeToString,
+            ),
+            'GetSkill': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSkill,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetSkillRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetSkillResponse.SerializeToString,
+            ),
+            'ListSkills': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListSkills,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListSkillsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListSkillsResponse.SerializeToString,
+            ),
+            'UpdateSkill': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateSkill,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.UpdateSkillRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.UpdateSkillResponse.SerializeToString,
+            ),
+            'DeleteSkill': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteSkill,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteSkillRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.SkillService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.SkillService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class SkillService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def CreateSkill(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SkillService/CreateSkill',
+            profile_dot_v1_dot_profile__pb2.CreateSkillRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.CreateSkillResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSkill(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SkillService/GetSkill',
+            profile_dot_v1_dot_profile__pb2.GetSkillRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetSkillResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListSkills(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SkillService/ListSkills',
+            profile_dot_v1_dot_profile__pb2.ListSkillsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListSkillsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateSkill(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SkillService/UpdateSkill',
+            profile_dot_v1_dot_profile__pb2.UpdateSkillRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.UpdateSkillResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteSkill(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SkillService/DeleteSkill',
+            profile_dot_v1_dot_profile__pb2.DeleteSkillRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
 class HookServiceStub:
     """Missing associated documentation comment in .proto file."""
 
@@ -1241,6 +1485,164 @@ class ActivityService:
             '/profile.v1.ActivityService/ListActivities',
             profile_dot_v1_dot_profile__pb2.ListActivitiesRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.ListActivitiesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class LearningServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.RecordLearning = channel.unary_unary(
+                '/profile.v1.LearningService/RecordLearning',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RecordLearningRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RecordLearningResponse.FromString,
+                _registered_method=True)
+        self.ListLearningEvents = channel.unary_unary(
+                '/profile.v1.LearningService/ListLearningEvents',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListLearningEventsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListLearningEventsResponse.FromString,
+                _registered_method=True)
+        self.GetLearningStats = channel.unary_unary(
+                '/profile.v1.LearningService/GetLearningStats',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.FromString,
+                _registered_method=True)
+
+
+class LearningServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def RecordLearning(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListLearningEvents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLearningStats(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_LearningServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'RecordLearning': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordLearning,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RecordLearningRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RecordLearningResponse.SerializeToString,
+            ),
+            'ListLearningEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListLearningEvents,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListLearningEventsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListLearningEventsResponse.SerializeToString,
+            ),
+            'GetLearningStats': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetLearningStats,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.LearningService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.LearningService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class LearningService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def RecordLearning(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.LearningService/RecordLearning',
+            profile_dot_v1_dot_profile__pb2.RecordLearningRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RecordLearningResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListLearningEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.LearningService/ListLearningEvents',
+            profile_dot_v1_dot_profile__pb2.ListLearningEventsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListLearningEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetLearningStats(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.LearningService/GetLearningStats',
+            profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.FromString,
             options,
             channel_credentials,
             insecure,
