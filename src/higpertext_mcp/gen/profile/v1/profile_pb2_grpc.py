@@ -1652,3 +1652,233 @@ class LearningService:
             timeout,
             metadata,
             _registered_method=True)
+
+
+class ProjectServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.ResolveProject = channel.unary_unary(
+                '/profile.v1.ProjectService/ResolveProject',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.FromString,
+                _registered_method=True)
+        self.ListProjects = channel.unary_unary(
+                '/profile.v1.ProjectService/ListProjects',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListProjectsResponse.FromString,
+                _registered_method=True)
+
+
+class ProjectServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def ResolveProject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListProjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_ProjectServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'ResolveProject': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResolveProject,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.SerializeToString,
+            ),
+            'ListProjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListProjects,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListProjectsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.ProjectService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.ProjectService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class ProjectService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def ResolveProject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ResolveProject',
+            profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListProjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ListProjects',
+            profile_dot_v1_dot_profile__pb2.ListProjectsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListProjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class UserServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.ResolveUser = channel.unary_unary(
+                '/profile.v1.UserService/ResolveUser',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ResolveUserRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ResolveUserResponse.FromString,
+                _registered_method=True)
+        self.ListUsers = channel.unary_unary(
+                '/profile.v1.UserService/ListUsers',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListUsersRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListUsersResponse.FromString,
+                _registered_method=True)
+
+
+class UserServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def ResolveUser(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListUsers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_UserServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'ResolveUser': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResolveUser,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ResolveUserRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ResolveUserResponse.SerializeToString,
+            ),
+            'ListUsers': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListUsers,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListUsersRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListUsersResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.UserService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.UserService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class UserService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def ResolveUser(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.UserService/ResolveUser',
+            profile_dot_v1_dot_profile__pb2.ResolveUserRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ResolveUserResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListUsers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.UserService/ListUsers',
+            profile_dot_v1_dot_profile__pb2.ListUsersRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListUsersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

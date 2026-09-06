@@ -148,7 +148,7 @@ async def test_hook_renderer_writes_claude_effective_hooks(monkeypatch, tmp_path
     settings = json.loads((tmp_path / ".claude/settings.json").read_text())
     assert "PreToolUse" in settings["hooks"]
     command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-    assert command == "higpertext-hook guard"
+    assert command == "higpertext-hook guard --assistant claude --event PreToolUse"
     assert ".claude/settings.json" in output["claude"]
 
 

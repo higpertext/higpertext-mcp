@@ -153,6 +153,8 @@ message Activity {
   string summary = 5;
   repeated string tags = 6;
   google.protobuf.Timestamp created_at = 7;
+  string project_id = 8; // vacío = sin proyecto asociado (ver ProjectService)
+  string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
 }
 
 // ── Aprendizaje en vivo (Redis) ─────────────────────────────────────────────
@@ -165,6 +167,34 @@ message LearningEvent {
   string summary = 5;
   repeated string tags = 6;
   google.protobuf.Timestamp created_at = 7;
+  string project_id = 8; // vacío = sin proyecto asociado (ver ProjectService)
+  string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
+}
+
+// ── Proyectos y usuarios (tenancy.db, separada de profile.db) ─────────────
+//
+// Ejes de scoping para datos de ejecución (Activity/LearningEvent). NO
+// aplican al catálogo compartido (Profile/Capability/Hook/GovernanceRule),
+// que sigue siendo global. Project identifica la ruta física raíz desde la
+// que se trabaja; User identifica un actor humano dentro de un Project —
+// sin mecanismo de autenticación real todavía, el identifier se acepta tal
+// cual lo mande el caller.
+
+message Project {
+  string id = 1;
+  string root_path = 2;
+  string root_path_hash = 3; // sha256(root_path)[:16]
+  string name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message User {
+  string id = 1;
+  string identifier = 2;
+  string display_name = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
 }
 
 message LearningStat {
@@ -340,11 +370,15 @@ message RecordActivityRequest {
   string status = 3;
   string summary = 4;
   repeated string tags = 5;
+  string project_id = 6; // vacío = sin proyecto asociado
+  string user_id = 7;    // vacío = sin usuario asociado
 }
 message RecordActivityResponse { Activity activity = 1; }
 message ListActivitiesRequest {
   string profile = 1; // vacío = todas
   int32 limit = 2;    // <=0 = sin límite explícito (el server aplica un tope razonable)
+  string project_id = 3; // vacío = todos los proyectos
+  string user_id = 4;    // vacío = todos los usuarios
 }
 message ListActivitiesResponse { repeated Activity activities = 1; }
 
@@ -354,15 +388,32 @@ message RecordLearningRequest {
   string outcome = 3; // success | failure
   string summary = 4;
   repeated string tags = 5;
+  string project_id = 6; // vacío = sin proyecto asociado
+  string user_id = 7;    // vacío = sin usuario asociado
 }
 message RecordLearningResponse { LearningEvent event = 1; }
 message ListLearningEventsRequest {
   string profile = 1; // vacío = todos
   int32 limit = 2;    // <=0 = 200; máximo 1000
+  string project_id = 3; // vacío = todos los proyectos
+  string user_id = 4;    // vacío = todos los usuarios
 }
 message ListLearningEventsResponse { repeated LearningEvent events = 1; }
 message GetLearningStatsRequest {}
 message GetLearningStatsResponse { repeated LearningStat stats = 1; }
+
+message ResolveProjectRequest { string root_path = 1; }
+message ResolveProjectResponse { Project project = 1; }
+message ListProjectsRequest {}
+message ListProjectsResponse { repeated Project projects = 1; }
+
+message ResolveUserRequest {
+  string identifier = 1;
+  string display_name = 2;
+}
+message ResolveUserResponse { User user = 1; }
+message ListUsersRequest {}
+message ListUsersResponse { repeated User users = 1; }
 
 // ── Servicios ─────────────────────────────────────────────────────────────────
 
@@ -420,4 +471,14 @@ service LearningService {
   rpc RecordLearning(RecordLearningRequest) returns (RecordLearningResponse);
   rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
   rpc GetLearningStats(GetLearningStatsRequest) returns (GetLearningStatsResponse);
+}
+
+service ProjectService {
+  rpc ResolveProject(ResolveProjectRequest) returns (ResolveProjectResponse);
+  rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+}
+
+service UserService {
+  rpc ResolveUser(ResolveUserRequest) returns (ResolveUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
 }
