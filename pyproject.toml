@@ -9,6 +9,10 @@ description = "Servidor MCP que expone capabilities y hooks nativos como tools/s
 requires-python = ">=3.10"
 license = {text = "Proprietary"}
 dependencies = [
+    # Bundled, offline grammars used by the DB-backed semantic graph parser.
+    "tree-sitter-language-pack==0.13.0",
+    "tree-sitter==0.25.2",
+    "tree-sitter-c-sharp==0.23.5",
     # Pineado a la serie 1.x: verificado contra 1.29.1. mcp 2.x reestructuró
     # server.fastmcp/server.lowlevel de forma incompatible (probado en este repo).
     "mcp>=1.12.0,<2.0.0",

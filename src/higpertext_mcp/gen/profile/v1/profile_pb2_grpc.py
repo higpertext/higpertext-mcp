@@ -1520,6 +1520,16 @@ class LearningServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.FromString,
                 _registered_method=True)
+        self.RecordThoughts = channel.unary_unary(
+                '/profile.v1.LearningService/RecordThoughts',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RecordThoughtsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RecordThoughtsResponse.FromString,
+                _registered_method=True)
+        self.ListThoughts = channel.unary_unary(
+                '/profile.v1.LearningService/ListThoughts',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListThoughtsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListThoughtsResponse.FromString,
+                _registered_method=True)
 
 
 class LearningServiceServicer:
@@ -1543,6 +1553,18 @@ class LearningServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordThoughts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListThoughts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_LearningServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1560,6 +1582,16 @@ def add_LearningServiceServicer_to_server(servicer, server):
                     servicer.GetLearningStats,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.SerializeToString,
+            ),
+            'RecordThoughts': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordThoughts,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RecordThoughtsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RecordThoughtsResponse.SerializeToString,
+            ),
+            'ListThoughts': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListThoughts,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListThoughtsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListThoughtsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1643,6 +1675,60 @@ class LearningService:
             '/profile.v1.LearningService/GetLearningStats',
             profile_dot_v1_dot_profile__pb2.GetLearningStatsRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.GetLearningStatsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordThoughts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.LearningService/RecordThoughts',
+            profile_dot_v1_dot_profile__pb2.RecordThoughtsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RecordThoughtsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListThoughts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.LearningService/ListThoughts',
+            profile_dot_v1_dot_profile__pb2.ListThoughtsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListThoughtsResponse.FromString,
             options,
             channel_credentials,
             insecure,

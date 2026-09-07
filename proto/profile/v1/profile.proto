@@ -161,7 +161,7 @@ message Activity {
 
 message LearningEvent {
   string id = 1;
-  string capability_id = 2;
+  string capability_id = 2; // "session" para el resumen agregado que manda hook_session_stop
   string profile = 3;
   string outcome = 4; // success | failure
   string summary = 5;
@@ -169,6 +169,19 @@ message LearningEvent {
   google.protobuf.Timestamp created_at = 7;
   string project_id = 8; // vacío = sin proyecto asociado (ver ProjectService)
   string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
+
+  // Resumen de sesión (capability_id="session", uno por sesión, emitido por
+  // hook_session_stop agregando .higpertext/state/telemetry.jsonl). En un
+  // LearningEvent normal de una capability puntual, estos campos quedan en
+  // su cero (0/0.0) — no se confunden con "cero tokens reales" porque solo
+  // se leen cuando capability_id == "session".
+  int64 total_tokens = 10;
+  int32 actions_total = 11;
+  int32 actions_success = 12;
+  int32 actions_failure = 13;
+  int32 files_modified_events = 14;   // cuenta ediciones (Edit/Write), no archivos únicos
+  int32 files_modified_unique = 15;   // archivos distintos tocados, deduplicados por path
+  double duration_min = 16;
 }
 
 // ── Proyectos y usuarios (tenancy.db, separada de profile.db) ─────────────
@@ -390,6 +403,13 @@ message RecordLearningRequest {
   repeated string tags = 5;
   string project_id = 6; // vacío = sin proyecto asociado
   string user_id = 7;    // vacío = sin usuario asociado
+  int64 total_tokens = 8;
+  int32 actions_total = 9;
+  int32 actions_success = 10;
+  int32 actions_failure = 11;
+  int32 files_modified_events = 12;
+  int32 files_modified_unique = 13;
+  double duration_min = 14;
 }
 message RecordLearningResponse { LearningEvent event = 1; }
 message ListLearningEventsRequest {
