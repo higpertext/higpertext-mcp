@@ -439,7 +439,37 @@ async def delete_governance_exception(exception_id: str) -> None:
 
 
 def _skill_to_dict(s: profile_pb2.Skill) -> dict:
-    return {"id": s.id, "name": s.name, "description": s.description, "content": s.content, "version": s.version, "enabled": s.enabled}
+    return {
+        "id": s.id, "name": s.name, "description": s.description, "content": s.content,
+        "version": s.version, "enabled": s.enabled,
+        "profiles": list(s.profiles),  # vacío = skill global (común a todo el sistema, ej. "common.*")
+        "project_id": s.project_id,    # referencia blanda opcional a Project.id (tenancy.db)
+    }
+
+
+async def create_skill(
+    *, id: str, name: str = "", description: str = "", content: str = "", version: str = "1.0.0",
+    enabled: bool = True, profiles: list[str] | None = None, project_id: str = "",
+) -> dict:
+    """Da de alta una skill (documento SKILL.md versionado). `content` debe
+    iniciar con un front matter YAML cerrado que declare `name`/`description`
+    coincidentes con los argumentos — el server lo valida y rechaza si no
+    coincide (ver validateSkill en internal/service/skill_service.go)."""
+    req = profile_pb2.CreateSkillRequest(
+        id=id, name=name or id, description=description, content=content, version=version,
+        enabled=enabled, profiles=profiles or [], project_id=project_id,
+    )
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SkillServiceStub(channel)
+        resp = await stub.CreateSkill(req, timeout=_CALL_TIMEOUT_S)
+        return _skill_to_dict(resp.skill)
+
+
+async def get_skill(skill_id: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SkillServiceStub(channel)
+        resp = await stub.GetSkill(profile_pb2.GetSkillRequest(id=skill_id), timeout=_CALL_TIMEOUT_S)
+        return _skill_to_dict(resp.skill)
 
 
 async def list_skills(*, enabled_only: bool = False) -> list[dict]:
@@ -447,6 +477,37 @@ async def list_skills(*, enabled_only: bool = False) -> list[dict]:
         stub = profile_pb2_grpc.SkillServiceStub(channel)
         resp = await stub.ListSkills(profile_pb2.ListSkillsRequest(enabled_only=enabled_only), timeout=_CALL_TIMEOUT_S)
         return [_skill_to_dict(s) for s in resp.skills]
+
+
+async def update_skill(
+    *, id: str, name: str, description: str, content: str, version: str, enabled: bool,
+    profiles: list[str] | None = None, project_id: str = "",
+) -> dict:
+    req = profile_pb2.UpdateSkillRequest(
+        id=id, name=name, description=description, content=content, version=version,
+        enabled=enabled, profiles=profiles or [], project_id=project_id,
+    )
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SkillServiceStub(channel)
+        resp = await stub.UpdateSkill(req, timeout=_CALL_TIMEOUT_S)
+        return _skill_to_dict(resp.skill)
+
+
+async def delete_skill(skill_id: str) -> None:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SkillServiceStub(channel)
+        await stub.DeleteSkill(profile_pb2.DeleteSkillRequest(id=skill_id), timeout=_CALL_TIMEOUT_S)
+
+
+async def resolve_project(root_path: str) -> dict:
+    """Resuelve (o crea) el Project asociado a root_path — tenancy.db, separada
+    de profile.db. Usado para scopear skills/actividad/aprendizaje a "este
+    proyecto puntual" via Skill.project_id."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=root_path), timeout=_CALL_TIMEOUT_S)
+        p = resp.project
+        return {"id": p.id, "root_path": p.root_path, "root_path_hash": p.root_path_hash, "name": p.name}
 
 
 async def profile_context(profile: str) -> tuple[profile_pb2.Profile, list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:

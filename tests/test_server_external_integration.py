@@ -112,7 +112,7 @@ async def test_local_and_external_names_never_collide(monkeypatch):
             names = {t.name for t in tools.tools}
             assert "common-grep-search" in names
             assert "external.common.echo" in names
-            assert len(names) == 9
+            assert len(names) == 10
             assert "higpertext-configure-project" in names
             assert "higpertext-render-adapters" in names
             assert "higpertext-governance-rule" in names
@@ -120,6 +120,7 @@ async def test_local_and_external_names_never_collide(monkeypatch):
             assert "higpertext-profile" in names
             assert "higpertext-capability" in names
             assert "higpertext-hook-admin" in names
+            assert "higpertext-skill" in names
 
 
 if __name__ == "__main__":

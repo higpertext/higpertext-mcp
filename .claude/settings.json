@@ -1,0 +1,58 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "hooks": [
+                    {
+                        "command": "higpertext-hook hook_audit",
+                        "statusMessage": "Audit hook: registra en AuditService cada acción que efecti",
+                        "timeout": 5,
+                        "type": "command"
+                    },
+                    {
+                        "command": "higpertext-hook hook_security_guard_post",
+                        "statusMessage": "Enmascara secretos detectados en outputs de herramientas.",
+                        "timeout": 5,
+                        "type": "command"
+                    }
+                ],
+                "matcher": ""
+            }
+        ],
+        "PreToolUse": [
+            {
+                "hooks": [
+                    {
+                        "command": "higpertext-hook hook_bash_guard",
+                        "statusMessage": "Evalúa en cadena las reglas de comandos Bash: bloques duros",
+                        "timeout": 10,
+                        "type": "command"
+                    }
+                ],
+                "matcher": "Bash"
+            },
+            {
+                "hooks": [
+                    {
+                        "command": "higpertext-hook hook_read_guard",
+                        "statusMessage": "Bloquea lecturas completas de archivos grandes y recomienda ",
+                        "timeout": 5,
+                        "type": "command"
+                    }
+                ],
+                "matcher": "Read"
+            },
+            {
+                "hooks": [
+                    {
+                        "command": "higpertext-hook hook_security_guard_pre",
+                        "statusMessage": "Bloquea comandos y rutas sensibles según reglas de segurida",
+                        "timeout": 5,
+                        "type": "command"
+                    }
+                ],
+                "matcher": "Bash|PowerShell|Read|Write|Edit"
+            }
+        ]
+    }
+}

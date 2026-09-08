@@ -1740,6 +1740,121 @@ class LearningService:
             _registered_method=True)
 
 
+class AuditServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.RecordAuditEvent = channel.unary_unary(
+                '/profile.v1.AuditService/RecordAuditEvent',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RecordAuditEventRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RecordAuditEventResponse.FromString,
+                _registered_method=True)
+        self.ListAuditEvents = channel.unary_unary(
+                '/profile.v1.AuditService/ListAuditEvents',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListAuditEventsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListAuditEventsResponse.FromString,
+                _registered_method=True)
+
+
+class AuditServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def RecordAuditEvent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAuditEvents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_AuditServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'RecordAuditEvent': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordAuditEvent,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RecordAuditEventRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RecordAuditEventResponse.SerializeToString,
+            ),
+            'ListAuditEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAuditEvents,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListAuditEventsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListAuditEventsResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.AuditService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.AuditService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class AuditService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def RecordAuditEvent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AuditService/RecordAuditEvent',
+            profile_dot_v1_dot_profile__pb2.RecordAuditEventRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RecordAuditEventResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAuditEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AuditService/ListAuditEvents',
+            profile_dot_v1_dot_profile__pb2.ListAuditEventsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListAuditEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
 class ProjectServiceStub:
     """Missing associated documentation comment in .proto file."""
 
@@ -1759,6 +1874,21 @@ class ProjectServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.ListProjectsResponse.FromString,
                 _registered_method=True)
+        self.AddProjectPath = channel.unary_unary(
+                '/profile.v1.ProjectService/AddProjectPath',
+                request_serializer=profile_dot_v1_dot_profile__pb2.AddProjectPathRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.AddProjectPathResponse.FromString,
+                _registered_method=True)
+        self.RemoveProjectPath = channel.unary_unary(
+                '/profile.v1.ProjectService/RemoveProjectPath',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RemoveProjectPathRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RemoveProjectPathResponse.FromString,
+                _registered_method=True)
+        self.RenameProject = channel.unary_unary(
+                '/profile.v1.ProjectService/RenameProject',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RenameProjectRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RenameProjectResponse.FromString,
+                _registered_method=True)
 
 
 class ProjectServiceServicer:
@@ -1776,6 +1906,24 @@ class ProjectServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def AddProjectPath(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveProjectPath(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RenameProject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ProjectServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1788,6 +1936,21 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     servicer.ListProjects,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.ListProjectsResponse.SerializeToString,
+            ),
+            'AddProjectPath': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddProjectPath,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.AddProjectPathRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.AddProjectPathResponse.SerializeToString,
+            ),
+            'RemoveProjectPath': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveProjectPath,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RemoveProjectPathRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RemoveProjectPathResponse.SerializeToString,
+            ),
+            'RenameProject': grpc.unary_unary_rpc_method_handler(
+                    servicer.RenameProject,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RenameProjectRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RenameProjectResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -1844,6 +2007,87 @@ class ProjectService:
             '/profile.v1.ProjectService/ListProjects',
             profile_dot_v1_dot_profile__pb2.ListProjectsRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.ListProjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddProjectPath(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/AddProjectPath',
+            profile_dot_v1_dot_profile__pb2.AddProjectPathRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.AddProjectPathResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveProjectPath(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/RemoveProjectPath',
+            profile_dot_v1_dot_profile__pb2.RemoveProjectPathRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RemoveProjectPathResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RenameProject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/RenameProject',
+            profile_dot_v1_dot_profile__pb2.RenameProjectRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RenameProjectResponse.FromString,
             options,
             channel_credentials,
             insecure,

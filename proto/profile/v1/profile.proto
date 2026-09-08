@@ -76,7 +76,7 @@ message Capability {
 // Skill almacena un documento SKILL.md completo. Content incluye el front
 // matter YAML para preservar metadatos específicos de cada asistente.
 message Skill {
-  string id = 1; // clave natural estable, ej. "build"
+  string id = 1; // clave natural estable, ej. "common.build" (global) o "build" (con scope)
   string name = 2;
   string description = 3;
   string content = 4;
@@ -84,6 +84,15 @@ message Skill {
   bool enabled = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  // Perfiles a los que pertenece esta skill (por nombre, igual que
+  // HookDefinition.profiles). Vacío = global: skill base compartida por
+  // defecto por todo el sistema, típicamente con id "common.*".
+  repeated string profiles = 9;
+  // Referencia blanda opcional a Project.id (tenancy.db) cuando la skill está
+  // atada a un único proyecto en vez de a uno o más perfiles. Vacío = no
+  // atada a un proyecto puntual. No es una FK: Project vive en una base
+  // separada (ver cmd/server/main.go, tenancyDB).
+  string project_id = 10;
 }
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -131,6 +140,13 @@ message GovernanceRule {
   // contra el comando Bash, además de contar como gobernanza CI/PR/deploy).
   // Vacío = regla de gobernanza pura, sin efecto en hooks.
   string pattern = 11;
+  // Criticidad 1-5 para el enforcement en runtime de reglas CON pattern.
+  // 5 = bloqueo duro no negociable (etapa "precondition"); 1-4 = etapas
+  // "policy", el hook puede decidir degradar a advertencia (`context`) en
+  // vez de `deny` según el peso. 0 = sin clasificar: el hook que consume
+  // esta regla debe derivarlo de severity (CRITICAL=5, HIGH=4, MEDIUM=3,
+  // LOW=1) en vez de asumir "no bloquea" — no confundir con "peso real 0".
+  int32 weight = 12;
 }
 
 message GovernanceException {
@@ -155,6 +171,34 @@ message Activity {
   google.protobuf.Timestamp created_at = 7;
   string project_id = 8; // vacío = sin proyecto asociado (ver ProjectService)
   string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
+}
+
+// ── Auditoría de hooks (registro append-only, centralizado por equipo) ───────
+//
+// AuditEvent es lo que emite el "audit hook": un registro inmutable de cada
+// decisión tomada por la cadena de hooks Pre/PostToolUse (allow/warn/block),
+// con quién la disparó y qué regla/hook la produjo. A diferencia de Activity
+// (resultado de ejecutar una Capability) y de LearningEvent (telemetría de
+// aprendizaje en Redis, TTL 7 días), AuditEvent es la traza de cumplimiento
+// para un equipo compartiendo un mismo profile server: durable en SQL, sin
+// expiración, pensada para poder responder "quién intentó qué, cuándo, y qué
+// hook/regla decidió qué" en una revisión posterior. summary debe venir ya
+// enmascarado por el emisor (mask_tool_output) — este servicio no vuelve a
+// sanitizar el contenido.
+message AuditEvent {
+  string id = 1;
+  string event = 2;       // PreToolUse | PostToolUse | UserPromptSubmit | Stop | PreCompact
+  string tool_name = 3;   // "Bash", "Write", "mcp__higpertext-mcp__...", etc.
+  string hook_id = 4;     // qué HookDefinition.id emitió este registro
+  string rule_id = 5;     // qué GovernanceRule.id decidió, si aplica (vacío = hard block sin rule asociada)
+  string decision = 6;    // "allow" | "warn" | "block"
+  int32 weight = 7;       // peso efectivo de la regla/etapa al momento de decidir (ver GovernanceRule.weight)
+  string summary = 8;     // comando/input truncado y ya enmascarado, nunca el secreto crudo
+  string actor = 9;       // identidad de quien disparó la acción (git email / OS user / User.identifier)
+  string profile = 10;    // perfil activo al momento del evento
+  string project_id = 11; // vacío = sin proyecto asociado (ver ProjectService)
+  string user_id = 12;    // vacío = sin usuario asociado (ver UserService)
+  google.protobuf.Timestamp created_at = 13;
 }
 
 // ── Aprendizaje en vivo (Redis) ─────────────────────────────────────────────
@@ -195,11 +239,16 @@ message LearningEvent {
 
 message Project {
   string id = 1;
-  string root_path = 2;
+  string root_path = 2; // ruta primaria (compat) — la primera ruta asociada
   string root_path_hash = 3; // sha256(root_path)[:16]
   string name = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  // Todas las rutas raíz asociadas a este proyecto, incluida root_path.
+  // Un proyecto puede depender de más de un repositorio/carpeta física;
+  // ResolveProject(root_path) resuelve al mismo Project.ID para cualquiera
+  // de estas rutas.
+  repeated string paths = 7;
 }
 
 message User {
@@ -208,6 +257,20 @@ message User {
   string display_name = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+}
+
+// Thought es un bloque de "chain of thought" (thinking) de un turno del
+// asistente, relacionado 1:N con el LearningEvent de resumen de sesión
+// (capability_id="session") que lo contiene. seq es la posición del turno
+// dentro de la sesión (0-based) — junto con learning_event_id identifica de
+// forma única cada cadena de pensamiento: volver a mandar el mismo seq para
+// el mismo learning_event_id reemplaza esa entrada, no la duplica.
+message Thought {
+  string id = 1;
+  string learning_event_id = 2; // FK blanda a LearningEvent.id
+  int32 seq = 3;
+  string content = 4;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 message LearningStat {
@@ -283,11 +346,20 @@ message CreateSkillRequest {
   string content = 4;
   string version = 5;
   bool enabled = 6;
+  repeated string profiles = 7;  // vacío = skill global (común a todo el sistema)
+  string project_id = 8;         // referencia blanda opcional a Project.id
 }
 message CreateSkillResponse { Skill skill = 1; }
 message GetSkillRequest { string id = 1; }
 message GetSkillResponse { Skill skill = 1; }
-message ListSkillsRequest { bool enabled_only = 1; }
+// Sin filtros: todas las skills. profile/project_id filtran por scope exacto
+// (no hacen merge de capas); vacíos ambos, junto con enabled_only=false,
+// listan el catálogo completo tal cual render-hooks lista hooks por perfil.
+message ListSkillsRequest {
+  bool enabled_only = 1;
+  string profile = 2;     // filtra: solo skills que declaren este perfil en `profiles`
+  string project_id = 3;  // filtra: solo skills con este project_id exacto
+}
 message ListSkillsResponse { repeated Skill skills = 1; }
 message UpdateSkillRequest {
   string id = 1;
@@ -296,6 +368,8 @@ message UpdateSkillRequest {
   string content = 4;
   string version = 5;
   bool enabled = 6;
+  repeated string profiles = 7;
+  string project_id = 8;
 }
 message UpdateSkillResponse { Skill skill = 1; }
 message DeleteSkillRequest { string id = 1; }
@@ -353,6 +427,7 @@ message CreateRuleRequest {
   string source = 7;
   optional double numeric_threshold = 8;
   string pattern = 9; // ver GovernanceRule.pattern
+  int32 weight = 10;  // ver GovernanceRule.weight
 }
 message CreateRuleResponse { GovernanceRule rule = 1; }
 message ListRulesRequest {
@@ -395,6 +470,29 @@ message ListActivitiesRequest {
 }
 message ListActivitiesResponse { repeated Activity activities = 1; }
 
+message RecordAuditEventRequest {
+  string event = 1;
+  string tool_name = 2;
+  string hook_id = 3;
+  string rule_id = 4;
+  string decision = 5;
+  int32 weight = 6;
+  string summary = 7;
+  string actor = 8;
+  string profile = 9;
+  string project_id = 10;
+  string user_id = 11;
+}
+message RecordAuditEventResponse { AuditEvent event = 1; }
+message ListAuditEventsRequest {
+  string profile = 1;    // vacío = todos
+  string project_id = 2; // vacío = todos
+  string user_id = 3;    // vacío = todos
+  string decision = 4;   // vacío = todas; "allow" | "warn" | "block"
+  int32 limit = 5;       // <=0 = 200; máximo 1000
+}
+message ListAuditEventsResponse { repeated AuditEvent events = 1; }
+
 message RecordLearningRequest {
   string capability_id = 1;
   string profile = 2;
@@ -422,10 +520,37 @@ message ListLearningEventsResponse { repeated LearningEvent events = 1; }
 message GetLearningStatsRequest {}
 message GetLearningStatsResponse { repeated LearningStat stats = 1; }
 
+message ThoughtInput {
+  int32 seq = 1;
+  string content = 2;
+}
+message RecordThoughtsRequest {
+  string learning_event_id = 1;
+  repeated ThoughtInput thoughts = 2;
+}
+message RecordThoughtsResponse { repeated Thought thoughts = 1; }
+message ListThoughtsRequest { string learning_event_id = 1; }
+message ListThoughtsResponse { repeated Thought thoughts = 1; }
+
 message ResolveProjectRequest { string root_path = 1; }
 message ResolveProjectResponse { Project project = 1; }
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
+message AddProjectPathRequest {
+  string project_id = 1;
+  string root_path = 2;
+}
+message AddProjectPathResponse { Project project = 1; }
+message RenameProjectRequest {
+  string project_id = 1;
+  string name = 2;
+}
+message RenameProjectResponse { Project project = 1; }
+message RemoveProjectPathRequest {
+  string project_id = 1;
+  string root_path = 2;
+}
+message RemoveProjectPathResponse { Project project = 1; }
 
 message ResolveUserRequest {
   string identifier = 1;
@@ -491,11 +616,22 @@ service LearningService {
   rpc RecordLearning(RecordLearningRequest) returns (RecordLearningResponse);
   rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
   rpc GetLearningStats(GetLearningStatsRequest) returns (GetLearningStatsResponse);
+
+  rpc RecordThoughts(RecordThoughtsRequest) returns (RecordThoughtsResponse);
+  rpc ListThoughts(ListThoughtsRequest) returns (ListThoughtsResponse);
+}
+
+service AuditService {
+  rpc RecordAuditEvent(RecordAuditEventRequest) returns (RecordAuditEventResponse);
+  rpc ListAuditEvents(ListAuditEventsRequest) returns (ListAuditEventsResponse);
 }
 
 service ProjectService {
   rpc ResolveProject(ResolveProjectRequest) returns (ResolveProjectResponse);
   rpc ListProjects(ListProjectsRequest) returns (ListProjectsResponse);
+  rpc AddProjectPath(AddProjectPathRequest) returns (AddProjectPathResponse);
+  rpc RemoveProjectPath(RemoveProjectPathRequest) returns (RemoveProjectPathResponse);
+  rpc RenameProject(RenameProjectRequest) returns (RenameProjectResponse);
 }
 
 service UserService {

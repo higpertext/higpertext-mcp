@@ -28,6 +28,7 @@ from higpertext_mcp import (
     profile_client,
     resources,
     schema,
+    skill_renderer,
 )
 
 SERVER_NAME = "higpertext-mcp"
@@ -37,6 +38,7 @@ GOVERNANCE_RULE_TOOL_NAME = "higpertext-governance-rule"
 PROFILE_TOOL_NAME = "higpertext-profile"
 CAPABILITY_TOOL_NAME = "higpertext-capability"
 HOOK_TOOL_NAME = "higpertext-hook-admin"
+SKILL_TOOL_NAME = "higpertext-skill"
 GOVERNANCE_EXCEPTION_TOOL_NAME = "higpertext-governance-exception"
 
 _CONFIGURE_TOOL = types.Tool(
@@ -230,6 +232,41 @@ _CAPABILITY_TOOL = types.Tool(
     },
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
 )
+_SKILL_TOOL = types.Tool(
+    name=SKILL_TOOL_NAME,
+    description=(
+        "Administra el catálogo persistente de documentos SKILL.md (SkillService): "
+        "crear, consultar, listar, actualizar o borrar. `content` debe empezar con "
+        "un front matter YAML cerrado que declare `name` y `description` idénticos "
+        "a los del request — el server lo rechaza si no coincide. `profiles`/"
+        "`project_id` vacíos (default) significan skill global, compartida por "
+        "todo el sistema (convención: id con prefijo 'common.'); seteá `profiles` "
+        "para atarla a uno o más perfiles, o `project_id` para atarla a un único "
+        "proyecto puntual (ver higpertext-profile action=list para ids de "
+        "proyecto — no hay tool de Project todavía, resolvé por root_path vía "
+        "higpertext-render-adapters, que ya llama a ResolveProject internamente). "
+        "Tras crear/editar/borrar, corré higpertext-render-adapters para reflejar "
+        "el cambio en .claude/skills, .gemini/skills, .agents/skills."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["create", "get", "list", "update", "delete"]},
+            "id": {"type": "string", "description": "requerido en create/get/update/delete, clave natural (ej. 'common.build')"},
+            "name": {"type": "string", "description": "requerido en create/update — debe coincidir con el `name` del front matter de `content`"},
+            "description": {"type": "string", "description": "requerido en create/update — debe coincidir con la `description` del front matter de `content`"},
+            "content": {"type": "string", "description": "requerido en create/update — el SKILL.md completo, con front matter YAML"},
+            "version": {"type": "string", "default": "1.0.0"},
+            "enabled": {"type": "boolean", "default": True},
+            "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, la skill solo es visible para estos perfiles"},
+            "project_id": {"type": "string", "description": "vacío = no atada a un proyecto puntual"},
+            "enabled_only": {"type": "boolean", "description": "solo para list: solo skills con enabled=true"},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    },
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
+)
 
 
 async def _load_tools() -> dict[str, schema.ToolSpec]:
@@ -287,7 +324,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, *local, *(await ext_pool.list_tools_merged())]
+        return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
     @server.call_tool()
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
@@ -299,6 +336,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 selected = arguments.get("assistants", []) if isinstance(arguments, dict) else []
                 data = adapter_renderer.render(root, selected, profile_data, caps, rules)
                 data["hooks"] = await hook_renderer.render(root, profile, data["assistants"])
+                data["skills"] = await skill_renderer.render(root, profile, data["assistants"])
                 summary = f"Configuración renderizada para: {', '.join(data['assistants'])}."
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
@@ -451,6 +489,43 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar el hook: {exc}"
+                return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
+        if name == SKILL_TOOL_NAME:
+            args = arguments if isinstance(arguments, dict) else {}
+            action = args.get("action")
+            try:
+                if action == "create":
+                    data = await profile_client.create_skill(
+                        id=args["id"], name=args.get("name", ""), description=args.get("description", ""),
+                        content=args.get("content", ""), version=args.get("version", "1.0.0"),
+                        enabled=bool(args.get("enabled", True)), profiles=args.get("profiles"),
+                        project_id=args.get("project_id", ""),
+                    )
+                    summary = f"Skill '{data['id']}' creada."
+                elif action == "get":
+                    data = await profile_client.get_skill(args["id"])
+                    summary = f"Skill '{data['id']}'."
+                elif action == "list":
+                    skills = await profile_client.list_skills(enabled_only=bool(args.get("enabled_only", False)))
+                    data = {"skills": skills}
+                    summary = f"{len(skills)} skill(s) en el catálogo."
+                elif action == "update":
+                    data = await profile_client.update_skill(
+                        id=args["id"], name=args["name"], description=args["description"],
+                        content=args["content"], version=args.get("version", "1.0.0"),
+                        enabled=bool(args.get("enabled", True)), profiles=args.get("profiles"),
+                        project_id=args.get("project_id", ""),
+                    )
+                    summary = f"Skill '{data['id']}' actualizada."
+                elif action == "delete":
+                    await profile_client.delete_skill(args["id"])
+                    data = {"id": args["id"]}
+                    summary = f"Skill '{args['id']}' borrada."
+                else:
+                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
+                return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudo administrar la skill: {exc}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == GOVERNANCE_EXCEPTION_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}

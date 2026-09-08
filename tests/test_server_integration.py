@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import adapter_renderer, discovery, dispatch, hook_renderer, server as server_module
+from higpertext_mcp import adapter_renderer, discovery, dispatch, hook_renderer, skill_renderer, server as server_module
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
@@ -58,7 +58,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
@@ -99,13 +99,16 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
         [],
     )
 
+    # SKILL.md ya no sale de adapter_renderer.render() — lo materializa
+    # skill_renderer.render() por separado (ver test_skill_renderer_writes_
+    # scoped_skills_across_assistants), igual que hook_renderer con los hooks.
     expected = {
         "AGENTS.md", "CLAUDE.md", ".clauderules", "GEMINI.md", "opencode.json",
         ".codex/rules/higpertext_rules.md", ".claude/rules/dev.md",
-        ".gemini/workflows/plan.md", ".gemini/skills/plan/SKILL.md",
+        ".gemini/workflows/plan.md",
         ".github/copilot-instructions.md", ".agents/mcp_config.json",
         ".agents/settings.json", ".agents/workflows/spec.md",
-        ".agents/skills/spec/SKILL.md", ".opencode/rules/dev.md",
+        ".opencode/rules/dev.md",
     }
     assert expected <= set(result["files"])
     assert "common.graph-query" in (tmp_path / ".agents/workflows/plan.md").read_text()
@@ -150,6 +153,50 @@ async def test_hook_renderer_writes_claude_effective_hooks(monkeypatch, tmp_path
     command = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
     assert command == "higpertext-hook guard --assistant claude --event PreToolUse"
     assert ".claude/settings.json" in output["claude"]
+
+
+@pytest.mark.anyio
+async def test_skill_renderer_scopes_by_project_and_profile_and_prunes_stale(monkeypatch, tmp_path):
+    """SKILL.md sale del catálogo de SkillService, no de un diccionario
+    hardcodeado (ver adapter_renderer.WORKFLOWS, que ya no las escribe).
+
+    Cubre las tres reglas de scope acordadas: global (sin profiles ni
+    project_id) siempre visible, project_id exacto visible solo para ese
+    proyecto, profile visible solo si está en `profiles`; y que una skill
+    materializada en una corrida previa que ya no aplica se borra (prune).
+    """
+    skills = [
+        {"id": "common.build", "content": "common.build content", "profiles": [], "project_id": ""},
+        {"id": "docs-api-style", "content": "docs-api-style content", "profiles": [], "project_id": "proj-123"},
+        {"id": "other-project-skill", "content": "irrelevant", "profiles": [], "project_id": "proj-999"},
+        {"id": "profile-scoped", "content": "profile-scoped content", "profiles": ["dev"], "project_id": ""},
+        {"id": "other-profile-scoped", "content": "irrelevant", "profiles": ["other"], "project_id": ""},
+    ]
+
+    async def fake_list_skills(*, enabled_only=False):
+        return skills
+
+    async def fake_resolve_project(root_path):
+        assert root_path == str(tmp_path)
+        return {"id": "proj-123", "root_path": root_path, "root_path_hash": "x", "name": "dev"}
+
+    monkeypatch.setattr(skill_renderer.profile_client, "list_skills", fake_list_skills)
+    monkeypatch.setattr(skill_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    # Simula una skill materializada en una corrida previa que ya no está en
+    # el catálogo visible — debe ser podada.
+    stale_dir = tmp_path / ".claude" / "skills" / "stale-skill"
+    stale_dir.mkdir(parents=True)
+    (stale_dir / "SKILL.md").write_text("old", encoding="utf-8")
+
+    output = await skill_renderer.render(tmp_path, "dev", ["claude"])
+
+    claude_dir = tmp_path / ".claude" / "skills"
+    materialized = {p.name for p in claude_dir.iterdir()}
+    assert materialized == {"common.build", "docs-api-style", "profile-scoped"}
+    assert not stale_dir.exists()
+    assert (claude_dir / "common.build" / "SKILL.md").read_text() == "common.build content"
+    assert output[".claude/skills"]["pruned"] == ["stale-skill"]
 
 
 @pytest.mark.anyio

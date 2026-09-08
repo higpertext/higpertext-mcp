@@ -1,0 +1,259 @@
+syntax = "proto3";
+
+package board.v1;
+
+option go_package = "github.com/aomerge/higpertext-server-profile/gen/board/v1;boardv1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// BoardService y hermanos (ColumnService, ActivityService, TaskService, más
+// abajo) son un dominio deliberadamente aislado: viven en su propia base
+// (board.db, ver internal/storage/sqlite/board_db.go) y en su propio
+// paquete proto (board.v1, sin depender de profile.v1), para que el día de
+// mañana puedan extraerse como microservicio propio sin arrastrar el resto
+// del catálogo de perfiles/capabilities/gobernanza.
+//
+// Jerarquía: Board -> Column -> BoardActivity -> Task -> AcceptanceCriterion.
+// BoardActivity es la "tarjeta" que se mueve entre columnas de un kanban
+// (equivalente agile de una story/epic); Task es un ítem de checklist
+// dentro de una BoardActivity (no tiene columna propia); AcceptanceCriterion
+// es un renglón de ese checklist, gestionado siempre inline con su Task.
+//
+// A diferencia de otros dominios de este server (ej. GovernanceService
+// agrupa Rule+Exception en un solo service), acá cada entidad de la
+// jerarquía tiene su PROPIO service gRPC — BoardService, ColumnService,
+// ActivityService, TaskService — para que se vean como entradas separadas
+// en cualquier explorador de RPCs (grpcurl/grpcui), igual que
+// profile.v1.ProfileService/CapabilityService/SkillService. Del lado Go,
+// cada service tiene su propio server (BoardServer, ColumnServer,
+// BoardActivityServer, TaskServer en internal/service/), todos compartiendo
+// la misma domain.BoardRepository — no hay motivo para 4 conexiones a
+// board.db.
+//
+// Fuera de alcance en esta iteración (PoC, deuda técnica aceptada a
+// propósito): no hay mecanismo de roadmap, no hay correlación automática con
+// profile.v1.Activity / profile.v1.LearningEvent, no hay autenticación, y el
+// server NO valida que todos los AcceptanceCriterion de una Task estén
+// done antes de permitir Task.done = true (responsabilidad del caller).
+
+// ── Priority ─────────────────────────────────────────────────────────────
+//
+// Compartido por BoardActivity. Enum propio de board.v1 (no reutiliza
+// profile.v1.Severity) para no acoplar este paquete a profile.proto.
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  LOW = 1;
+  MEDIUM = 2;
+  HIGH = 3;
+  CRITICAL = 4;
+}
+
+// ── Board ────────────────────────────────────────────────────────────────
+
+message Board {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string project_id = 4; // referencia blanda a profile.v1.Project (tenancy.db), opcional
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CreateBoardRequest {
+  string name = 1;
+  string description = 2;
+  string project_id = 3;
+}
+message CreateBoardResponse { Board board = 1; }
+message GetBoardRequest { string id = 1; }
+message GetBoardResponse { Board board = 1; }
+message ListBoardsRequest {
+  string project_id = 1; // vacío = todos los boards, de cualquier proyecto
+}
+message ListBoardsResponse { repeated Board boards = 1; }
+message DeleteBoardRequest { string id = 1; } // borra en cascada Column/BoardActivity/Task/AcceptanceCriterion
+
+// ResolveBoard hace upsert idempotente por (project_id, name) — mismo
+// patrón que profile.v1.ProjectService.ResolveProject /
+// profile.v1.UserService.ResolveUser. Si el board no existía, además crea
+// sus 3 columnas fijas (Pending, Active, Done — ver domain.BoardColumn*),
+// listas para usar.
+message ResolveBoardRequest {
+  string project_id = 1;
+  string name = 2;
+}
+message ResolveBoardResponse { Board board = 1; }
+
+// ── Column ───────────────────────────────────────────────────────────────
+
+message Column {
+  string id = 1;
+  string board_id = 2;
+  string name = 3;
+  int32 position = 4; // orden dentro del board, 0-based
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateColumnRequest {
+  string board_id = 1;
+  string name = 2;
+  int32 position = 3;
+}
+message CreateColumnResponse { Column column = 1; }
+message ListColumnsRequest { string board_id = 1; }
+message ListColumnsResponse { repeated Column columns = 1; } // ordenadas por position asc
+message DeleteColumnRequest { string id = 1; } // borra en cascada BoardActivity/Task/AcceptanceCriterion de esa columna
+
+message ColumnPosition {
+  string id = 1;
+  int32 position = 2;
+}
+message ReorderColumnsRequest {
+  string board_id = 1;
+  repeated ColumnPosition columns = 2; // set completo de posiciones deseado
+}
+message ReorderColumnsResponse { repeated Column columns = 1; }
+
+// ── BoardActivity ────────────────────────────────────────────────────────
+//
+// El service se llama ActivityService (no BoardActivityService) porque
+// vive en el paquete board.v1 — no hay colisión posible con
+// profile.v1.ActivityService al ser paquetes proto distintos. Del lado Go
+// sí se usa el nombre BoardActivityServer para el struct que lo implementa,
+// para no chocar con el ActivityServer de profile.v1 dentro del mismo
+// paquete Go internal/service.
+
+message BoardActivity {
+  string id = 1;
+  string board_id = 2;
+  string column_id = 3;
+  string title = 4;
+  string description = 5;
+  string assignee_user_id = 6; // referencia blanda a profile.v1.User (tenancy.db), opcional
+  Priority priority = 7;
+  repeated string tags = 8;
+  int32 position = 9; // orden dentro de la columna, 0-based
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  optional google.protobuf.Timestamp closed_at = 12;
+}
+
+message CreateActivityRequest {
+  string board_id = 1;
+  string column_id = 2;
+  string title = 3;
+  string description = 4;
+  string assignee_user_id = 5;
+  Priority priority = 6;
+  repeated string tags = 7;
+}
+message CreateActivityResponse { BoardActivity activity = 1; }
+message GetActivityRequest { string id = 1; }
+message GetActivityResponse { BoardActivity activity = 1; }
+message ListActivitiesRequest {
+  string board_id = 1;
+  string column_id = 2; // vacío = todas las columnas del board
+}
+message ListActivitiesResponse { repeated BoardActivity activities = 1; } // ordenadas por column_id, position asc
+message UpdateActivityRequest {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string assignee_user_id = 4;
+  Priority priority = 5;
+  repeated string tags = 6;
+}
+message UpdateActivityResponse { BoardActivity activity = 1; }
+message DeleteActivityRequest { string id = 1; } // borra en cascada Task/AcceptanceCriterion de esa activity
+
+message MoveActivityRequest {
+  string id = 1;
+  string target_column_id = 2;
+  int32 position = 3; // posición deseada dentro de target_column_id
+}
+message MoveActivityResponse { BoardActivity activity = 1; }
+
+// ── Task ─────────────────────────────────────────────────────────────────
+//
+// AcceptanceCriterion se gestiona siempre inline con su Task — no hay RPCs
+// propios para crearlo/borrarlo suelto.
+
+message Task {
+  string id = 1;
+  string board_activity_id = 2;
+  string title = 3;
+  bool done = 4;
+  int32 position = 5; // orden dentro de la BoardActivity, 0-based
+  repeated AcceptanceCriterion acceptance_criteria = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message AcceptanceCriterion {
+  string id = 1;
+  string task_id = 2;
+  string description = 3;
+  bool done = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// AcceptanceCriterionInput es el shape mínimo para crear un criterio inline
+// al crear una Task — sin id/task_id/done (el server los asigna: id nuevo,
+// done=false por default).
+message AcceptanceCriterionInput {
+  string description = 1;
+}
+
+message CreateTaskRequest {
+  string board_activity_id = 1;
+  string title = 2;
+  repeated AcceptanceCriterionInput acceptance_criteria = 3;
+}
+message CreateTaskResponse { Task task = 1; }
+message GetTaskRequest { string id = 1; }
+message GetTaskResponse { Task task = 1; }
+message ListTasksRequest { string board_activity_id = 1; }
+message ListTasksResponse { repeated Task tasks = 1; } // ordenadas por position asc
+message UpdateTaskRequest {
+  string id = 1;
+  string title = 2;
+  bool done = 3; // sin validar contra acceptance_criteria — ver nota de alcance arriba
+  int32 position = 4;
+}
+message UpdateTaskResponse { Task task = 1; }
+message DeleteTaskRequest { string id = 1; } // borra en cascada sus AcceptanceCriterion
+
+// ── Servicios ────────────────────────────────────────────────────────────
+
+service BoardService {
+  rpc CreateBoard(CreateBoardRequest) returns (CreateBoardResponse);
+  rpc GetBoard(GetBoardRequest) returns (GetBoardResponse);
+  rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse);
+  rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty);
+  rpc ResolveBoard(ResolveBoardRequest) returns (ResolveBoardResponse);
+}
+
+service ColumnService {
+  rpc CreateColumn(CreateColumnRequest) returns (CreateColumnResponse);
+  rpc ListColumns(ListColumnsRequest) returns (ListColumnsResponse);
+  rpc DeleteColumn(DeleteColumnRequest) returns (google.protobuf.Empty);
+  rpc ReorderColumns(ReorderColumnsRequest) returns (ReorderColumnsResponse);
+}
+
+service ActivityService {
+  rpc CreateActivity(CreateActivityRequest) returns (CreateActivityResponse);
+  rpc GetActivity(GetActivityRequest) returns (GetActivityResponse);
+  rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
+  rpc UpdateActivity(UpdateActivityRequest) returns (UpdateActivityResponse);
+  rpc DeleteActivity(DeleteActivityRequest) returns (google.protobuf.Empty);
+  rpc MoveActivity(MoveActivityRequest) returns (MoveActivityResponse);
+}
+
+service TaskService {
+  rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
+  rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
+  rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+}

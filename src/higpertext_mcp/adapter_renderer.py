@@ -183,9 +183,11 @@ def _write(path: Path, content: str, written: list[str], root: Path) -> None:
 
 
 def _workflows(root: Path, base: Path, written: list[str]) -> None:
+    # Solo los .md de referencia rápida (comandos tipo slash) — las skills
+    # reales (SKILL.md) ya no salen de acá: las materializa skill_renderer.py
+    # desde el catálogo de SkillService, no de este diccionario hardcodeado.
     for name, content in WORKFLOWS.items():
         _write(base / "workflows" / f"{name}.md", content, written, root)
-        _write(base / "skills" / name / "SKILL.md", f"---\nname: {name}\n---\n\n{content}", written, root)
 
 
 def render(root: Path, assistants: list[str], profile, caps: list, rules: list) -> dict:
@@ -200,7 +202,7 @@ def render(root: Path, assistants: list[str], profile, caps: list, rules: list) 
         if assistant == "codex":
             _write(root / "AGENTS.md", content, written, root)
             _write(root / ".codex" / "rules" / "higpertext_rules.md", content, written, root)
-            for name in ("workflows", "skills"):
+            for name in ("workflows",):
                 (root / ".agents" / name).mkdir(parents=True, exist_ok=True)
             _workflows(root, root / ".agents", written)
             _write(root / ".agents" / "rules" / "higpertext_rules.md", content, written, root)
@@ -211,7 +213,7 @@ def render(root: Path, assistants: list[str], profile, caps: list, rules: list) 
             _write(root / ".clauderules", content, written, root)
         elif assistant == "gemini":
             _write(root / "GEMINI.md", content, written, root)
-            for name in ("workflows", "skills"):
+            for name in ("workflows",):
                 (root / ".gemini" / name).mkdir(parents=True, exist_ok=True)
             _workflows(root, root / ".gemini", written)
         elif assistant == "copilot":
