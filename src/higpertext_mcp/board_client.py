@@ -94,6 +94,8 @@ def _activity_to_dict(a: board_pb2.BoardActivity) -> dict:
         "priority": board_pb2.Priority.Name(a.priority),
         "tags": list(a.tags),
         "position": a.position,
+        "type": board_pb2.WorkItemType.Name(a.type),
+        "parent_id": a.parent_id,
     }
 
 
@@ -151,12 +153,14 @@ async def resolve_column_id(board_id: str, column_name: str) -> str:
 async def create_activity(
     *,
     board_id: str,
-    column_id: str,
     title: str,
+    column_id: str = "",
     description: str = "",
     assignee_user_id: str = "",
     priority: str = "PRIORITY_UNSPECIFIED",
     tags: list[str] | None = None,
+    item_type: str = "ROADMAP",
+    parent_id: str = "",
 ) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.ActivityServiceStub(channel)
@@ -169,6 +173,8 @@ async def create_activity(
                 assignee_user_id=assignee_user_id,
                 priority=board_pb2.Priority.Value(priority.upper()),
                 tags=tags or [],
+                type=board_pb2.WorkItemType.Value(item_type.upper()),
+                parent_id=parent_id,
             ),
             timeout=_CALL_TIMEOUT_S,
         )

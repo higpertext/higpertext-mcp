@@ -22,15 +22,3 @@ permission:
 
 - Expand scope beyond approved tasks
 - Modify production PowerShell code when task is docs/agents-only
-
-## Active skills
-
-- [higpertext-guide](file:///.agents/skills/higpertext-guide/SKILL.md)
-
-## Active subagents
-
-- `research`
-
-# Session Info
-- **Session ID**: `sess_1788344422_d70a`
-- **Status**: `active`

@@ -1,4 +1,5 @@
 ---
+name: common.spec
 description: Generate and refine functional specifications through interactive assumptions clarification and BDD output.
 mode: primary
 temperature: 0.1

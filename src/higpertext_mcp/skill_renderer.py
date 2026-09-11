@@ -18,7 +18,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from higpertext_mcp import profile_client
+from higpertext_mcp import discovery, profile_client
 
 # Multiple assistants can share a directory (codex/antigravity both use
 # .agents/skills) — rendering is deduplicated by directory, not by assistant.
@@ -58,7 +58,7 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, d
     # copilot/opencode) no es un error — simplemente no recibe nada acá.
     selected = [a for a in dict.fromkeys(assistants) if a in _SKILLS_DIR] or list(_SKILLS_DIR)
 
-    project = await profile_client.resolve_project(str(root))
+    project = await profile_client.resolve_project(str(discovery.canonical_project_path(root)))
     project_id = project.get("id", "")
 
     skills = await profile_client.list_skills(enabled_only=True)

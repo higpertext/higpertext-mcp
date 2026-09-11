@@ -1,4 +1,5 @@
 ---
+name: common.review
 description: Perform risk-oriented review of proposed or implemented changes against Clean Code, DDD, TDD, and best practices.
 mode: primary
 temperature: 0.1

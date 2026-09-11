@@ -14,10 +14,12 @@ import "google/protobuf/empty.proto";
 // mañana puedan extraerse como microservicio propio sin arrastrar el resto
 // del catálogo de perfiles/capabilities/gobernanza.
 //
-// Jerarquía: Board -> Column -> BoardActivity -> Task -> AcceptanceCriterion.
-// BoardActivity es la "tarjeta" que se mueve entre columnas de un kanban
-// (equivalente agile de una story/epic); Task es un ítem de checklist
-// dentro de una BoardActivity (no tiene columna propia); AcceptanceCriterion
+// Jerarquía: Board -> Column -> WorkItem (BoardActivity por compatibilidad)
+// -> Task -> AcceptanceCriterion. Un WorkItem puede ser roadmap, feature,
+// story, bug o issue; todos comparten el mismo flujo kanban.
+// BoardActivity es la "tarjeta" compatible que se mueve entre columnas
+// (equivalente agile de un WorkItem); Task es un ítem de checklist
+// dentro de un WorkItem (no tiene columna propia); AcceptanceCriterion
 // es un renglón de ese checklist, gestionado siempre inline con su Task.
 //
 // A diferencia de otros dominios de este server (ej. GovernanceService
@@ -47,6 +49,16 @@ enum Priority {
   MEDIUM = 2;
   HIGH = 3;
   CRITICAL = 4;
+}
+
+enum WorkItemType {
+  WORK_ITEM_TYPE_UNSPECIFIED = 0;
+  ROADMAP = 1;
+  EPIC = 2;
+  FEATURE = 3;
+  STORY = 4;
+  BUG = 5;
+  ISSUE = 6;
 }
 
 // ── Board ────────────────────────────────────────────────────────────────
@@ -137,16 +149,20 @@ message BoardActivity {
   google.protobuf.Timestamp created_at = 10;
   google.protobuf.Timestamp updated_at = 11;
   optional google.protobuf.Timestamp closed_at = 12;
+  WorkItemType type = 13;
+  string parent_id = 14; // WorkItem padre opcional para jerarquías agile
 }
 
 message CreateActivityRequest {
   string board_id = 1;
-  string column_id = 2;
+  string column_id = 2; // vacío = primera columna del board
   string title = 3;
   string description = 4;
   string assignee_user_id = 5;
   Priority priority = 6;
   repeated string tags = 7;
+  WorkItemType type = 8; // omitido = ROADMAP por compatibilidad
+  string parent_id = 9;
 }
 message CreateActivityResponse { BoardActivity activity = 1; }
 message GetActivityRequest { string id = 1; }

@@ -304,20 +304,22 @@ class LearningEvent(_message.Message):
     def __init__(self, id: _Optional[str] = ..., capability_id: _Optional[str] = ..., profile: _Optional[str] = ..., outcome: _Optional[str] = ..., summary: _Optional[str] = ..., tags: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., project_id: _Optional[str] = ..., user_id: _Optional[str] = ..., total_tokens: _Optional[int] = ..., actions_total: _Optional[int] = ..., actions_success: _Optional[int] = ..., actions_failure: _Optional[int] = ..., files_modified_events: _Optional[int] = ..., files_modified_unique: _Optional[int] = ..., duration_min: _Optional[float] = ...) -> None: ...
 
 class Project(_message.Message):
-    __slots__ = ("id", "root_path", "root_path_hash", "name", "created_at", "updated_at")
+    __slots__ = ("id", "root_path", "root_path_hash", "name", "created_at", "updated_at", "paths")
     ID_FIELD_NUMBER: _ClassVar[int]
     ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
     ROOT_PATH_HASH_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    PATHS_FIELD_NUMBER: _ClassVar[int]
     id: str
     root_path: str
     root_path_hash: str
     name: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., root_path: _Optional[str] = ..., root_path_hash: _Optional[str] = ..., name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    paths: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, id: _Optional[str] = ..., root_path: _Optional[str] = ..., root_path_hash: _Optional[str] = ..., name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., paths: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class User(_message.Message):
     __slots__ = ("id", "identifier", "display_name", "created_at", "updated_at")
@@ -1044,6 +1046,48 @@ class ListProjectsResponse(_message.Message):
     PROJECTS_FIELD_NUMBER: _ClassVar[int]
     projects: _containers.RepeatedCompositeFieldContainer[Project]
     def __init__(self, projects: _Optional[_Iterable[_Union[Project, _Mapping]]] = ...) -> None: ...
+
+class AddProjectPathRequest(_message.Message):
+    __slots__ = ("project_id", "root_path")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ...) -> None: ...
+
+class AddProjectPathResponse(_message.Message):
+    __slots__ = ("project",)
+    PROJECT_FIELD_NUMBER: _ClassVar[int]
+    project: Project
+    def __init__(self, project: _Optional[_Union[Project, _Mapping]] = ...) -> None: ...
+
+class RenameProjectRequest(_message.Message):
+    __slots__ = ("project_id", "name")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    name: str
+    def __init__(self, project_id: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+
+class RenameProjectResponse(_message.Message):
+    __slots__ = ("project",)
+    PROJECT_FIELD_NUMBER: _ClassVar[int]
+    project: Project
+    def __init__(self, project: _Optional[_Union[Project, _Mapping]] = ...) -> None: ...
+
+class RemoveProjectPathRequest(_message.Message):
+    __slots__ = ("project_id", "root_path")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ...) -> None: ...
+
+class RemoveProjectPathResponse(_message.Message):
+    __slots__ = ("project",)
+    PROJECT_FIELD_NUMBER: _ClassVar[int]
+    project: Project
+    def __init__(self, project: _Optional[_Union[Project, _Mapping]] = ...) -> None: ...
 
 class ResolveUserRequest(_message.Message):
     __slots__ = ("identifier", "display_name")

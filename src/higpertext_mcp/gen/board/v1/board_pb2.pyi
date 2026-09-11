@@ -24,6 +24,23 @@ MEDIUM: Priority
 HIGH: Priority
 CRITICAL: Priority
 
+class WorkItemType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    WORK_ITEM_TYPE_UNSPECIFIED: _ClassVar[WorkItemType]
+    ROADMAP: _ClassVar[WorkItemType]
+    EPIC: _ClassVar[WorkItemType]
+    FEATURE: _ClassVar[WorkItemType]
+    STORY: _ClassVar[WorkItemType]
+    BUG: _ClassVar[WorkItemType]
+    ISSUE: _ClassVar[WorkItemType]
+WORK_ITEM_TYPE_UNSPECIFIED: WorkItemType
+ROADMAP: WorkItemType
+EPIC: WorkItemType
+FEATURE: WorkItemType
+STORY: WorkItemType
+BUG: WorkItemType
+ISSUE: WorkItemType
+
 class Board(_message.Message):
     __slots__ = ("id", "name", "description", "project_id", "created_at", "updated_at")
     ID_FIELD_NUMBER: _ClassVar[int]
@@ -171,7 +188,7 @@ class ReorderColumnsResponse(_message.Message):
     def __init__(self, columns: _Optional[_Iterable[_Union[Column, _Mapping]]] = ...) -> None: ...
 
 class BoardActivity(_message.Message):
-    __slots__ = ("id", "board_id", "column_id", "title", "description", "assignee_user_id", "priority", "tags", "position", "created_at", "updated_at", "closed_at")
+    __slots__ = ("id", "board_id", "column_id", "title", "description", "assignee_user_id", "priority", "tags", "position", "created_at", "updated_at", "closed_at", "type", "parent_id")
     ID_FIELD_NUMBER: _ClassVar[int]
     BOARD_ID_FIELD_NUMBER: _ClassVar[int]
     COLUMN_ID_FIELD_NUMBER: _ClassVar[int]
@@ -184,6 +201,8 @@ class BoardActivity(_message.Message):
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     CLOSED_AT_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    PARENT_ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     board_id: str
     column_id: str
@@ -196,10 +215,12 @@ class BoardActivity(_message.Message):
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     closed_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., board_id: _Optional[str] = ..., column_id: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., assignee_user_id: _Optional[str] = ..., priority: _Optional[_Union[Priority, str]] = ..., tags: _Optional[_Iterable[str]] = ..., position: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., closed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    type: WorkItemType
+    parent_id: str
+    def __init__(self, id: _Optional[str] = ..., board_id: _Optional[str] = ..., column_id: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., assignee_user_id: _Optional[str] = ..., priority: _Optional[_Union[Priority, str]] = ..., tags: _Optional[_Iterable[str]] = ..., position: _Optional[int] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., closed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., type: _Optional[_Union[WorkItemType, str]] = ..., parent_id: _Optional[str] = ...) -> None: ...
 
 class CreateActivityRequest(_message.Message):
-    __slots__ = ("board_id", "column_id", "title", "description", "assignee_user_id", "priority", "tags")
+    __slots__ = ("board_id", "column_id", "title", "description", "assignee_user_id", "priority", "tags", "type", "parent_id")
     BOARD_ID_FIELD_NUMBER: _ClassVar[int]
     COLUMN_ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
@@ -207,6 +228,8 @@ class CreateActivityRequest(_message.Message):
     ASSIGNEE_USER_ID_FIELD_NUMBER: _ClassVar[int]
     PRIORITY_FIELD_NUMBER: _ClassVar[int]
     TAGS_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    PARENT_ID_FIELD_NUMBER: _ClassVar[int]
     board_id: str
     column_id: str
     title: str
@@ -214,7 +237,9 @@ class CreateActivityRequest(_message.Message):
     assignee_user_id: str
     priority: Priority
     tags: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, board_id: _Optional[str] = ..., column_id: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., assignee_user_id: _Optional[str] = ..., priority: _Optional[_Union[Priority, str]] = ..., tags: _Optional[_Iterable[str]] = ...) -> None: ...
+    type: WorkItemType
+    parent_id: str
+    def __init__(self, board_id: _Optional[str] = ..., column_id: _Optional[str] = ..., title: _Optional[str] = ..., description: _Optional[str] = ..., assignee_user_id: _Optional[str] = ..., priority: _Optional[_Union[Priority, str]] = ..., tags: _Optional[_Iterable[str]] = ..., type: _Optional[_Union[WorkItemType, str]] = ..., parent_id: _Optional[str] = ...) -> None: ...
 
 class CreateActivityResponse(_message.Message):
     __slots__ = ("activity",)

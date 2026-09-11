@@ -6,6 +6,7 @@ profile server y los hooks se materializan por separado desde su catálogo.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from higpertext_mcp.gen.profile.v1 import profile_pb2
@@ -182,6 +183,40 @@ def _write(path: Path, content: str, written: list[str], root: Path) -> None:
     written.append(str(path.relative_to(root)))
 
 
+def _ensure_project_mcp(root: Path, written: list[str]) -> None:
+    """Registra higpertext en la configuración MCP común del proyecto.
+
+    La configuración compartida permite que el MCP quede disponible para
+    cualquier asistente aunque el adapter renderizado haya sido otro.
+    Conserva servidores existentes y sólo agrega higpertext si falta.
+    """
+    path = root / ".mcp.json"
+    if path.exists():
+        try:
+            config = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"{path} no contiene JSON válido: {exc}") from exc
+        if not isinstance(config, dict):
+            raise ValueError(f"{path} debe contener un objeto JSON")
+    else:
+        config = {}
+
+    servers = config.get("mcpServers")
+    if servers is None:
+        servers = {}
+        config["mcpServers"] = servers
+    if not isinstance(servers, dict):
+        raise ValueError(f"{path}: 'mcpServers' debe ser un objeto")
+    if "higpertext" in servers:
+        return
+
+    servers["higpertext"] = {
+        "type": "http",
+        "url": os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/"),
+    }
+    _write(path, json.dumps(config, ensure_ascii=False, indent=2) + "\n", written, root)
+
+
 def _workflows(root: Path, base: Path, written: list[str]) -> None:
     # Solo los .md de referencia rápida (comandos tipo slash) — las skills
     # reales (SKILL.md) ya no salen de acá: las materializa skill_renderer.py
@@ -198,6 +233,7 @@ def render(root: Path, assistants: list[str], profile, caps: list, rules: list) 
     profile_name = getattr(profile, "name", profile)
     content = _rules(profile, caps, rules)
     written: list[str] = []
+    _ensure_project_mcp(root, written)
     for assistant in selected:
         if assistant == "codex":
             _write(root / "AGENTS.md", content, written, root)

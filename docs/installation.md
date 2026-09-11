@@ -51,13 +51,26 @@ Genera `.higpertext/config/environment.json`,
 sobrescribe. Reconectá el cliente MCP al terminar para que lea el perfil y
 publique sus capabilities.
 
-El server resuelve la raíz del proyecto destino por el **cwd del proceso** en
-el que se lanza (no por el cwd de `higpertext-mcp`). Dos formas de fijarla:
+En el despliegue HTTP, las tools `higpertext-configure-project` y
+`higpertext-render-adapters` aceptan `project_id` o `root_path` para elegir
+explícitamente cualquiera de las rutas físicas registradas. Todas las rutas
+siguen compartiendo el mismo `project_id`, pero cada checkout conserva su
+propio `.higpertext` y sus propios archivos `.claude`, `.codex`, etc. Nunca se
+generan archivos en el directorio del servidor MCP.
+
+En el transporte STDIO, el server resuelve la raíz del proyecto por el
+**cwd del proceso** en el que se lanza (no por el cwd de `higpertext-mcp`).
+También se puede fijar explícitamente con:
 
 - dejar que el cliente MCP lo lance con `cwd` = raíz del proyecto destino
   (patrón estándar en Claude Code: el `.mcp.json` vive en la raíz del
   proyecto destino, y el cliente lanza el proceso ahí), o
 - forzarla explícitamente con la variable de entorno `HIGPERTEXT_PROJECT_ROOT`.
+
+En Docker, el despliegue HTTP monta el conjunto de proyectos en `/projects`.
+`HIGPERTEXT_PROJECTS_ROOT` permite cambiar la raíz host que se monta; por
+defecto usa `/home/aomerge/Documentos/Proyects`. El MCP traduce las rutas host
+recibidas por las tools a esa ruta estable dentro del contenedor.
 
 > **No uses `~` en `command`.** Postman y Claude Code lanzan el proceso con
 > `spawn()` directo (sin pasar por una shell), que no expande `~` a tu home —

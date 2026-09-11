@@ -507,7 +507,30 @@ async def resolve_project(root_path: str) -> dict:
         stub = profile_pb2_grpc.ProjectServiceStub(channel)
         resp = await stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=root_path), timeout=_CALL_TIMEOUT_S)
         p = resp.project
-        return {"id": p.id, "root_path": p.root_path, "root_path_hash": p.root_path_hash, "name": p.name}
+        return {
+            "id": p.id,
+            "root_path": p.root_path,
+            "root_path_hash": p.root_path_hash,
+            "name": p.name,
+            "paths": list(p.paths),
+        }
+
+
+async def list_projects() -> list[dict]:
+    """Lista los proyectos registrados en el profile server."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.ListProjects(profile_pb2.ListProjectsRequest(), timeout=_CALL_TIMEOUT_S)
+        return [
+            {
+                "id": p.id,
+                "root_path": p.root_path,
+                "root_path_hash": p.root_path_hash,
+                "name": p.name,
+                "paths": list(p.paths),
+            }
+            for p in resp.projects
+        ]
 
 
 async def profile_context(profile: str) -> tuple[profile_pb2.Profile, list[profile_pb2.Capability], list[profile_pb2.GovernanceRule]]:

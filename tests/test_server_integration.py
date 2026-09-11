@@ -64,6 +64,20 @@ async def test_list_tools_over_real_protocol(monkeypatch):
         assert "pattern" in grep_tool.inputSchema["properties"]
 
 
+def test_render_adapters_requires_project_selector_but_accepts_either_form():
+    schema = server_module._RENDER_ADAPTERS_TOOL.inputSchema
+
+    assert schema["oneOf"] == [{"required": ["project_id"]}, {"required": ["root_path"]}]
+    assert "required" not in schema
+
+
+def test_configure_project_accepts_project_selector():
+    schema = server_module._CONFIGURE_TOOL.inputSchema
+
+    assert {"project_id", "root_path"} <= set(schema["properties"])
+    assert schema["required"] == ["profile"]
+
+
 @pytest.mark.anyio
 async def test_configure_project_creates_missing_files(monkeypatch):
     root = Path(tempfile.mkdtemp())
@@ -118,6 +132,35 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
     assert not (tmp_path / ".gemini/subagents").exists()
     assert not (tmp_path / ".github/agents").exists()
     assert not (tmp_path / ".opencode/agents").exists()
+
+
+def test_adapter_renderer_adds_shared_mcp_for_any_adapter_and_preserves_servers(tmp_path):
+    existing = {"mcpServers": {"other": {"command": "other-mcp"}}}
+    (tmp_path / ".mcp.json").write_text(json.dumps(existing), encoding="utf-8")
+
+    adapter_renderer.render(tmp_path, ["claude"], "dev", [], [])
+
+    generated = json.loads((tmp_path / ".mcp.json").read_text())
+    assert generated["mcpServers"]["other"] == {"command": "other-mcp"}
+    assert generated["mcpServers"]["higpertext"] == {
+        "type": "http",
+        "url": "http://127.0.0.1:8790/mcp/",
+    }
+
+
+def test_adapter_renderer_does_not_rewrite_existing_higpertext_server(tmp_path):
+    existing = {
+        "mcpServers": {
+            "higpertext": {"command": "custom-higpertext", "args": ["serve"]},
+        },
+    }
+    path = tmp_path / ".mcp.json"
+    path.write_text(json.dumps(existing), encoding="utf-8")
+
+    result = adapter_renderer.render(tmp_path, ["gemini"], "dev", [], [])
+
+    assert json.loads(path.read_text()) == existing
+    assert ".mcp.json" not in result["files"]
 
 
 def test_adapter_rules_use_profile_identity_and_mcp_discovery(tmp_path):

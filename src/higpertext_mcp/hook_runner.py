@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from pathlib import Path
 
 from higpertext_mcp import discovery, profile_client
@@ -23,10 +24,26 @@ def _cache_dir(root: Path) -> Path:
     return path
 
 
+def _resolve_hook_project_root() -> Path:
+    """Raíz de proyecto para el CLI `higpertext-hook`.
+
+    A diferencia de `discovery.resolve_project_root()` (pensado para el
+    proceso MCP de larga vida, que puede servir a más de un proyecto y por
+    eso nunca confía en su propio cwd), este CLI es un subproceso nuevo por
+    cada invocación que el asistente (Claude Code, etc.) siempre lanza con
+    cwd = raíz del proyecto activo — cae a Path.cwd() cuando no hay
+    HIGPERTEXT_PROJECT_ROOT explícito, en vez de exigirlo y fallar.
+    """
+    override = os.environ.get("HIGPERTEXT_PROJECT_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path.cwd()
+
+
 async def resolve_hook_script(hook_id: str) -> Path:
     """Path local al script del hook, escrito (junto a sus shared assets) en
     `.higpertext/cache/hooks/` del proyecto actual."""
-    root = discovery.resolve_project_root()
+    root = _resolve_hook_project_root()
     cache_dir = _cache_dir(root)
 
     source_code_b64 = await profile_client.get_hook_script(hook_id)

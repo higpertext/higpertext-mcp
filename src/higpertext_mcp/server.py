@@ -44,7 +44,7 @@ GOVERNANCE_EXCEPTION_TOOL_NAME = "higpertext-governance-exception"
 _CONFIGURE_TOOL = types.Tool(
     name=CONFIGURE_TOOL_NAME,
     description=(
-        "Crea la configuración mínima de higpertext en el proyecto actual: "
+        "Crea la configuración mínima de higpertext en un proyecto seleccionado: "
         ".higpertext/config/environment.json, mcp_external.json y .mcp.json. "
         "No sobrescribe una configuración existente."
     ),
@@ -54,7 +54,15 @@ _CONFIGURE_TOOL = types.Tool(
             "profile": {
                 "type": "string",
                 "description": "Nombre de un perfil ya registrado en higpertext-server-profile.",
-            }
+            },
+            "project_id": {
+                "type": "string",
+                "description": "ID de un proyecto registrado en ProjectService.",
+            },
+            "root_path": {
+                "type": "string",
+                "description": "Una ruta registrada del proyecto destino.",
+            },
         },
         "required": ["profile"],
         "additionalProperties": False,
@@ -64,7 +72,16 @@ _CONFIGURE_TOOL = types.Tool(
 _RENDER_ADAPTERS_TOOL = types.Tool(
     name=RENDER_ADAPTERS_TOOL_NAME,
     description="Genera los archivos nativos de Codex, Claude, Gemini, Copilot, Antigravity y OpenCode desde el perfil activo.",
-    inputSchema={"type": "object", "properties": {"assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_renderer.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."}}, "additionalProperties": False},
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "project_id": {"type": "string", "description": "ID de un proyecto registrado en ProjectService."},
+            "root_path": {"type": "string", "description": "Una ruta registrada del proyecto destino."},
+            "assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_renderer.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."},
+        },
+        "oneOf": [{"required": ["project_id"]}, {"required": ["root_path"]}],
+        "additionalProperties": False,
+    },
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
 )
 _GOVERNANCE_RULE_TOOL = types.Tool(
@@ -330,10 +347,14 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
         if name == RENDER_ADAPTERS_TOOL_NAME:
             try:
-                root = discovery.resolve_project_root()
+                args = arguments if isinstance(arguments, dict) else {}
+                root, _project = await discovery.resolve_registered_project(
+                    root_path=args.get("root_path", ""),
+                    project_id=args.get("project_id", ""),
+                )
                 profile = discovery.active_profile(root) or ""
                 profile_data, caps, rules = await profile_client.profile_context(profile)
-                selected = arguments.get("assistants", []) if isinstance(arguments, dict) else []
+                selected = args.get("assistants", [])
                 data = adapter_renderer.render(root, selected, profile_data, caps, rules)
                 data["hooks"] = await hook_renderer.render(root, profile, data["assistants"])
                 data["skills"] = await skill_renderer.render(root, profile, data["assistants"])
@@ -555,9 +576,17 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == CONFIGURE_TOOL_NAME:
             try:
-                profile = arguments.get("profile") if isinstance(arguments, dict) else None
+                args = arguments if isinstance(arguments, dict) else {}
+                profile = args.get("profile")
+                if args.get("root_path") or args.get("project_id"):
+                    root, _project = await discovery.resolve_registered_project(
+                        root_path=args.get("root_path", ""),
+                        project_id=args.get("project_id", ""),
+                    )
+                else:
+                    root = discovery.resolve_project_root()
                 changes = project_config.create_project_configuration(
-                    discovery.resolve_project_root(), profile
+                    root, profile
                 )
                 summary = "Configuración de higpertext generada."
                 return types.CallToolResult(
