@@ -13,6 +13,7 @@ import asyncio
 import json
 import sys
 
+import jsonschema
 import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
@@ -46,7 +47,10 @@ _CONFIGURE_TOOL = types.Tool(
     description=(
         "Crea la configuración mínima de higpertext en un proyecto seleccionado: "
         ".higpertext/config/environment.json, mcp_external.json y .mcp.json. "
-        "No sobrescribe una configuración existente."
+        "No sobrescribe una configuración existente. `profile` es obligatorio. "
+        "`project_id` y `root_path` son opcionales: si se omiten, usa el proyecto "
+        "seleccionado por HIGPERTEXT_PROJECT_ROOT; en un Project multi-ruta, usa "
+        "`root_path` para elegir explícitamente cada checkout."
     ),
     inputSchema={
         "type": "object",
@@ -71,7 +75,12 @@ _CONFIGURE_TOOL = types.Tool(
 )
 _RENDER_ADAPTERS_TOOL = types.Tool(
     name=RENDER_ADAPTERS_TOOL_NAME,
-    description="Genera los archivos nativos de Codex, Claude, Gemini, Copilot, Antigravity y OpenCode desde el perfil activo.",
+    description=(
+        "Genera los archivos nativos desde el perfil activo del proyecto seleccionado. "
+        "Requiere exactamente uno de `project_id` o `root_path`; `assistants` solo "
+        "filtra los adaptadores a renderizar y no identifica el proyecto. "
+        "Si `assistants` se omite o es vacío, renderiza todos los adaptadores."
+    ),
     inputSchema={
         "type": "object",
         "properties": {
@@ -141,6 +150,7 @@ _HOOK_TOOL = types.Tool(
             "capability_id": {"type": "string"},
             "priority": {"type": "integer", "default": 0},
             "source_code": {"type": "string", "description": "contenido del hook en texto plano (requerido en create) — debe definir main() y usar imports relativos a sus siblings (.hook_utils, .hook_io, ._rules.*), ver higpertext-mcp/hooks-src como referencia de contrato"},
+            "script": {"type": "string", "description": "etiqueta/metadata opcional del script; no se lee desde disco"},
             "files": {"type": "object", "additionalProperties": {"type": "string"}, "description": "solo para set_shared_assets: filename (puede incluir subdirectorio, ej. '_rules/bash_rules.py') -> contenido en texto plano. Reemplaza el bundle ENTERO, no hace merge."},
         },
         "required": ["action"],
@@ -231,6 +241,7 @@ _CAPABILITY_TOOL = types.Tool(
                         "default": {"type": "string"},
                     },
                     "required": ["name"],
+                    "additionalProperties": False,
                 },
             },
             "requires_pat": {"type": "boolean"},
@@ -242,6 +253,7 @@ _CAPABILITY_TOOL = types.Tool(
                     "success_pattern": {"type": "string"},
                     "on_empty": {"type": "string"},
                 },
+                "additionalProperties": False,
             },
         },
         "required": ["action"],
@@ -276,6 +288,7 @@ _SKILL_TOOL = types.Tool(
             "version": {"type": "string", "default": "1.0.0"},
             "enabled": {"type": "boolean", "default": True},
             "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, la skill solo es visible para estos perfiles"},
+            "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
             "project_id": {"type": "string", "description": "vacío = no atada a un proyecto puntual"},
             "enabled_only": {"type": "boolean", "description": "solo para list: solo skills con enabled=true"},
         },
@@ -329,6 +342,34 @@ def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
     )
 
 
+def _invalid_arguments_result(name: str, arguments: object, error: jsonschema.ValidationError) -> types.CallToolResult:
+    """Devuelve errores de argumentos accionables sin filtrar el mensaje crudo de jsonschema."""
+    if name == RENDER_ADAPTERS_TOOL_NAME and error.validator == "oneOf":
+        detail = "se requiere exactamente uno de 'project_id' o 'root_path'"
+    elif error.validator == "required":
+        missing = error.message.removeprefix("'").removesuffix("' is a required property")
+        detail = f"'{missing}' es obligatorio"
+    else:
+        path = ".".join(str(part) for part in error.absolute_path)
+        location = f" en '{path}'" if path else ""
+        detail = f"{error.message}{location}"
+    message = f"Parámetros inválidos para '{name}': {detail}."
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=message)],
+        isError=True,
+        structuredContent={
+            "ok": False,
+            "summary": message,
+            "data": {},
+            "error": {
+                "code": "invalid_arguments",
+                "message": message,
+                "arguments": arguments if isinstance(arguments, dict) else {},
+            },
+        },
+    )
+
+
 def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     server = Server(SERVER_NAME)
     state: dict[str, dict[str, schema.ToolSpec]] = {"tools": {}}
@@ -343,8 +384,39 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
         return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
-    @server.call_tool()
+    # La validación de entrada se hace acá para poder devolver un CallToolResult
+    # útil al cliente. La validación automática del SDK corta antes del handler y
+    # expone el mensaje crudo de jsonschema (por ejemplo, "no es válido bajo
+    # ninguno de los schemas"), que no le indica al modelo cómo corregirse.
+    @server.call_tool(validate_input=False)
     async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        if "name_to_id" not in state:
+            state["tools"] = await _load_tools()
+            state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
+
+        local_tools = {
+            tool.name: tool
+            for tool in (
+                _CONFIGURE_TOOL,
+                _RENDER_ADAPTERS_TOOL,
+                _GOVERNANCE_RULE_TOOL,
+                _GOVERNANCE_EXCEPTION_TOOL,
+                _PROFILE_TOOL,
+                _CAPABILITY_TOOL,
+                _HOOK_TOOL,
+                _SKILL_TOOL,
+            )
+        }
+        capability_id = state["name_to_id"].get(name)
+        if capability_id is not None:
+            local_tools[name] = _to_mcp_tool(capability_id, state["tools"][capability_id])
+        tool = local_tools.get(name)
+        if tool is not None:
+            try:
+                jsonschema.validate(instance=arguments or {}, schema=tool.inputSchema)
+            except jsonschema.ValidationError as exc:
+                return _invalid_arguments_result(name, arguments, exc)
+
         if name == RENDER_ADAPTERS_TOOL_NAME:
             try:
                 args = arguments if isinstance(arguments, dict) else {}
@@ -527,7 +599,11 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = await profile_client.get_skill(args["id"])
                     summary = f"Skill '{data['id']}'."
                 elif action == "list":
-                    skills = await profile_client.list_skills(enabled_only=bool(args.get("enabled_only", False)))
+                    skills = await profile_client.list_skills(
+                        enabled_only=bool(args.get("enabled_only", False)),
+                        profile=args.get("profile", ""),
+                        project_id=args.get("project_id", ""),
+                    )
                     data = {"skills": skills}
                     summary = f"{len(skills)} skill(s) en el catálogo."
                 elif action == "update":
@@ -583,31 +659,49 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         root_path=args.get("root_path", ""),
                         project_id=args.get("project_id", ""),
                     )
+                    selector = "project_id" if args.get("project_id") else "root_path"
                 else:
                     root = discovery.resolve_project_root()
+                    selector = "HIGPERTEXT_PROJECT_ROOT"
                 changes = project_config.create_project_configuration(
                     root, profile
                 )
-                summary = "Configuración de higpertext generada."
+                summary = f"Configuración de higpertext generada en {root}."
                 return types.CallToolResult(
                     content=[types.TextContent(type="text", text=summary)],
-                    structuredContent={"ok": True, "summary": summary, "data": changes},
+                    structuredContent={
+                        "ok": True,
+                        "summary": summary,
+                        "data": {"root": str(root), "selector": selector, "changes": changes},
+                    },
+                )
+            except RuntimeError as exc:
+                message = (
+                    "No se pudo seleccionar el proyecto: no hay un proyecto destino "
+                    "configurado; indique 'project_id' o 'root_path'."
+                )
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=message)],
+                    isError=True,
+                    structuredContent={
+                        "ok": False,
+                        "summary": message,
+                        "data": {},
+                        "error": {"code": "project_not_selected", "message": message},
+                    },
                 )
             except (TypeError, ValueError, OSError) as exc:
                 message = f"No se pudo generar la configuración: {exc}"
                 return types.CallToolResult(
                     content=[types.TextContent(type="text", text=message)],
                     isError=True,
-                    structuredContent={"ok": False, "summary": message, "data": {}},
+                    structuredContent={
+                        "ok": False,
+                        "summary": message,
+                        "data": {},
+                        "error": {"code": "configuration_error", "message": message},
+                    },
                 )
-        if "name_to_id" not in state:
-            # Un cliente puede llamar call_tool() sin haber pedido list_tools()
-            # antes (o en tests, que hablan el server directo) — cargar acá
-            # evita depender de ese orden, mismo comportamiento que cuando
-            # _load_tools() se computaba una vez de forma síncrona al construir
-            # el server.
-            state["tools"] = await _load_tools()
-            state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         tools = state["tools"]
         capability_id = state.get("name_to_id", {}).get(name)
         if capability_id is None:

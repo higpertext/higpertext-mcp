@@ -22,7 +22,7 @@ class ToolSpec:
     raw: dict[str, Any]
 
 
-def _infer_type(default: Any) -> str:
+def _infer_type(default: Any, declared_type: Any = None) -> str:
     """Infiere el tipo JSON Schema a partir del default string de la capability.
 
     Todas las capabilities declaran sus defaults como string (formato CLI), pero
@@ -31,6 +31,17 @@ def _infer_type(default: Any) -> str:
     el tipo real acá no rompe el dispatch in-process (str(True) -> "True" sigue
     siendo válido para el parser de la capability).
     """
+    if isinstance(declared_type, str) and declared_type:
+        aliases = {
+            "bool": "boolean", "boolean": "boolean",
+            "int": "integer", "integer": "integer",
+            "float": "number", "number": "number",
+            "dict": "object", "object": "object",
+            "list": "array", "array": "array",
+            "str": "string", "string": "string",
+        }
+        if declared_type.strip().lower() in aliases:
+            return aliases[declared_type.strip().lower()]
     if not isinstance(default, str):
         return "string"
     if default.lower() in ("true", "false"):
@@ -38,6 +49,24 @@ def _infer_type(default: Any) -> str:
     if re.fullmatch(r"-?\d+", default):
         return "integer"
     return "string"
+
+
+def _schema_default(default: Any, declared_type: Any = None) -> Any:
+    """Convierte el default textual del catálogo al tipo anunciado al cliente."""
+    kind = _infer_type(default, declared_type)
+    if kind == "boolean" and isinstance(default, str):
+        return default.lower() == "true"
+    if kind == "integer" and isinstance(default, str):
+        try:
+            return int(default)
+        except ValueError:
+            return default
+    if kind == "number" and isinstance(default, str):
+        try:
+            return float(default)
+        except ValueError:
+            return default
+    return default
 
 
 def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
@@ -49,15 +78,19 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
             continue
         default = param.get("default")
         prop: dict[str, Any] = {
-            "type": _infer_type(default) if default is not None else "string",
+            "type": _infer_type(default, param.get("type")) if default is not None else _infer_type(None, param.get("type")),
             "description": param.get("description", ""),
         }
         if default is not None:
-            prop["default"] = default
+            prop["default"] = _schema_default(default, param.get("type"))
         properties[name] = prop
         if param.get("required", False):
             required.append(name)
-    schema: dict[str, Any] = {"type": "object", "properties": properties}
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+        "additionalProperties": False,
+    }
     if required:
         schema["required"] = required
     return schema
@@ -65,6 +98,16 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
 
 def _build_description(definition: dict) -> str:
     parts = [definition.get("description", "")]
+    parameters = definition.get("parameters", [])
+    if parameters:
+        parts.append("Parámetros:")
+        for parameter in parameters:
+            name = parameter.get("name", "")
+            if not name:
+                continue
+            required = "requerido" if parameter.get("required") else "opcional"
+            declared_type = parameter.get("type") or "string"
+            parts.append(f"- `{name}` ({declared_type}, {required}). {parameter.get('description', '')}".rstrip())
     contract = definition.get("contract", {})
     rules = contract.get("rules", [])
     if rules:
@@ -89,6 +132,7 @@ def _capability_to_raw(cap: profile_pb2.Capability) -> dict[str, Any]:
     for p in cap.parameters:
         param: dict[str, Any] = {
             "name": p.name,
+            "type": p.type,
             "required": p.required,
             "description": p.description,
         }

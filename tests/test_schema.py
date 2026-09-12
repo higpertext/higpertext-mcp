@@ -23,7 +23,7 @@ def test_build_input_schema_infers_boolean_type():
     parameters = [{"name": "regex", "required": False, "default": "false"}]
     result = schema._build_input_schema(parameters)
     assert result["properties"]["regex"]["type"] == "boolean"
-    assert result["properties"]["regex"]["default"] == "false"
+    assert result["properties"]["regex"]["default"] is False
 
 
 def test_build_input_schema_infers_integer_type():

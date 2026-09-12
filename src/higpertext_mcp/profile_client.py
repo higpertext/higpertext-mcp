@@ -472,10 +472,17 @@ async def get_skill(skill_id: str) -> dict:
         return _skill_to_dict(resp.skill)
 
 
-async def list_skills(*, enabled_only: bool = False) -> list[dict]:
+async def list_skills(
+    *, enabled_only: bool = False, profile: str = "", project_id: str = ""
+) -> list[dict]:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.SkillServiceStub(channel)
-        resp = await stub.ListSkills(profile_pb2.ListSkillsRequest(enabled_only=enabled_only), timeout=_CALL_TIMEOUT_S)
+        resp = await stub.ListSkills(
+            profile_pb2.ListSkillsRequest(
+                enabled_only=enabled_only, profile=profile, project_id=project_id
+            ),
+            timeout=_CALL_TIMEOUT_S,
+        )
         return [_skill_to_dict(s) for s in resp.skills]
 
 

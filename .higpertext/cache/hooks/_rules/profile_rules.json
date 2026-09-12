@@ -1,0 +1,10 @@
+{
+  "rules": [
+    {
+      "pattern": "(?<!venv[/\\\\]bin[/\\\\])(?<!Scripts[/\\\\])\\bpip\\s+install\\b|(?<!venv[/\\\\]bin[/\\\\])(?<!Scripts[/\\\\])\\bpip3\\s+install\\b",
+      "severity": "block",
+      "capability": "",
+      "reason": "Las instalaciones de paquetes deben hacerse en el entorno controlado .venv. Usa '.venv/bin/pip install <paquete>' o gestiona dependencias desde pyproject.toml."
+    }
+  ]
+}

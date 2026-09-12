@@ -69,6 +69,42 @@ def test_render_adapters_requires_project_selector_but_accepts_either_form():
 
     assert schema["oneOf"] == [{"required": ["project_id"]}, {"required": ["root_path"]}]
     assert "required" not in schema
+    assert "project_id" in schema["properties"]
+    assert "root_path" in schema["properties"]
+    assert "assistants" in schema["properties"]
+    assert "exactamente uno" in server_module._RENDER_ADAPTERS_TOOL.description
+
+
+def test_dynamic_capability_schema_is_strict_and_uses_declared_type():
+    capability = profile_pb2.Capability(
+        id="custom.tool",
+        description="tool",
+        parameters=[
+            profile_pb2.Parameter(name="enabled", type="bool", required=True),
+            profile_pb2.Parameter(name="count", type="int", default="2"),
+        ],
+    )
+    tool = server_module._to_mcp_tool(
+        capability.id, server_module.schema.tool_spec_from_capability(capability)
+    )
+    assert tool.inputSchema["additionalProperties"] is False
+    assert tool.inputSchema["properties"]["enabled"]["type"] == "boolean"
+    assert tool.inputSchema["properties"]["count"]["type"] == "integer"
+    assert tool.inputSchema["properties"]["count"]["default"] == 2
+
+
+def test_admin_schemas_expose_dispatch_parameters():
+    hook_schema = server_module._HOOK_TOOL.inputSchema
+    assert "script" in hook_schema["properties"]
+
+    capability_item = server_module._CAPABILITY_TOOL.inputSchema["properties"]["parameters"]["items"]
+    assert capability_item["additionalProperties"] is False
+
+    skill_schema = server_module._SKILL_TOOL.inputSchema
+    # These selectors are accepted by SkillService.ListSkills and must remain
+    # visible to the MCP client instead of being hidden by an old schema.
+    assert "profile" in skill_schema["properties"]
+    assert "project_id" in skill_schema["properties"]
 
 
 def test_configure_project_accepts_project_selector():
@@ -76,6 +112,40 @@ def test_configure_project_accepts_project_selector():
 
     assert {"project_id", "root_path"} <= set(schema["properties"])
     assert schema["required"] == ["profile"]
+
+
+@pytest.mark.anyio
+async def test_invalid_tool_arguments_return_actionable_result(monkeypatch):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {})
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool(
+            "higpertext-render-adapters", {"assistants": ["codex"]}
+        )
+
+    assert result.isError is True
+    assert "project_id" in result.content[0].text
+    assert "root_path" in result.content[0].text
+    assert "not valid under any" not in result.content[0].text
+    assert result.structuredContent["error"]["code"] == "invalid_arguments"
+
+
+@pytest.mark.anyio
+async def test_missing_configure_profile_returns_common_argument_error(monkeypatch):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {})
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("higpertext-configure-project", {})
+
+    assert result.isError is True
+    assert result.content[0].text.endswith("'profile' es obligatorio.")
+    assert result.structuredContent["error"]["code"] == "invalid_arguments"
 
 
 @pytest.mark.anyio
