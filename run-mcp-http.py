@@ -47,7 +47,15 @@ class _StreamableHTTPASGIApp:
 
 
 def build_app() -> Starlette:
-    mcp_server = higpertext_server.build_server(external.ExternalServerPool([]))
+    # ExternalServerPool real, no [] hardcodeado: sin esto, ningún server
+    # declarado en `.higpertext/config/mcp_external.json` (telemetry,
+    # controller, ...) queda federado bajo `external.<name>.<tool>` cuando
+    # el gateway corre por HTTP (Docker) — el modo stdio (server.py:_amain)
+    # sí lo cargaba, este entrypoint HTTP no.
+    root = discovery.resolve_project_root()
+    configs = external.load_external_servers(root)
+    pool = external.ExternalServerPool(configs)
+    mcp_server = higpertext_server.build_server(pool)
     session_manager = StreamableHTTPSessionManager(
         app=mcp_server, stateless=True, security_settings=SECURITY_SETTINGS
     )
@@ -55,7 +63,7 @@ def build_app() -> Starlette:
 
     @contextlib.asynccontextmanager
     async def lifespan(app: Starlette):
-        async with session_manager.run():
+        async with pool, session_manager.run():
             stop = asyncio.Event()
             async def collect() -> None:
                 while not stop.is_set():
@@ -82,4 +90,4 @@ def build_app() -> Starlette:
 app = build_app()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+    uvicorn.run(app, host=HOST, port=PORT, log_level="info")d

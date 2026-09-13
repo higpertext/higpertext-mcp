@@ -24,6 +24,7 @@ from pathlib import Path
 import mcp.types as types
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamable_http_client
 
 _CONFIG_REL_PATH = Path(".higpertext") / "config" / "mcp_external.json"
 _NAME_PREFIX = "external"
@@ -36,9 +37,11 @@ def _warn(message: str) -> None:
 @dataclass(frozen=True)
 class ExternalServerConfig:
     name: str
-    command: str
+    command: str | None = None
     args: list[str] = field(default_factory=list)
     env: dict[str, str] | None = None
+    transport: str = "stdio"
+    url: str | None = None
 
 
 def _read_json(path: Path) -> dict:
@@ -61,9 +64,16 @@ def load_external_servers(root: Path) -> list[ExternalServerConfig]:
             _warn(f"entrada de servidor externo inválida (no es objeto): {entry!r}")
             continue
         name = entry.get("name")
+        transport = entry.get("transport", "stdio")
         command = entry.get("command")
-        if not name or not command:
-            _warn(f"entrada de servidor externo sin 'name'/'command', omitida: {entry!r}")
+        url = entry.get("url")
+        valid = (
+            bool(name)
+            and transport in {"stdio", "http"}
+            and ((transport == "stdio" and bool(command)) or (transport == "http" and bool(url)))
+        )
+        if not valid:
+            _warn(f"entrada de servidor externo inválida, omitida: {entry!r}")
             continue
         configs.append(
             ExternalServerConfig(
@@ -71,6 +81,8 @@ def load_external_servers(root: Path) -> list[ExternalServerConfig]:
                 command=command,
                 args=list(entry.get("args", [])),
                 env=entry.get("env"),
+                transport=transport,
+                url=url,
             )
         )
     return configs
@@ -102,14 +114,50 @@ class ExternalServerPool:
 
     async def start(self) -> None:
         for cfg in self._configs:
+            # Stack por-servidor, no el compartido self._stack: si la
+            # conexión falla a mitad de camino (streamable_http_client ya
+            # entrado, ClientSession no), un __aenter__ roto queda igual
+            # registrado ahí y vuelve a explotar más tarde al cerrar TODO
+            # el pool (aclose -> self._stack.aclose()), aunque acá ya lo
+            # hayamos "atrapado" — un servidor roto tumbaría el shutdown
+            # entero. Cerrando su propio stack en el momento, el fallo
+            # queda contenido a este server y no contamina a los demás.
+            server_stack = AsyncExitStack()
             try:
-                params = StdioServerParameters(command=cfg.command, args=cfg.args, env=cfg.env)
-                read, write = await self._stack.enter_async_context(stdio_client(params))
-                session = await self._stack.enter_async_context(ClientSession(read, write))
+                if cfg.transport == "http":
+                    if not cfg.url:
+                        raise ValueError("HTTP external server requires url")
+                    read, write, _ = await server_stack.enter_async_context(streamable_http_client(cfg.url))
+                else:
+                    if not cfg.command:
+                        raise ValueError("stdio external server requires command")
+                    params = StdioServerParameters(command=cfg.command, args=cfg.args, env=cfg.env)
+                    read, write = await server_stack.enter_async_context(stdio_client(params))
+                session = await server_stack.enter_async_context(ClientSession(read, write))
                 await session.initialize()
-            except Exception as exc:  # noqa: BLE001 — un servidor roto no debe tumbar el proceso
-                _warn(f"servidor externo '{cfg.name}' no pudo iniciar: {exc}")
+            except BaseException as exc:  # noqa: BLE001 — un servidor roto no debe tumbar el proceso
+                # BaseException a propósito, no Exception: una conexión
+                # fallida (DNS, connection refused) hace que la task group
+                # interna de anyio (streamable_http_client / ClientSession)
+                # levante un asyncio.CancelledError o un BaseExceptionGroup
+                # envolviéndolo — ninguno de los dos hereda de Exception
+                # desde Python 3.8/3.11. Con `except Exception` esto se
+                # escapaba entero, tumbando el arranque de TODO
+                # higpertext-mcp por un solo server externo caído (visto
+                # con "telemetry"/"controller" apagados). El scope acá es
+                # sólo "intentar conectar un server" dentro del for, así
+                # que atrapar BaseException no esconde una cancelación real
+                # del proceso — el loop sigue con el próximo cfg y termina
+                # en el mismo tick.
+                _warn(f"servidor externo '{cfg.name}' no pudo iniciar: {exc!r}")
+                try:
+                    await server_stack.aclose()
+                except BaseException as close_exc:  # noqa: BLE001 — mismo motivo: no tumbar el proceso al descartar lo roto
+                    _warn(f"servidor externo '{cfg.name}': error adicional descartando conexión rota: {close_exc!r}")
                 continue
+            # Éxito: el stack por-servidor pasa a vivir dentro del stack
+            # del pool (se cierra junto con todo lo demás en aclose()).
+            await self._stack.enter_async_context(server_stack)
             self._sessions[cfg.name] = session
 
     async def list_tools_merged(self) -> list[types.Tool]:

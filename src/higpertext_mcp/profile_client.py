@@ -609,3 +609,31 @@ async def record_activity(
             )
     except Exception as exc:  # noqa: BLE001 — profile server caído no debe tumbar el server MCP
         _warn(f"no se pudo registrar actividad en profile server: {exc}")
+
+
+async def record_thoughts(
+    *, learning_event_id: str, thoughts: list[tuple[int, str]]
+) -> None:
+    """Registra resúmenes explícitos de una sesión. Best-effort.
+
+    ``thoughts`` contiene (seq, content); no debe usarse para enviar el
+    razonamiento interno oculto del modelo, sino el resumen de cada acción o
+    decisión observable.
+    """
+    if not learning_event_id or not thoughts:
+        return
+    try:
+        async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+            stub = profile_pb2_grpc.LearningServiceStub(channel)
+            await stub.RecordThoughts(
+                profile_pb2.RecordThoughtsRequest(
+                    learning_event_id=learning_event_id,
+                    thoughts=[
+                        profile_pb2.ThoughtInput(seq=seq, content=content)
+                        for seq, content in thoughts
+                    ],
+                ),
+                timeout=_CALL_TIMEOUT_S,
+            )
+    except Exception as exc:  # noqa: BLE001 — el aprendizaje no debe tumbar el flujo principal
+        _warn(f"no se pudieron registrar thoughts en profile server: {exc}")
