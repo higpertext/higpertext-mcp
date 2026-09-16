@@ -90,4 +90,4 @@ def build_app() -> Starlette:
 app = build_app()
 
 if __name__ == "__main__":
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")d
+    uvicorn.run(app, host=HOST, port=PORT, log_level="info")

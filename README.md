@@ -1,5 +1,18 @@
 # higpertext-mcp
 
+## Eventos canónicos
+
+Los adapters traducen los eventos nativos de cada asistente a un catálogo
+independiente de plataforma: `SESSION_STARTED`, `PROMPT_RECEIVED`,
+`PLAN_CREATED`, `ACTION_REQUESTED`, `ACTION_AUTHORIZED`, `ACTION_STARTED`,
+`ACTION_COMPLETED`, `ACTION_FAILED`, `CONTEXT_COMPACTING` y
+`SESSION_FINISHED`.
+
+La traducción se implementa en `higpertext_mcp.events` y
+`higpertext_mcp.hook_protocol`. Cada adapter declara qué eventos puede
+observar y sus limitaciones. En particular, `ACTION_AUTHORIZED` no lo emite
+un hook: la autorización efectiva pertenece al gateway/controller.
+
 Servidor MCP que expone capabilities de `higpertext-cli` como tools reales
 (function-calling), en vez del interceptor de texto sobre Bash que usaba antes el motor.
 

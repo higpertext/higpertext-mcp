@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from higpertext_mcp import hook_invoker, hook_protocol, hook_renderer
+from higpertext_mcp import events, hook_invoker, hook_protocol, hook_renderer
 
 
 def hook(id="hook_bash_guard", event="PreToolUse", matcher="Bash", timeout=10):
@@ -69,6 +69,30 @@ def test_native_shell_payload_is_canonical(assistant, payload):
     assert result["tool_name"] == "Bash"
     assert result["tool_input"]["command"] == "echo harmless"
     assert result["hook_event_name"] == "PreToolUse"
+    assert result["canonical_event"] == events.EventType.ACTION_REQUESTED.value
+    assert result["event_observation"] == "observed"
+
+
+@pytest.mark.parametrize("assistant,native,canonical", [
+    ("claude", "PreToolUse", events.EventType.ACTION_REQUESTED),
+    ("claude", "PostToolUse", events.EventType.ACTION_COMPLETED),
+    ("claude", "UserPromptSubmit", events.EventType.PROMPT_RECEIVED),
+    ("claude", "PreCompact", events.EventType.CONTEXT_COMPACTING),
+    ("claude", "Stop", events.EventType.SESSION_FINISHED),
+])
+def test_native_events_translate_to_canonical_events(assistant, native, canonical):
+    assert events.canonical_type(assistant, native) is canonical
+
+
+def test_authorization_is_never_claimed_by_an_adapter():
+    for capabilities in events.ADAPTERS.values():
+        assert events.EventType.ACTION_AUTHORIZED in capabilities.unsupported
+        assert any("gateway/controller" in limitation for limitation in capabilities.limitations)
+
+
+def test_unsupported_native_event_is_explicit():
+    with pytest.raises(ValueError, match="not supported"):
+        events.canonical_type("opencode", "UserPromptSubmit")
 
 
 @pytest.mark.parametrize("assistant", hook_protocol.EVENTS)

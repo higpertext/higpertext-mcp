@@ -26,7 +26,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from higpertext_mcp import discovery, execution, memory, profile_client, runner, tracing
+from higpertext_mcp import discovery, events, execution, memory, profile_client, runner, tracing
 
 
 @dataclass
@@ -123,10 +123,19 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
     argv = _params_to_argv(capability_id, validation.params)
     root = discovery.resolve_project_root()
     trace_id = tracing.current()
-    await memory.record_trace_event(root, trace_id=trace_id, event="capability.started", data={"capability_id": capability_id, "params": validation.params})
+    trace_data = {"capability_id": capability_id, "params": validation.params}
+    await memory.record_trace_event(
+        root, trace_id=trace_id, event=events.EventType.ACTION_REQUESTED.value, data=trace_data
+    )
     try:
         script_path = await runner.resolve_script(capability_id)
     except Exception as exc:  # noqa: BLE001 — profile server caído/script inexistente
+        await memory.record_trace_event(
+            root,
+            trace_id=trace_id,
+            event=events.EventType.ACTION_FAILED.value,
+            data={**trace_data, "stage": "resolve_script", "error": type(exc).__name__},
+        )
         return CapabilityResult(
             ok=False,
             summary="Could not fetch capability script from the profile server.",
@@ -135,6 +144,9 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
             warnings=[],
             error=str(exc),
         )
+    await memory.record_trace_event(
+        root, trace_id=trace_id, event=events.EventType.ACTION_STARTED.value, data=trace_data
+    )
     result = execution.run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
 
     contract_ok, contract_errors = True, []
@@ -156,7 +168,24 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
     await _record_activity_best_effort(
         capability_id, validation.params, result, contract_ok, contract_errors
     )
-    await memory.record_trace_event(root, trace_id=trace_id, event="capability.finished", data={"capability_id": capability_id, "ok": ok, "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr, "contract_errors": contract_errors})
+    terminal_event = (
+        events.EventType.ACTION_COMPLETED
+        if ok
+        else events.EventType.ACTION_FAILED
+    )
+    await memory.record_trace_event(
+        root,
+        trace_id=trace_id,
+        event=terminal_event.value,
+        data={
+            "capability_id": capability_id,
+            "ok": ok,
+            "returncode": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "contract_errors": contract_errors,
+        },
+    )
 
     return CapabilityResult(
         ok=ok,

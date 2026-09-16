@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 
+from higpertext_mcp import events
+
 EVENTS = {
     "opencode": {"PreToolUse": "tool.execute.before", "PostToolUse": "tool.execute.after"},
     "claude": {e: e for e in ("PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "PreCompact")},
@@ -56,7 +58,14 @@ def normalize(assistant: str, event: str, payload: dict) -> dict:
     for key in ("filePath", "filepath", "path", "AbsolutePath", "TargetFile"):
         if "file_path" not in args and key in args:
             args["file_path"] = args[key]
-    result.update(hook_event_name=event, tool_name=name, tool_input=args)
+    canonical = events.canonical_type(assistant, event)
+    result.update(
+        hook_event_name=event,
+        canonical_event=canonical.value,
+        event_observation="observed",
+        tool_name=name,
+        tool_input=args,
+    )
     return result
 
 
