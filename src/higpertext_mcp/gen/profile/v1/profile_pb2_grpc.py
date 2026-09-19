@@ -1094,6 +1094,250 @@ class HookService:
             _registered_method=True)
 
 
+class AgentServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.CreateAgent = channel.unary_unary(
+                '/profile.v1.AgentService/CreateAgent',
+                request_serializer=profile_dot_v1_dot_profile__pb2.CreateAgentRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.CreateAgentResponse.FromString,
+                _registered_method=True)
+        self.GetAgent = channel.unary_unary(
+                '/profile.v1.AgentService/GetAgent',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetAgentRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetAgentResponse.FromString,
+                _registered_method=True)
+        self.ListAgents = channel.unary_unary(
+                '/profile.v1.AgentService/ListAgents',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListAgentsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListAgentsResponse.FromString,
+                _registered_method=True)
+        self.UpdateAgent = channel.unary_unary(
+                '/profile.v1.AgentService/UpdateAgent',
+                request_serializer=profile_dot_v1_dot_profile__pb2.UpdateAgentRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.UpdateAgentResponse.FromString,
+                _registered_method=True)
+        self.DeleteAgent = channel.unary_unary(
+                '/profile.v1.AgentService/DeleteAgent',
+                request_serializer=profile_dot_v1_dot_profile__pb2.DeleteAgentRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
+
+
+class AgentServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def CreateAgent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAgent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListAgents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateAgent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteAgent(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_AgentServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'CreateAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateAgent,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.CreateAgentRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.CreateAgentResponse.SerializeToString,
+            ),
+            'GetAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAgent,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetAgentRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetAgentResponse.SerializeToString,
+            ),
+            'ListAgents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListAgents,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListAgentsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListAgentsResponse.SerializeToString,
+            ),
+            'UpdateAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateAgent,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.UpdateAgentRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.UpdateAgentResponse.SerializeToString,
+            ),
+            'DeleteAgent': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteAgent,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteAgentRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.AgentService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.AgentService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class AgentService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def CreateAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AgentService/CreateAgent',
+            profile_dot_v1_dot_profile__pb2.CreateAgentRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.CreateAgentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AgentService/GetAgent',
+            profile_dot_v1_dot_profile__pb2.GetAgentRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetAgentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListAgents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AgentService/ListAgents',
+            profile_dot_v1_dot_profile__pb2.ListAgentsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListAgentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AgentService/UpdateAgent',
+            profile_dot_v1_dot_profile__pb2.UpdateAgentRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.UpdateAgentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteAgent(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.AgentService/DeleteAgent',
+            profile_dot_v1_dot_profile__pb2.DeleteAgentRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
 class GovernanceServiceStub:
     """Missing associated documentation comment in .proto file."""
 

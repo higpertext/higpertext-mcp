@@ -506,6 +506,83 @@ async def delete_skill(skill_id: str) -> None:
         await stub.DeleteSkill(profile_pb2.DeleteSkillRequest(id=skill_id), timeout=_CALL_TIMEOUT_S)
 
 
+def _agent_to_dict(a: profile_pb2.Agent) -> dict:
+    return {
+        "id": a.id, "name": a.name, "description": a.description,
+        "tools": list(a.tools), "model": a.model, "prompt": a.prompt,
+        "permission_mode": a.permission_mode, "skills": list(a.skills), "memory": a.memory,
+        "background": a.background if a.HasField("background") else None,
+        "color": a.color, "effort": a.effort,
+        "profiles": list(a.profiles),  # vacío = agent global (común a todo el sistema)
+        "project_id": a.project_id,    # referencia blanda opcional a Project.id (tenancy.db)
+    }
+
+
+async def create_agent(
+    *, id: str, name: str = "", description: str = "", tools: list[str] | None = None,
+    model: str = "", prompt: str = "", permission_mode: str = "", skills: list[str] | None = None,
+    memory: str = "", background: bool | None = None, color: str = "", effort: str = "",
+    profiles: list[str] | None = None, project_id: str = "",
+) -> dict:
+    """Da de alta un subagente de Claude Code. A diferencia de Skill, el
+    front matter no viaja como blob opaco: cada campo es estructurado y quien
+    lo materializa en .claude/agents/<id>.md es agent_renderer.py, no este
+    cliente."""
+    req = profile_pb2.CreateAgentRequest(
+        id=id, name=name or id, description=description, tools=tools or [], model=model,
+        prompt=prompt, permission_mode=permission_mode, skills=skills or [], memory=memory,
+        color=color, effort=effort, profiles=profiles or [], project_id=project_id,
+    )
+    if background is not None:
+        req.background = background
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.AgentServiceStub(channel)
+        resp = await stub.CreateAgent(req, timeout=_CALL_TIMEOUT_S)
+        return _agent_to_dict(resp.agent)
+
+
+async def get_agent(agent_id: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.AgentServiceStub(channel)
+        resp = await stub.GetAgent(profile_pb2.GetAgentRequest(id=agent_id), timeout=_CALL_TIMEOUT_S)
+        return _agent_to_dict(resp.agent)
+
+
+async def list_agents(*, profile: str = "", project_id: str = "") -> list[dict]:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.AgentServiceStub(channel)
+        resp = await stub.ListAgents(
+            profile_pb2.ListAgentsRequest(profile=profile, project_id=project_id),
+            timeout=_CALL_TIMEOUT_S,
+        )
+        return [_agent_to_dict(a) for a in resp.agents]
+
+
+async def update_agent(
+    *, id: str, name: str, description: str, tools: list[str] | None, model: str, prompt: str,
+    permission_mode: str = "", skills: list[str] | None = None, memory: str = "",
+    background: bool | None = None, color: str = "", effort: str = "",
+    profiles: list[str] | None = None, project_id: str = "",
+) -> dict:
+    req = profile_pb2.UpdateAgentRequest(
+        id=id, name=name, description=description, tools=tools or [], model=model, prompt=prompt,
+        permission_mode=permission_mode, skills=skills or [], memory=memory,
+        color=color, effort=effort, profiles=profiles or [], project_id=project_id,
+    )
+    if background is not None:
+        req.background = background
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.AgentServiceStub(channel)
+        resp = await stub.UpdateAgent(req, timeout=_CALL_TIMEOUT_S)
+        return _agent_to_dict(resp.agent)
+
+
+async def delete_agent(agent_id: str) -> None:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.AgentServiceStub(channel)
+        await stub.DeleteAgent(profile_pb2.DeleteAgentRequest(id=agent_id), timeout=_CALL_TIMEOUT_S)
+
+
 async def resolve_project(root_path: str) -> dict:
     """Resuelve (o crea) el Project asociado a root_path — tenancy.db, separada
     de profile.db. Usado para scopear skills/actividad/aprendizaje a "este
@@ -612,13 +689,12 @@ async def record_activity(
 
 
 async def record_thoughts(
-    *, learning_event_id: str, thoughts: list[tuple[int, str]]
+    *, learning_event_id: str, thoughts: list[dict]
 ) -> None:
     """Registra resúmenes explícitos de una sesión. Best-effort.
 
-    ``thoughts`` contiene (seq, content); no debe usarse para enviar el
-    razonamiento interno oculto del modelo, sino el resumen de cada acción o
-    decisión observable.
+    ``thoughts`` contiene metadatos de acciones observables; no debe usarse
+    para enviar el razonamiento interno oculto del modelo.
     """
     if not learning_event_id or not thoughts:
         return
@@ -629,8 +705,15 @@ async def record_thoughts(
                 profile_pb2.RecordThoughtsRequest(
                     learning_event_id=learning_event_id,
                     thoughts=[
-                        profile_pb2.ThoughtInput(seq=seq, content=content)
-                        for seq, content in thoughts
+                        profile_pb2.ThoughtInput(
+                            seq=item["seq"], content=item["content"],
+                            action_id=item.get("action_id", ""),
+                            tool_name=item.get("tool_name", ""),
+                            outcome=item.get("outcome", ""),
+                            tokens=item.get("tokens", 0),
+                            output_text=item.get("output_text", ""),
+                        )
+                        for item in thoughts
                     ],
                 ),
                 timeout=_CALL_TIMEOUT_S,

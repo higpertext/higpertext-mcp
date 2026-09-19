@@ -122,6 +122,33 @@ message HookDefinition {
   google.protobuf.Timestamp updated_at = 14;
 }
 
+// ── Agents ─────────────────────────────────────────────────────────────────
+
+// Agent almacena la definición de un subagente de Claude Code (.claude/agents/*.md):
+// front matter YAML estructurado + prompt (cuerpo markdown = system prompt del
+// subagente). A diferencia de Skill, el front matter no viaja como blob opaco:
+// cada campo es estructurado para permitir CRUD granular vía higpertext-agent,
+// y quien renderiza (agent_renderer.py en higpertext-mcp) sintetiza el .md final
+// (frontmatter + body) a partir de estos campos.
+message Agent {
+  string id = 1;               // clave natural, ej. "mcp-test-runner" (== nombre de archivo sin .md)
+  string name = 2;              // frontmatter `name` — normalmente == id
+  string description = 3;       // frontmatter `description` — usado por Claude Code para auto-invocación
+  repeated string tools = 4;    // frontmatter `tools`, ej. ["Read","Grep","Bash"]; vacío = sin restricción
+  string model = 5;             // frontmatter `model`, ej. "sonnet"
+  string prompt = 6;            // cuerpo markdown = system prompt del subagente
+  string permission_mode = 7;   // opcional; "" = omitir del frontmatter
+  repeated string skills = 8;   // opcional; vacío = omitir
+  string memory = 9;            // opcional; "" = omitir
+  optional bool background = 10; // opcional; sin setear = omitir del frontmatter (no emitir "background: false")
+  string color = 11;            // opcional; "" = omitir
+  string effort = 12;           // opcional; "" = omitir
+  repeated string profiles = 13; // vacío = global, misma semántica que Skill.profiles; NO se emite en el .md
+  string project_id = 14;        // referencia blanda opcional a Project.id, igual que Skill.project_id; NO se emite en el .md
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp updated_at = 16;
+}
+
 // ── Reglas de gobernanza ──────────────────────────────────────────────────────
 
 message GovernanceRule {
@@ -215,7 +242,7 @@ message LearningEvent {
   string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
 
   // Resumen de sesión (capability_id="session", uno por sesión, emitido por
-  // hook_session_stop agregando .higpertext/state/telemetry.jsonl). En un
+  // hook_session_stop agregando la telemetría de Redis). En un
   // LearningEvent normal de una capability puntual, estos campos quedan en
   // su cero (0/0.0) — no se confunden con "cero tokens reales" porque solo
   // se leen cuando capability_id == "session".
@@ -226,6 +253,7 @@ message LearningEvent {
   int32 files_modified_events = 14;   // cuenta ediciones (Edit/Write), no archivos únicos
   int32 files_modified_unique = 15;   // archivos distintos tocados, deduplicados por path
   double duration_min = 16;
+  repeated string capabilities = 17; // snapshot de capabilities efectivas al abrir la sesión
 }
 
 // ── Proyectos y usuarios (tenancy.db, separada de profile.db) ─────────────
@@ -271,6 +299,11 @@ message Thought {
   int32 seq = 3;
   string content = 4;
   google.protobuf.Timestamp created_at = 5;
+  string action_id = 6;
+  string tool_name = 7;
+  string outcome = 8;
+  int64 tokens = 9;
+  string output_text = 10;
 }
 
 message LearningStat {
@@ -417,6 +450,51 @@ message SetSharedHookAssetsResponse { SharedHookAssets assets = 1; }
 message GetSharedHookAssetsRequest {}
 message GetSharedHookAssetsResponse { SharedHookAssets assets = 1; }
 
+message CreateAgentRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string tools = 4;
+  string model = 5;
+  string prompt = 6;
+  string permission_mode = 7;
+  repeated string skills = 8;
+  string memory = 9;
+  optional bool background = 10;
+  string color = 11;
+  string effort = 12;
+  repeated string profiles = 13;
+  string project_id = 14;
+}
+message CreateAgentResponse { Agent agent = 1; }
+message GetAgentRequest { string id = 1; }
+message GetAgentResponse { Agent agent = 1; }
+// Sin filtros: todos los agents. profile/project_id filtran por scope exacto,
+// mismo criterio que ListSkillsRequest (sin enabled_only: Agent no tiene ese campo).
+message ListAgentsRequest {
+  string profile = 1;
+  string project_id = 2;
+}
+message ListAgentsResponse { repeated Agent agents = 1; }
+message UpdateAgentRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string tools = 4;
+  string model = 5;
+  string prompt = 6;
+  string permission_mode = 7;
+  repeated string skills = 8;
+  string memory = 9;
+  optional bool background = 10;
+  string color = 11;
+  string effort = 12;
+  repeated string profiles = 13;
+  string project_id = 14;
+}
+message UpdateAgentResponse { Agent agent = 1; }
+message DeleteAgentRequest { string id = 1; }
+
 message CreateRuleRequest {
   string id = 1; // natural key definido por el llamante, ej. "sec-001"
   string description = 2;
@@ -508,6 +586,7 @@ message RecordLearningRequest {
   int32 files_modified_events = 12;
   int32 files_modified_unique = 13;
   double duration_min = 14;
+  repeated string capabilities = 15; // snapshot de capabilities efectivas de la sesión
 }
 message RecordLearningResponse { LearningEvent event = 1; }
 message ListLearningEventsRequest {
@@ -523,6 +602,11 @@ message GetLearningStatsResponse { repeated LearningStat stats = 1; }
 message ThoughtInput {
   int32 seq = 1;
   string content = 2;
+  string action_id = 3;
+  string tool_name = 4;
+  string outcome = 5;
+  int64 tokens = 6;
+  string output_text = 7;
 }
 message RecordThoughtsRequest {
   string learning_event_id = 1;
@@ -595,6 +679,14 @@ service HookService {
 
   rpc SetSharedHookAssets(SetSharedHookAssetsRequest) returns (SetSharedHookAssetsResponse);
   rpc GetSharedHookAssets(GetSharedHookAssetsRequest) returns (GetSharedHookAssetsResponse);
+}
+
+service AgentService {
+  rpc CreateAgent(CreateAgentRequest) returns (CreateAgentResponse);
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse);
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  rpc UpdateAgent(UpdateAgentRequest) returns (UpdateAgentResponse);
+  rpc DeleteAgent(DeleteAgentRequest) returns (google.protobuf.Empty);
 }
 
 service GovernanceService {

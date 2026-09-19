@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from higpertext_mcp import adapter_renderer, discovery, dispatch, hook_renderer, skill_renderer, server as server_module
+from higpertext_mcp import adapter_renderer, agent_renderer, discovery, dispatch, hook_renderer, skill_renderer, server as server_module
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
@@ -58,7 +58,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "higpertext-agent", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
@@ -310,6 +310,135 @@ async def test_skill_renderer_scopes_by_project_and_profile_and_prunes_stale(mon
     assert not stale_dir.exists()
     assert (claude_dir / "common.build" / "SKILL.md").read_text() == "common.build content"
     assert output[".claude/skills"]["pruned"] == ["stale-skill"]
+
+
+def test_agent_render_md_omits_unset_optional_fields():
+    agent = {
+        "id": "mcp-test-runner", "name": "mcp-test-runner", "description": "runs tests",
+        "tools": ["Read", "Grep", "Glob", "Bash"], "model": "sonnet", "prompt": "You run tests.",
+        "permission_mode": "", "skills": [], "memory": "", "background": None, "color": "", "effort": "",
+    }
+    rendered = agent_renderer._render_claude(agent)
+    assert rendered.startswith(
+        "---\nname: mcp-test-runner\ndescription: runs tests\ntools: Read, Grep, Glob, Bash\nmodel: sonnet\n---\n\n"
+    )
+    assert "permissionMode" not in rendered
+    assert "background" not in rendered
+    assert agent_renderer._MARKER_TEXT in rendered
+
+
+def test_agent_render_codex_toml_omits_fields_without_codex_equivalent():
+    agent = {
+        "id": "mcp-test-runner", "name": "mcp-test-runner", "description": "runs tests",
+        "tools": ["Read", "Grep", "Glob", "Bash"], "model": "gpt-5-codex", "prompt": "You run tests.",
+        "permission_mode": "acceptEdits", "skills": ["common.build"], "memory": "notes", "color": "blue",
+        "effort": "high",
+    }
+    rendered = agent_renderer._render_codex(agent)
+    assert rendered.startswith(
+        'name = "mcp-test-runner"\ndescription = "runs tests"\n'
+        'developer_instructions = """\nYou run tests.\n"""\n'
+        'model = "gpt-5-codex"\nmodel_reasoning_effort = "high"\n'
+    )
+    # Sin equivalente en el schema de Codex: se omiten a propósito, no se
+    # fuerza un mapeo aproximado (tools/permission_mode/skills/memory/color).
+    for absent in ("tools", "sandbox_mode", "skills", "memory", "color", "acceptEdits", "blue"):
+        assert absent not in rendered
+    assert agent_renderer._MARKER_TEXT in rendered
+
+
+@pytest.mark.anyio
+async def test_agent_renderer_scopes_and_prunes_stale_and_respects_unmanaged_files(monkeypatch, tmp_path):
+    """Calco de test_skill_renderer_scopes_by_project_and_profile_and_prunes_stale,
+    adaptado a archivos planos + contenido sintetizado, más el mecanismo de
+    ownership propio de agent_renderer: un .md preexistente sin la marca
+    `managed_by` nunca se sobreescribe ni se poda."""
+    agents = [
+        {"id": "global-agent", "name": "global-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "global prompt", "profiles": [], "project_id": ""},
+        {"id": "project-agent", "name": "project-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "project prompt", "profiles": [], "project_id": "proj-123"},
+        {"id": "other-project-agent", "name": "other-project-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "irrelevant", "profiles": [], "project_id": "proj-999"},
+        {"id": "profile-agent", "name": "profile-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "profile prompt", "profiles": ["dev"], "project_id": ""},
+        {"id": "other-profile-agent", "name": "other-profile-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "irrelevant", "profiles": ["other"], "project_id": ""},
+    ]
+
+    async def fake_list_agents(*, profile="", project_id=""):
+        return agents
+
+    async def fake_resolve_project(root_path):
+        assert root_path == str(tmp_path)
+        return {"id": "proj-123", "root_path": root_path, "root_path_hash": "x", "name": "dev"}
+
+    monkeypatch.setattr(agent_renderer.profile_client, "list_agents", fake_list_agents)
+    monkeypatch.setattr(agent_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    agents_dir = tmp_path / ".claude" / "agents"
+    agents_dir.mkdir(parents=True)
+
+    # Managed, stale (ya no está en el catálogo visible) — debe podarse.
+    stale = agents_dir / "stale-agent.md"
+    stale.write_text(f"stale content\n\n<!-- {agent_renderer._MARKER_TEXT} -->\n", encoding="utf-8")
+
+    # Sin marca de ownership y con id colisionando con un agent visible del
+    # catálogo — editado a mano, nunca se sobreescribe.
+    unmanaged = agents_dir / "profile-agent.md"
+    unmanaged.write_text("# hand made, no marker here\n", encoding="utf-8")
+
+    output = await agent_renderer.render(tmp_path, "dev", ["claude"])
+
+    materialized = {p.name for p in agents_dir.iterdir()}
+    assert materialized == {
+        "global-agent.md", "project-agent.md", "profile-agent.md",
+    }
+    assert not stale.exists()
+    assert unmanaged.read_text(encoding="utf-8") == "# hand made, no marker here\n"
+    assert (agents_dir / "global-agent.md").read_text(encoding="utf-8") == agent_renderer._render_claude(agents[0])
+
+    result = output[".claude/agents"]
+    assert set(result["written"]) == {
+        ".claude/agents/global-agent.md", ".claude/agents/project-agent.md",
+    }
+    assert result["pruned"] == ["stale-agent"]
+    assert result["skipped_unmanaged"] == [".claude/agents/profile-agent.md"]
+
+
+@pytest.mark.anyio
+async def test_agent_renderer_targets_codex_toml_alongside_claude(monkeypatch, tmp_path):
+    """Un mismo catálogo se materializa en formatos distintos por asistente,
+    igual que hook_renderer con los 6 asistentes de hooks — acá con dos
+    destinos de extensión y contenido totalmente distintos (.md YAML+MD vs
+    .toml)."""
+    agents = [
+        {"id": "global-agent", "name": "global-agent", "description": "d", "tools": [], "model": "sonnet",
+         "prompt": "global prompt", "profiles": [], "project_id": ""},
+    ]
+
+    async def fake_list_agents(*, profile="", project_id=""):
+        return agents
+
+    async def fake_resolve_project(root_path):
+        return {"id": "proj-123", "root_path": root_path, "root_path_hash": "x", "name": "dev"}
+
+    monkeypatch.setattr(agent_renderer.profile_client, "list_agents", fake_list_agents)
+    monkeypatch.setattr(agent_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    output = await agent_renderer.render(tmp_path, "dev", ["claude", "codex"])
+
+    assert (tmp_path / ".claude/agents/global-agent.md").exists()
+    codex_path = tmp_path / ".codex/agents/global-agent.toml"
+    assert codex_path.exists()
+    assert codex_path.read_text(encoding="utf-8") == agent_renderer._render_codex(agents[0])
+    assert output[".claude/agents"]["written"] == [".claude/agents/global-agent.md"]
+    assert output[".codex/agents"]["written"] == [".codex/agents/global-agent.toml"]
+
+    # Pedir solo "claude" no debe tocar el destino de codex.
+    output_claude_only = await agent_renderer.render(tmp_path, "dev", ["claude"])
+    assert list(output_claude_only.keys()) == [".claude/agents"]
+    assert codex_path.exists()
 
 
 @pytest.mark.anyio

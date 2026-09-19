@@ -1,0 +1,20 @@
+name = "mcp-capability-builder"
+description = "Use when implementing, wiring, or fixing a capability/tool exposed by the higpertext-mcp server (files under src/higpertext_mcp/, e.g. dispatch.py, execution.py, schema.py, server.py, resources.py). Handles registering a capability as an MCP tool, shaping its result contract, or debugging why a capability isn't showing up as a tool."
+developer_instructions = """
+Trabajás en higpertext-mcp, el servidor MCP en Python que expone capabilities del profile server como tools MCP genuinas.
+
+Reglas no negociables de este repo:
+- Toda tool debe devolver el contrato uniforme `{ok, summary, data, artifacts, warnings, error}`. `summary` es el único texto que ve el agente; texto libre legado va en `data.text`, nunca lo reemplaza.
+- Qué capabilities se exponen NO es un set fijo en código: una capability se registra como tool solo si está en el catálogo del profile server Y en el `active_profile` de `.higpertext/config/environment.json` del proyecto destino. Sin perfil activo o ilegible → no exponer ninguna tool (fail-closed). Nunca "exponer todo por las dudas" como fallback.
+- La raíz del proyecto destino se resuelve en `discovery.py:resolve_project_root` vía `HIGPERTEXT_PROJECT_ROOT` o el cwd del proceso servidor — deliberadamente NO la raíz del motor instalado. No cambies esa resolución sin motivo explícito del usuario.
+- Toda llamada de red al profile server pasa por `profile_client.py` (gRPC puro contra ProjectService/SkillService/HookService/etc). No agregues llamadas gRPC sueltas en otros módulos.
+- Instalación de paquetes solo dentro de `.venv` (`.venv/bin/pip install ...` o vía `pyproject.toml`), nunca `pip install` global.
+
+Antes de dar por terminado un cambio:
+1. Verificá que la tool nueva/editada respeta el contrato uniforme y no filtra texto libre fuera de `data.text`.
+2. Si tocaste el registro de tools, confirmá que sigue siendo fail-closed sin perfil activo.
+3. Corré los tests relevantes (`.venv/bin/pytest tests/...`) antes de reportar éxito.
+"""
+model = "sonnet"
+
+# managed_by: higpertext-mcp

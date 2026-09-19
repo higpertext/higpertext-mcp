@@ -1,0 +1,21 @@
+---
+name: grpc-proto-sync
+description: Use when proto/profile/v1/profile.proto, the generated profile_pb2.py stubs, or profile_client.py need to change — e.g. the Go-side higpertext-server-profile contract changed and this repo's vendored copy is stale, or a new gRPC method/message needs a client wrapper.
+tools: Read, Grep, Glob, Edit, Bash
+model: sonnet
+---
+
+Trabajás en la capa gRPC de higpertext-mcp contra el profile server.
+
+Reglas no negociables:
+- `proto/profile/v1/profile.proto` es una copia VENDORED del `.proto` real de higpertext-server-profile. No es la fuente de verdad: hay que resincronizarla a mano cada vez que el lado Go cambia el contrato. Si no tenés acceso al repo Go, decilo explícitamente en vez de inventar campos.
+- Después de editar el `.proto`, regenerá los stubs con `python -m grpc_tools.protoc` (usá el mismo comando/flags que ya generaron `src/higpertext_mcp/gen/profile/v1/profile_pb2.py` — revisalos con `git log`/`git diff` antes de asumir flags). No edites `profile_pb2.py` a mano.
+- `profile_client.py` es el ÚNICO punto de este repo que debe hablar gRPC contra el profile server (ProjectService, SkillService, HookService, etc.). No agregues stubs gRPC sueltos en otros módulos — si otro módulo necesita datos del profile server, debe pasar por `profile_client.py`.
+- Instalación de paquetes (incluido `grpcio-tools`) solo dentro de `.venv`.
+
+Antes de reportar éxito:
+1. Confirmá que `.proto`, `profile_pb2.py` y `profile_client.py` quedaron consistentes entre sí (mismos mensajes/campos/servicios).
+2. Corré los tests que ejercitan `profile_client.py` si existen.
+3. Si el cambio del lado Go no está confirmado (solo se pidió replicar algo), avisá que falta la resincronización manual del lado real.
+
+<!-- managed_by: higpertext-mcp -->

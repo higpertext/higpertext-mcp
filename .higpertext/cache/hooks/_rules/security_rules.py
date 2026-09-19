@@ -66,7 +66,18 @@ def evaluate_path_guard(tool_name: str, tool_input: dict[str, Any]) -> RuleResul
 
 
 def mask_tool_output(tool_response: Any, root: Path) -> RuleResult | None:
-    """Enmascara secretos presentes en outputs de herramientas."""
+    """Enmascara secretos presentes en outputs de herramientas.
+
+    NOTA (2026-09-18): esta función se sigue usando desde hook_security_guard.py
+    para el branch PostToolUse, pero PostToolUse en Claude Code NO tiene forma de
+    reemplazar el output real que ve el modelo (verificado contra la doc oficial
+    — solo admite additionalContext/bloqueo retroactivo). El campo
+    `replacement_output` que devuelve esta función nunca tuvo efecto en la
+    práctica. El enmascarado real ahora se hace en PreToolUse, reescribiendo el
+    comando (ver hook_bash_output_rewrite.py + _rules/output_filter.py). Se deja
+    esta función intacta por compatibilidad hasta que se limpie el branch muerto
+    en hook_security_guard.py — no la uses como si funcionara.
+    """
     output = _stringify_response(tool_response)
     if not output:
         return None

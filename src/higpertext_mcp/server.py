@@ -21,6 +21,7 @@ from mcp.server.stdio import stdio_server
 from higpertext_mcp import (
     annotations,
     adapter_renderer,
+    agent_renderer,
     discovery,
     dispatch,
     external,
@@ -40,6 +41,7 @@ PROFILE_TOOL_NAME = "higpertext-profile"
 CAPABILITY_TOOL_NAME = "higpertext-capability"
 HOOK_TOOL_NAME = "higpertext-hook-admin"
 SKILL_TOOL_NAME = "higpertext-skill"
+AGENT_TOOL_NAME = "higpertext-agent"
 GOVERNANCE_EXCEPTION_TOOL_NAME = "higpertext-governance-exception"
 
 _CONFIGURE_TOOL = types.Tool(
@@ -297,6 +299,49 @@ _SKILL_TOOL = types.Tool(
     },
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
 )
+_AGENT_TOOL = types.Tool(
+    name=AGENT_TOOL_NAME,
+    description=(
+        "Administra el catálogo persistente de subagentes (AgentService): crear, consultar, "
+        "listar, actualizar o borrar. A diferencia de higpertext-skill, no se manda un archivo "
+        "completo: los campos van estructurados (`name`, `description`, `tools`, `model`, "
+        "`prompt` = system prompt, y opcionales `permission_mode`/`skills`/`memory`/"
+        "`background`/`color`/`effort`) y es higpertext-render-adapters el que sintetiza el "
+        "archivo nativo por asistente — `.claude/agents/<id>.md` (YAML frontmatter + cuerpo) "
+        "para Claude Code, `.codex/agents/<id>.toml` para Codex CLI (que no tiene equivalente "
+        "para `tools`/`permission_mode`/`skills`/`memory`/`color`, así que esos campos se "
+        "omiten del .toml en vez de forzarse). `profiles`/`project_id` vacíos (default) "
+        "significan agent global, compartido por todo el sistema; seteá `profiles` para "
+        "atarlo a uno o más perfiles, o `project_id` para atarlo a un único proyecto puntual. "
+        "Un archivo preexistente sin la marca de ownership del renderer nunca se sobreescribe "
+        "ni se borra automáticamente. Tras crear/editar/borrar, corré higpertext-render-adapters "
+        "para reflejar el cambio en los destinos de cada asistente."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["create", "get", "list", "update", "delete"]},
+            "id": {"type": "string", "description": "requerido en create/get/update/delete, clave natural (ej. 'mcp-test-runner')"},
+            "name": {"type": "string", "description": "requerido en create/update — frontmatter `name`, normalmente == id"},
+            "description": {"type": "string", "description": "requerido en create/update — frontmatter `description`"},
+            "tools": {"type": "array", "items": {"type": "string"}, "description": "frontmatter `tools`; vacío = sin restricción"},
+            "model": {"type": "string", "description": "requerido en create/update — frontmatter `model`, ej. 'sonnet'"},
+            "prompt": {"type": "string", "description": "requerido en create/update — cuerpo markdown, system prompt del subagente"},
+            "permission_mode": {"type": "string", "description": "opcional — frontmatter `permissionMode`"},
+            "skills": {"type": "array", "items": {"type": "string"}, "description": "opcional — frontmatter `skills`"},
+            "memory": {"type": "string", "description": "opcional — frontmatter `memory`"},
+            "background": {"type": "boolean", "description": "opcional — sin setear = omitido del frontmatter"},
+            "color": {"type": "string", "description": "opcional — frontmatter `color`"},
+            "effort": {"type": "string", "description": "opcional — frontmatter `effort`"},
+            "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, el agent solo es visible para estos perfiles"},
+            "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
+            "project_id": {"type": "string", "description": "vacío = no atado a un proyecto puntual"},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    },
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
+)
 
 
 async def _load_tools() -> dict[str, schema.ToolSpec]:
@@ -382,7 +427,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, *local, *(await ext_pool.list_tools_merged())]
+        return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
     # La validación de entrada se hace acá para poder devolver un CallToolResult
     # útil al cliente. La validación automática del SDK corta antes del handler y
@@ -405,6 +450,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 _CAPABILITY_TOOL,
                 _HOOK_TOOL,
                 _SKILL_TOOL,
+                _AGENT_TOOL,
             )
         }
         capability_id = state["name_to_id"].get(name)
@@ -430,6 +476,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 data = adapter_renderer.render(root, selected, profile_data, caps, rules)
                 data["hooks"] = await hook_renderer.render(root, profile, data["assistants"])
                 data["skills"] = await skill_renderer.render(root, profile, data["assistants"])
+                data["agents"] = await agent_renderer.render(root, profile, data["assistants"])
                 summary = f"Configuración renderizada para: {', '.join(data['assistants'])}."
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
@@ -623,6 +670,49 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar la skill: {exc}"
+                return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
+        if name == AGENT_TOOL_NAME:
+            args = arguments if isinstance(arguments, dict) else {}
+            action = args.get("action")
+            try:
+                if action == "create":
+                    data = await profile_client.create_agent(
+                        id=args["id"], name=args.get("name", ""), description=args.get("description", ""),
+                        tools=args.get("tools"), model=args.get("model", ""), prompt=args.get("prompt", ""),
+                        permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
+                        memory=args.get("memory", ""), background=args.get("background"),
+                        color=args.get("color", ""), effort=args.get("effort", ""),
+                        profiles=args.get("profiles"), project_id=args.get("project_id", ""),
+                    )
+                    summary = f"Agent '{data['id']}' creado."
+                elif action == "get":
+                    data = await profile_client.get_agent(args["id"])
+                    summary = f"Agent '{data['id']}'."
+                elif action == "list":
+                    agents = await profile_client.list_agents(
+                        profile=args.get("profile", ""), project_id=args.get("project_id", ""),
+                    )
+                    data = {"agents": agents}
+                    summary = f"{len(agents)} agent(s) en el catálogo."
+                elif action == "update":
+                    data = await profile_client.update_agent(
+                        id=args["id"], name=args["name"], description=args["description"],
+                        tools=args.get("tools"), model=args["model"], prompt=args["prompt"],
+                        permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
+                        memory=args.get("memory", ""), background=args.get("background"),
+                        color=args.get("color", ""), effort=args.get("effort", ""),
+                        profiles=args.get("profiles"), project_id=args.get("project_id", ""),
+                    )
+                    summary = f"Agent '{data['id']}' actualizado."
+                elif action == "delete":
+                    await profile_client.delete_agent(args["id"])
+                    data = {"id": args["id"]}
+                    summary = f"Agent '{args['id']}' borrado."
+                else:
+                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
+                return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudo administrar el agent: {exc}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == GOVERNANCE_EXCEPTION_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
