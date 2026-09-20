@@ -26,6 +26,31 @@ def test_build_input_schema_infers_boolean_type():
     assert result["properties"]["regex"]["default"] is False
 
 
+def test_build_input_schema_exposes_enum_values():
+    parameters = [{"name": "action", "type": "string", "enum_values": ["list", "remove"]}]
+    result = schema._build_input_schema(parameters)
+    assert result["properties"]["action"]["enum"] == ["list", "remove"]
+
+
+def test_common_legacy_parameters_are_exposed_with_rich_types():
+    cap = profile_pb2.Capability(
+        id="common.grep-search",
+        parameters=[
+            profile_pb2.Parameter(name="include", default=""),
+            profile_pb2.Parameter(name="regex", default="false"),
+            profile_pb2.Parameter(name="max_results", default="100"),
+            profile_pb2.Parameter(name="preset", default="all"),
+        ],
+    )
+    result = schema.tool_spec_from_capability(cap).input_schema["properties"]
+    assert result["include"]["type"] == "array"
+    assert result["include"]["items"] == {"type": "string"}
+    assert result["regex"]["type"] == "boolean"
+    assert result["regex"]["default"] is False
+    assert result["max_results"]["type"] == "integer"
+    assert result["preset"]["enum"] == ["all", "code", "python", "web", "docs", "config"]
+
+
 def test_build_input_schema_infers_integer_type():
     parameters = [{"name": "max_results", "required": False, "default": "100"}]
     result = schema._build_input_schema(parameters)

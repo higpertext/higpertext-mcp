@@ -62,18 +62,20 @@ class Profile(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., system_prompt: _Optional[str] = ..., capabilities: _Optional[_Iterable[str]] = ..., subprofiles: _Optional[_Iterable[str]] = ..., rules: _Optional[_Iterable[str]] = ..., hooks_global: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Parameter(_message.Message):
-    __slots__ = ("name", "type", "required", "description", "default")
+    __slots__ = ("name", "type", "required", "description", "default", "enum_values")
     NAME_FIELD_NUMBER: _ClassVar[int]
     TYPE_FIELD_NUMBER: _ClassVar[int]
     REQUIRED_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     DEFAULT_FIELD_NUMBER: _ClassVar[int]
+    ENUM_VALUES_FIELD_NUMBER: _ClassVar[int]
     name: str
     type: str
     required: bool
     description: str
     default: str
-    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., required: _Optional[bool] = ..., description: _Optional[str] = ..., default: _Optional[str] = ...) -> None: ...
+    enum_values: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., required: _Optional[bool] = ..., description: _Optional[str] = ..., default: _Optional[str] = ..., enum_values: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Contract(_message.Message):
     __slots__ = ("rules", "success_pattern", "on_empty")
@@ -170,7 +172,7 @@ class HookDefinition(_message.Message):
     def __init__(self, id: _Optional[str] = ..., event: _Optional[str] = ..., matcher: _Optional[str] = ..., script: _Optional[str] = ..., description: _Optional[str] = ..., timeout: _Optional[int] = ..., enabled: _Optional[bool] = ..., assistants: _Optional[_Iterable[str]] = ..., profiles: _Optional[_Iterable[str]] = ..., capability_id: _Optional[str] = ..., priority: _Optional[int] = ..., source_code: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Agent(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "created_at", "updated_at")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants", "created_at", "updated_at")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -185,6 +187,7 @@ class Agent(_message.Message):
     EFFORT_FIELD_NUMBER: _ClassVar[int]
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     id: str
@@ -201,9 +204,10 @@ class Agent(_message.Message):
     effort: str
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
+    assistants: _containers.RepeatedScalarFieldContainer[str]
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GovernanceRule(_message.Message):
     __slots__ = ("id", "description", "severity", "scopes", "automated", "capability", "source", "numeric_threshold", "created_at", "updated_at", "pattern", "weight")
@@ -303,44 +307,6 @@ class AuditEvent(_message.Message):
     created_at: _timestamp_pb2.Timestamp
     def __init__(self, id: _Optional[str] = ..., event: _Optional[str] = ..., tool_name: _Optional[str] = ..., hook_id: _Optional[str] = ..., rule_id: _Optional[str] = ..., decision: _Optional[str] = ..., weight: _Optional[int] = ..., summary: _Optional[str] = ..., actor: _Optional[str] = ..., profile: _Optional[str] = ..., project_id: _Optional[str] = ..., user_id: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
-class LearningEvent(_message.Message):
-    __slots__ = ("id", "capability_id", "profile", "outcome", "summary", "tags", "created_at", "project_id", "user_id", "total_tokens", "actions_total", "actions_success", "actions_failure", "files_modified_events", "files_modified_unique", "duration_min", "capabilities")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    CAPABILITY_ID_FIELD_NUMBER: _ClassVar[int]
-    PROFILE_FIELD_NUMBER: _ClassVar[int]
-    OUTCOME_FIELD_NUMBER: _ClassVar[int]
-    SUMMARY_FIELD_NUMBER: _ClassVar[int]
-    TAGS_FIELD_NUMBER: _ClassVar[int]
-    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
-    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
-    USER_ID_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_TOTAL_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_FAILURE_FIELD_NUMBER: _ClassVar[int]
-    FILES_MODIFIED_EVENTS_FIELD_NUMBER: _ClassVar[int]
-    FILES_MODIFIED_UNIQUE_FIELD_NUMBER: _ClassVar[int]
-    DURATION_MIN_FIELD_NUMBER: _ClassVar[int]
-    CAPABILITIES_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    capability_id: str
-    profile: str
-    outcome: str
-    summary: str
-    tags: _containers.RepeatedScalarFieldContainer[str]
-    created_at: _timestamp_pb2.Timestamp
-    project_id: str
-    user_id: str
-    total_tokens: int
-    actions_total: int
-    actions_success: int
-    actions_failure: int
-    files_modified_events: int
-    files_modified_unique: int
-    duration_min: float
-    capabilities: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, id: _Optional[str] = ..., capability_id: _Optional[str] = ..., profile: _Optional[str] = ..., outcome: _Optional[str] = ..., summary: _Optional[str] = ..., tags: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., project_id: _Optional[str] = ..., user_id: _Optional[str] = ..., total_tokens: _Optional[int] = ..., actions_total: _Optional[int] = ..., actions_success: _Optional[int] = ..., actions_failure: _Optional[int] = ..., files_modified_events: _Optional[int] = ..., files_modified_unique: _Optional[int] = ..., duration_min: _Optional[float] = ..., capabilities: _Optional[_Iterable[str]] = ...) -> None: ...
-
 class Project(_message.Message):
     __slots__ = ("id", "root_path", "root_path_hash", "name", "created_at", "updated_at", "paths")
     ID_FIELD_NUMBER: _ClassVar[int]
@@ -372,46 +338,6 @@ class User(_message.Message):
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
     def __init__(self, id: _Optional[str] = ..., identifier: _Optional[str] = ..., display_name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
-
-class Thought(_message.Message):
-    __slots__ = ("id", "learning_event_id", "seq", "content", "created_at", "action_id", "tool_name", "outcome", "tokens", "output_text")
-    ID_FIELD_NUMBER: _ClassVar[int]
-    LEARNING_EVENT_ID_FIELD_NUMBER: _ClassVar[int]
-    SEQ_FIELD_NUMBER: _ClassVar[int]
-    CONTENT_FIELD_NUMBER: _ClassVar[int]
-    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
-    ACTION_ID_FIELD_NUMBER: _ClassVar[int]
-    TOOL_NAME_FIELD_NUMBER: _ClassVar[int]
-    OUTCOME_FIELD_NUMBER: _ClassVar[int]
-    TOKENS_FIELD_NUMBER: _ClassVar[int]
-    OUTPUT_TEXT_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    learning_event_id: str
-    seq: int
-    content: str
-    created_at: _timestamp_pb2.Timestamp
-    action_id: str
-    tool_name: str
-    outcome: str
-    tokens: int
-    output_text: str
-    def __init__(self, id: _Optional[str] = ..., learning_event_id: _Optional[str] = ..., seq: _Optional[int] = ..., content: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., action_id: _Optional[str] = ..., tool_name: _Optional[str] = ..., outcome: _Optional[str] = ..., tokens: _Optional[int] = ..., output_text: _Optional[str] = ...) -> None: ...
-
-class LearningStat(_message.Message):
-    __slots__ = ("capability_id", "successes", "failures", "total", "success_rate", "updated_at")
-    CAPABILITY_ID_FIELD_NUMBER: _ClassVar[int]
-    SUCCESSES_FIELD_NUMBER: _ClassVar[int]
-    FAILURES_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_FIELD_NUMBER: _ClassVar[int]
-    SUCCESS_RATE_FIELD_NUMBER: _ClassVar[int]
-    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
-    capability_id: str
-    successes: int
-    failures: int
-    total: int
-    success_rate: float
-    updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, capability_id: _Optional[str] = ..., successes: _Optional[int] = ..., failures: _Optional[int] = ..., total: _Optional[int] = ..., success_rate: _Optional[float] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CreateProfileRequest(_message.Message):
     __slots__ = ("name", "description", "system_prompt", "capabilities", "subprofiles", "rules", "hooks_global")
@@ -792,7 +718,7 @@ class GetSharedHookAssetsResponse(_message.Message):
     def __init__(self, assets: _Optional[_Union[SharedHookAssets, _Mapping]] = ...) -> None: ...
 
 class CreateAgentRequest(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -807,6 +733,7 @@ class CreateAgentRequest(_message.Message):
     EFFORT_FIELD_NUMBER: _ClassVar[int]
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     description: str
@@ -821,7 +748,8 @@ class CreateAgentRequest(_message.Message):
     effort: str
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ...) -> None: ...
+    assistants: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class CreateAgentResponse(_message.Message):
     __slots__ = ("agent",)
@@ -856,7 +784,7 @@ class ListAgentsResponse(_message.Message):
     def __init__(self, agents: _Optional[_Iterable[_Union[Agent, _Mapping]]] = ...) -> None: ...
 
 class UpdateAgentRequest(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants")
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -871,6 +799,7 @@ class UpdateAgentRequest(_message.Message):
     EFFORT_FIELD_NUMBER: _ClassVar[int]
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     description: str
@@ -885,7 +814,8 @@ class UpdateAgentRequest(_message.Message):
     effort: str
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ...) -> None: ...
+    assistants: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class UpdateAgentResponse(_message.Message):
     __slots__ = ("agent",)
@@ -1081,118 +1011,6 @@ class ListAuditEventsResponse(_message.Message):
     events: _containers.RepeatedCompositeFieldContainer[AuditEvent]
     def __init__(self, events: _Optional[_Iterable[_Union[AuditEvent, _Mapping]]] = ...) -> None: ...
 
-class RecordLearningRequest(_message.Message):
-    __slots__ = ("capability_id", "profile", "outcome", "summary", "tags", "project_id", "user_id", "total_tokens", "actions_total", "actions_success", "actions_failure", "files_modified_events", "files_modified_unique", "duration_min", "capabilities")
-    CAPABILITY_ID_FIELD_NUMBER: _ClassVar[int]
-    PROFILE_FIELD_NUMBER: _ClassVar[int]
-    OUTCOME_FIELD_NUMBER: _ClassVar[int]
-    SUMMARY_FIELD_NUMBER: _ClassVar[int]
-    TAGS_FIELD_NUMBER: _ClassVar[int]
-    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
-    USER_ID_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_TOTAL_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_SUCCESS_FIELD_NUMBER: _ClassVar[int]
-    ACTIONS_FAILURE_FIELD_NUMBER: _ClassVar[int]
-    FILES_MODIFIED_EVENTS_FIELD_NUMBER: _ClassVar[int]
-    FILES_MODIFIED_UNIQUE_FIELD_NUMBER: _ClassVar[int]
-    DURATION_MIN_FIELD_NUMBER: _ClassVar[int]
-    CAPABILITIES_FIELD_NUMBER: _ClassVar[int]
-    capability_id: str
-    profile: str
-    outcome: str
-    summary: str
-    tags: _containers.RepeatedScalarFieldContainer[str]
-    project_id: str
-    user_id: str
-    total_tokens: int
-    actions_total: int
-    actions_success: int
-    actions_failure: int
-    files_modified_events: int
-    files_modified_unique: int
-    duration_min: float
-    capabilities: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, capability_id: _Optional[str] = ..., profile: _Optional[str] = ..., outcome: _Optional[str] = ..., summary: _Optional[str] = ..., tags: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., user_id: _Optional[str] = ..., total_tokens: _Optional[int] = ..., actions_total: _Optional[int] = ..., actions_success: _Optional[int] = ..., actions_failure: _Optional[int] = ..., files_modified_events: _Optional[int] = ..., files_modified_unique: _Optional[int] = ..., duration_min: _Optional[float] = ..., capabilities: _Optional[_Iterable[str]] = ...) -> None: ...
-
-class RecordLearningResponse(_message.Message):
-    __slots__ = ("event",)
-    EVENT_FIELD_NUMBER: _ClassVar[int]
-    event: LearningEvent
-    def __init__(self, event: _Optional[_Union[LearningEvent, _Mapping]] = ...) -> None: ...
-
-class ListLearningEventsRequest(_message.Message):
-    __slots__ = ("profile", "limit", "project_id", "user_id")
-    PROFILE_FIELD_NUMBER: _ClassVar[int]
-    LIMIT_FIELD_NUMBER: _ClassVar[int]
-    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
-    USER_ID_FIELD_NUMBER: _ClassVar[int]
-    profile: str
-    limit: int
-    project_id: str
-    user_id: str
-    def __init__(self, profile: _Optional[str] = ..., limit: _Optional[int] = ..., project_id: _Optional[str] = ..., user_id: _Optional[str] = ...) -> None: ...
-
-class ListLearningEventsResponse(_message.Message):
-    __slots__ = ("events",)
-    EVENTS_FIELD_NUMBER: _ClassVar[int]
-    events: _containers.RepeatedCompositeFieldContainer[LearningEvent]
-    def __init__(self, events: _Optional[_Iterable[_Union[LearningEvent, _Mapping]]] = ...) -> None: ...
-
-class GetLearningStatsRequest(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
-
-class GetLearningStatsResponse(_message.Message):
-    __slots__ = ("stats",)
-    STATS_FIELD_NUMBER: _ClassVar[int]
-    stats: _containers.RepeatedCompositeFieldContainer[LearningStat]
-    def __init__(self, stats: _Optional[_Iterable[_Union[LearningStat, _Mapping]]] = ...) -> None: ...
-
-class ThoughtInput(_message.Message):
-    __slots__ = ("seq", "content", "action_id", "tool_name", "outcome", "tokens", "output_text")
-    SEQ_FIELD_NUMBER: _ClassVar[int]
-    CONTENT_FIELD_NUMBER: _ClassVar[int]
-    ACTION_ID_FIELD_NUMBER: _ClassVar[int]
-    TOOL_NAME_FIELD_NUMBER: _ClassVar[int]
-    OUTCOME_FIELD_NUMBER: _ClassVar[int]
-    TOKENS_FIELD_NUMBER: _ClassVar[int]
-    OUTPUT_TEXT_FIELD_NUMBER: _ClassVar[int]
-    seq: int
-    content: str
-    action_id: str
-    tool_name: str
-    outcome: str
-    tokens: int
-    output_text: str
-    def __init__(self, seq: _Optional[int] = ..., content: _Optional[str] = ..., action_id: _Optional[str] = ..., tool_name: _Optional[str] = ..., outcome: _Optional[str] = ..., tokens: _Optional[int] = ..., output_text: _Optional[str] = ...) -> None: ...
-
-class RecordThoughtsRequest(_message.Message):
-    __slots__ = ("learning_event_id", "thoughts")
-    LEARNING_EVENT_ID_FIELD_NUMBER: _ClassVar[int]
-    THOUGHTS_FIELD_NUMBER: _ClassVar[int]
-    learning_event_id: str
-    thoughts: _containers.RepeatedCompositeFieldContainer[ThoughtInput]
-    def __init__(self, learning_event_id: _Optional[str] = ..., thoughts: _Optional[_Iterable[_Union[ThoughtInput, _Mapping]]] = ...) -> None: ...
-
-class RecordThoughtsResponse(_message.Message):
-    __slots__ = ("thoughts",)
-    THOUGHTS_FIELD_NUMBER: _ClassVar[int]
-    thoughts: _containers.RepeatedCompositeFieldContainer[Thought]
-    def __init__(self, thoughts: _Optional[_Iterable[_Union[Thought, _Mapping]]] = ...) -> None: ...
-
-class ListThoughtsRequest(_message.Message):
-    __slots__ = ("learning_event_id",)
-    LEARNING_EVENT_ID_FIELD_NUMBER: _ClassVar[int]
-    learning_event_id: str
-    def __init__(self, learning_event_id: _Optional[str] = ...) -> None: ...
-
-class ListThoughtsResponse(_message.Message):
-    __slots__ = ("thoughts",)
-    THOUGHTS_FIELD_NUMBER: _ClassVar[int]
-    thoughts: _containers.RepeatedCompositeFieldContainer[Thought]
-    def __init__(self, thoughts: _Optional[_Iterable[_Union[Thought, _Mapping]]] = ...) -> None: ...
-
 class ResolveProjectRequest(_message.Message):
     __slots__ = ("root_path",)
     ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
@@ -1280,3 +1098,117 @@ class ListUsersResponse(_message.Message):
     USERS_FIELD_NUMBER: _ClassVar[int]
     users: _containers.RepeatedCompositeFieldContainer[User]
     def __init__(self, users: _Optional[_Iterable[_Union[User, _Mapping]]] = ...) -> None: ...
+
+class SemanticSymbol(_message.Message):
+    __slots__ = ("name", "type", "file", "line")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    FILE_FIELD_NUMBER: _ClassVar[int]
+    LINE_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    type: str
+    file: str
+    line: int
+    def __init__(self, name: _Optional[str] = ..., type: _Optional[str] = ..., file: _Optional[str] = ..., line: _Optional[int] = ...) -> None: ...
+
+class SemanticRelation(_message.Message):
+    __slots__ = ("source", "target", "type", "confidence")
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    TARGET_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
+    source: str
+    target: str
+    type: str
+    confidence: float
+    def __init__(self, source: _Optional[str] = ..., target: _Optional[str] = ..., type: _Optional[str] = ..., confidence: _Optional[float] = ...) -> None: ...
+
+class SemanticGraphSnapshot(_message.Message):
+    __slots__ = ("project_id", "root_path", "root_hash", "revision", "indexed_at", "symbols", "relations")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    ROOT_HASH_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    INDEXED_AT_FIELD_NUMBER: _ClassVar[int]
+    SYMBOLS_FIELD_NUMBER: _ClassVar[int]
+    RELATIONS_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    root_hash: str
+    revision: str
+    indexed_at: _timestamp_pb2.Timestamp
+    symbols: _containers.RepeatedCompositeFieldContainer[SemanticSymbol]
+    relations: _containers.RepeatedCompositeFieldContainer[SemanticRelation]
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ..., root_hash: _Optional[str] = ..., revision: _Optional[str] = ..., indexed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., symbols: _Optional[_Iterable[_Union[SemanticSymbol, _Mapping]]] = ..., relations: _Optional[_Iterable[_Union[SemanticRelation, _Mapping]]] = ...) -> None: ...
+
+class GetSemanticGraphRequest(_message.Message):
+    __slots__ = ("project_id", "root_path")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ...) -> None: ...
+
+class GetSemanticGraphResponse(_message.Message):
+    __slots__ = ("snapshot",)
+    SNAPSHOT_FIELD_NUMBER: _ClassVar[int]
+    snapshot: SemanticGraphSnapshot
+    def __init__(self, snapshot: _Optional[_Union[SemanticGraphSnapshot, _Mapping]] = ...) -> None: ...
+
+class QuerySemanticGraphRequest(_message.Message):
+    __slots__ = ("project_id", "root_path", "symbol", "depth", "limit", "type", "files_only")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_FIELD_NUMBER: _ClassVar[int]
+    DEPTH_FIELD_NUMBER: _ClassVar[int]
+    LIMIT_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    FILES_ONLY_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    symbol: str
+    depth: int
+    limit: int
+    type: str
+    files_only: bool
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ..., symbol: _Optional[str] = ..., depth: _Optional[int] = ..., limit: _Optional[int] = ..., type: _Optional[str] = ..., files_only: _Optional[bool] = ...) -> None: ...
+
+class QuerySemanticGraphResponse(_message.Message):
+    __slots__ = ("symbols", "total", "revision", "indexed_at")
+    SYMBOLS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    INDEXED_AT_FIELD_NUMBER: _ClassVar[int]
+    symbols: _containers.RepeatedCompositeFieldContainer[SemanticSymbol]
+    total: int
+    revision: str
+    indexed_at: _timestamp_pb2.Timestamp
+    def __init__(self, symbols: _Optional[_Iterable[_Union[SemanticSymbol, _Mapping]]] = ..., total: _Optional[int] = ..., revision: _Optional[str] = ..., indexed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class SemanticGraphStatusRequest(_message.Message):
+    __slots__ = ("project_id", "root_path")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    root_path: str
+    def __init__(self, project_id: _Optional[str] = ..., root_path: _Optional[str] = ...) -> None: ...
+
+class SemanticGraphStatusResponse(_message.Message):
+    __slots__ = ("exists", "project_id", "root_path", "root_hash", "revision", "indexed_at", "symbol_count", "relation_count")
+    EXISTS_FIELD_NUMBER: _ClassVar[int]
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    ROOT_HASH_FIELD_NUMBER: _ClassVar[int]
+    REVISION_FIELD_NUMBER: _ClassVar[int]
+    INDEXED_AT_FIELD_NUMBER: _ClassVar[int]
+    SYMBOL_COUNT_FIELD_NUMBER: _ClassVar[int]
+    RELATION_COUNT_FIELD_NUMBER: _ClassVar[int]
+    exists: bool
+    project_id: str
+    root_path: str
+    root_hash: str
+    revision: str
+    indexed_at: _timestamp_pb2.Timestamp
+    symbol_count: int
+    relation_count: int
+    def __init__(self, exists: _Optional[bool] = ..., project_id: _Optional[str] = ..., root_path: _Optional[str] = ..., root_hash: _Optional[str] = ..., revision: _Optional[str] = ..., indexed_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., symbol_count: _Optional[int] = ..., relation_count: _Optional[int] = ...) -> None: ...

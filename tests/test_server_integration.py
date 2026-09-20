@@ -93,12 +93,31 @@ def test_dynamic_capability_schema_is_strict_and_uses_declared_type():
     assert tool.inputSchema["properties"]["count"]["default"] == 2
 
 
+def test_dynamic_capability_schema_preserves_enum_values():
+    capability = profile_pb2.Capability(
+        id="higpertext.project-registry",
+        parameters=[
+            profile_pb2.Parameter(
+                name="action", type="string", enum_values=["list", "resolve", "remove"]
+            ),
+            profile_pb2.Parameter(name="confirm", type="boolean", default="false"),
+        ],
+    )
+    tool = server_module._to_mcp_tool(
+        capability.id, server_module.schema.tool_spec_from_capability(capability)
+    )
+    assert tool.inputSchema["properties"]["action"]["enum"] == ["list", "resolve", "remove"]
+    assert tool.inputSchema["properties"]["confirm"]["type"] == "boolean"
+    assert tool.inputSchema["properties"]["confirm"]["default"] is False
+
+
 def test_admin_schemas_expose_dispatch_parameters():
     hook_schema = server_module._HOOK_TOOL.inputSchema
     assert "script" in hook_schema["properties"]
 
     capability_item = server_module._CAPABILITY_TOOL.inputSchema["properties"]["parameters"]["items"]
     assert capability_item["additionalProperties"] is False
+    assert "enum_values" in capability_item["properties"]
 
     skill_schema = server_module._SKILL_TOOL.inputSchema
     # These selectors are accepted by SkillService.ListSkills and must remain

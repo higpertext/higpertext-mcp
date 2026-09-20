@@ -1889,6 +1889,11 @@ class ProjectServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.RenameProjectRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.RenameProjectResponse.FromString,
                 _registered_method=True)
+        self.DeleteProject = channel.unary_unary(
+                '/profile.v1.ProjectService/DeleteProject',
+                request_serializer=profile_dot_v1_dot_profile__pb2.DeleteProjectRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.DeleteProjectResponse.FromString,
+                _registered_method=True)
 
 
 class ProjectServiceServicer:
@@ -1924,6 +1929,12 @@ class ProjectServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteProject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ProjectServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1951,6 +1962,11 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     servicer.RenameProject,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.RenameProjectRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.RenameProjectResponse.SerializeToString,
+            ),
+            'DeleteProject': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteProject,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteProjectRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.DeleteProjectResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2098,6 +2114,33 @@ class ProjectService:
             metadata,
             _registered_method=True)
 
+    @staticmethod
+    def DeleteProject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/DeleteProject',
+            profile_dot_v1_dot_profile__pb2.DeleteProjectRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.DeleteProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
 
 class UserServiceStub:
     """Missing associated documentation comment in .proto file."""
@@ -2203,6 +2246,164 @@ class UserService:
             '/profile.v1.UserService/ListUsers',
             profile_dot_v1_dot_profile__pb2.ListUsersRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.ListUsersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+
+class SemanticGraphServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.GetSemanticGraph = channel.unary_unary(
+                '/profile.v1.SemanticGraphService/GetSemanticGraph',
+                request_serializer=profile_dot_v1_dot_profile__pb2.GetSemanticGraphRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GetSemanticGraphResponse.FromString,
+                _registered_method=True)
+        self.QuerySemanticGraph = channel.unary_unary(
+                '/profile.v1.SemanticGraphService/QuerySemanticGraph',
+                request_serializer=profile_dot_v1_dot_profile__pb2.QuerySemanticGraphRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.QuerySemanticGraphResponse.FromString,
+                _registered_method=True)
+        self.GetSemanticGraphStatus = channel.unary_unary(
+                '/profile.v1.SemanticGraphService/GetSemanticGraphStatus',
+                request_serializer=profile_dot_v1_dot_profile__pb2.SemanticGraphStatusRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.SemanticGraphStatusResponse.FromString,
+                _registered_method=True)
+
+
+class SemanticGraphServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def GetSemanticGraph(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def QuerySemanticGraph(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSemanticGraphStatus(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_SemanticGraphServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'GetSemanticGraph': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSemanticGraph,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.GetSemanticGraphRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GetSemanticGraphResponse.SerializeToString,
+            ),
+            'QuerySemanticGraph': grpc.unary_unary_rpc_method_handler(
+                    servicer.QuerySemanticGraph,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.QuerySemanticGraphRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.QuerySemanticGraphResponse.SerializeToString,
+            ),
+            'GetSemanticGraphStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSemanticGraphStatus,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.SemanticGraphStatusRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.SemanticGraphStatusResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'profile.v1.SemanticGraphService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('profile.v1.SemanticGraphService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class SemanticGraphService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetSemanticGraph(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SemanticGraphService/GetSemanticGraph',
+            profile_dot_v1_dot_profile__pb2.GetSemanticGraphRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GetSemanticGraphResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def QuerySemanticGraph(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SemanticGraphService/QuerySemanticGraph',
+            profile_dot_v1_dot_profile__pb2.QuerySemanticGraphRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.QuerySemanticGraphResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSemanticGraphStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.SemanticGraphService/GetSemanticGraphStatus',
+            profile_dot_v1_dot_profile__pb2.SemanticGraphStatusRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.SemanticGraphStatusResponse.FromString,
             options,
             channel_credentials,
             insecure,

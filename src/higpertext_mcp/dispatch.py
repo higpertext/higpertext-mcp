@@ -64,6 +64,10 @@ def _params_to_argv(capability_id: str, params: dict) -> list[str]:
     for key, value in params.items():
         if value is None:
             continue
+        if isinstance(value, list):
+            value = ",".join(str(item) for item in value)
+        elif isinstance(value, bool):
+            value = "true" if value else "false"
         argv.extend([f"--{key}", str(value)])
     return argv
 

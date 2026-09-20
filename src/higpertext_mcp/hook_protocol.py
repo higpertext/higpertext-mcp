@@ -68,6 +68,13 @@ def encode(assistant: str, event: str, output: dict) -> dict:
     if assistant in {"claude", "codex", "opencode"}:
         if denied and event == "PreToolUse":
             return {"hookSpecificOutput": {"hookEventName": event, "permissionDecision": "deny", "permissionDecisionReason": reason}}
+        if event == "PreToolUse" and "updatedInput" in specific and "permissionDecision" not in specific:
+            normalized = dict(output)
+            normalized_specific = dict(specific)
+            normalized_specific["hookEventName"] = event
+            normalized_specific["permissionDecision"] = "allow"
+            normalized["hookSpecificOutput"] = normalized_specific
+            return normalized
         return output
     if assistant == "gemini":
         if denied:

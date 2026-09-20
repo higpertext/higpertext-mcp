@@ -22,6 +22,13 @@
       "description": "Cubrir la matriz por adaptador, actualizar la documentación y verificar artefactos generados.",
       "status": "done",
       "skills": ["common.build", "common.review"]
+    },
+    {
+      "id": "semantic-graph-service",
+      "name": "Servicio central del grafo semántico",
+      "description": "Exponer snapshots, consulta y estado del grafo semántico desde higpertext-server-profile, manteniendo el parser en higpertext-mcp y sincronizando ambos contratos protobuf.",
+      "status": "done",
+      "skills": ["common.plan", "common.build"]
     }
   ]
 }

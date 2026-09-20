@@ -48,6 +48,7 @@ message Parameter {
   bool required = 3;
   string description = 4;
   string default = 5; // valor por defecto declarado en el JSON de higpertext-cli (formato CLI, siempre string)
+  repeated string enum_values = 6;
 }
 
 message Contract {
@@ -537,6 +538,10 @@ message RemoveProjectPathRequest {
   string root_path = 2;
 }
 message RemoveProjectPathResponse { Project project = 1; }
+message DeleteProjectRequest { string project_id = 1; }
+message DeleteProjectResponse {
+  string message = 1;
+}
 
 message ResolveUserRequest {
   string identifier = 1;
@@ -545,6 +550,67 @@ message ResolveUserRequest {
 message ResolveUserResponse { User user = 1; }
 message ListUsersRequest {}
 message ListUsersResponse { repeated User users = 1; }
+
+// ── Grafo semántico ────────────────────────────────────────────────────────
+
+message SemanticSymbol {
+  string name = 1;
+  string type = 2;
+  string file = 3;
+  int32 line = 4;
+}
+
+message SemanticRelation {
+  string source = 1;
+  string target = 2;
+  string type = 3;
+  double confidence = 4;
+}
+
+message SemanticGraphSnapshot {
+  string project_id = 1;
+  string root_path = 2;
+  string root_hash = 3;
+  string revision = 4;
+  google.protobuf.Timestamp indexed_at = 5;
+  repeated SemanticSymbol symbols = 6;
+  repeated SemanticRelation relations = 7;
+}
+
+message GetSemanticGraphRequest {
+  string project_id = 1;
+  string root_path = 2;
+}
+message GetSemanticGraphResponse { SemanticGraphSnapshot snapshot = 1; }
+message QuerySemanticGraphRequest {
+  string project_id = 1;
+  string root_path = 2;
+  string symbol = 3;
+  int32 depth = 4;
+  int32 limit = 5;
+  string type = 6;
+  bool files_only = 7;
+}
+message QuerySemanticGraphResponse {
+  repeated SemanticSymbol symbols = 1;
+  int32 total = 2;
+  string revision = 3;
+  google.protobuf.Timestamp indexed_at = 4;
+}
+message SemanticGraphStatusRequest {
+  string project_id = 1;
+  string root_path = 2;
+}
+message SemanticGraphStatusResponse {
+  bool exists = 1;
+  string project_id = 2;
+  string root_path = 3;
+  string root_hash = 4;
+  string revision = 5;
+  google.protobuf.Timestamp indexed_at = 6;
+  int32 symbol_count = 7;
+  int32 relation_count = 8;
+}
 
 // ── Servicios ─────────────────────────────────────────────────────────────────
 
@@ -617,9 +683,16 @@ service ProjectService {
   rpc AddProjectPath(AddProjectPathRequest) returns (AddProjectPathResponse);
   rpc RemoveProjectPath(RemoveProjectPathRequest) returns (RemoveProjectPathResponse);
   rpc RenameProject(RenameProjectRequest) returns (RenameProjectResponse);
+  rpc DeleteProject(DeleteProjectRequest) returns (DeleteProjectResponse);
 }
 
 service UserService {
   rpc ResolveUser(ResolveUserRequest) returns (ResolveUserResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+service SemanticGraphService {
+  rpc GetSemanticGraph(GetSemanticGraphRequest) returns (GetSemanticGraphResponse);
+  rpc QuerySemanticGraph(QuerySemanticGraphRequest) returns (QuerySemanticGraphResponse);
+  rpc GetSemanticGraphStatus(SemanticGraphStatusRequest) returns (SemanticGraphStatusResponse);
 }

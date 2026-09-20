@@ -242,6 +242,7 @@ _CAPABILITY_TOOL = types.Tool(
                         "required": {"type": "boolean"},
                         "description": {"type": "string"},
                         "default": {"type": "string"},
+                        "enum_values": {"type": "array", "items": {"type": "string"}},
                     },
                     "required": ["name"],
                     "additionalProperties": False,

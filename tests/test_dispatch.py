@@ -14,6 +14,13 @@ def test_params_to_argv_stringifies_values():
     assert argv == ["common.grep-search", "--max_results", "5"]
 
 
+def test_params_to_argv_serializes_rich_values_for_legacy_scripts():
+    argv = dispatch._params_to_argv(
+        "common.grep-search", {"include": ["py", "ts"], "regex": True}
+    )
+    assert argv == ["common.grep-search", "--include", "py,ts", "--regex", "true"]
+
+
 @pytest.mark.anyio
 async def test_call_capability_records_canonical_lifecycle(monkeypatch, tmp_path):
     trace = []

@@ -108,6 +108,40 @@ def test_deny_and_abstain_do_not_grant_permissions(assistant):
     assert "allow" not in json.dumps(permitted)
 
 
+@pytest.mark.parametrize("assistant", ["claude", "codex", "opencode"])
+def test_updated_input_explicitly_allows_pretooluse_rewrite(assistant):
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "updatedInput": {"command": "echo rewritten"},
+        }
+    }
+
+    result = hook_protocol.encode(assistant, "PreToolUse", output)
+
+    assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+    assert result["hookSpecificOutput"]["updatedInput"] == {"command": "echo rewritten"}
+
+
+def test_updated_input_does_not_override_explicit_deny():
+    output = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": "policy",
+            "updatedInput": {"command": "echo rewritten"},
+        }
+    }
+
+    result = hook_protocol.encode("codex", "PreToolUse", output)
+
+    assert result["hookSpecificOutput"] == {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": "policy",
+    }
+
+
 @pytest.mark.parametrize("assistant", hook_protocol.EVENTS)
 def test_invoker_failure_denies_in_native_protocol(monkeypatch, capsys, assistant):
     import io

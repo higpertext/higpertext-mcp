@@ -14,6 +14,113 @@ from typing import Any
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
+# Algunas capabilities históricas fueron registradas antes de que el contrato
+# Proto soportara tipos ricos. Esta tabla mantiene la corrección en un único
+# punto, sin borrar/recrear capabilities (lo que podría perder source_code), y
+# permite migrarlas gradualmente en el catálogo del profile server.
+_COMMON_PARAMETER_OVERRIDES: dict[str, dict[str, dict[str, Any]]] = {
+    "common.context-assembler": {
+        "type": {"type": "string", "enum_values": ["refactor", "feature", "bugfix", "review"]},
+    },
+    "common.context-budget-report": {
+        "operation": {"type": "string", "enum_values": ["read", "search", "skeleton"]},
+        "json": {"type": "boolean"},
+    },
+    "common.diff-impact-analyzer": {
+        "files": {"type": "array", "items": {"type": "string"}},
+        "format": {"type": "string", "enum_values": ["text", "json"]},
+    },
+    "common.error-context-locator": {
+        "max_context": {"type": "integer"},
+        "include_tests": {"type": "boolean"},
+        "json": {"type": "boolean"},
+    },
+    "common.governance-exception": {
+        "action": {"type": "string", "enum_values": ["register", "list"]},
+    },
+    "common.graph-query": {
+        "depth": {"type": "integer"},
+        "budget": {"type": "integer"},
+        "type": {"type": "string", "enum_values": ["class", "function", "method", "variable", "module"]},
+        "limit": {"type": "integer"},
+        "files_only": {"type": "boolean"},
+        "json": {"type": "boolean"},
+    },
+    "common.graph-rebuild": {"god_threshold": {"type": "integer"}},
+    "common.grep-search": {
+        "include": {"type": "array", "items": {"type": "string"}},
+        "extension": {"type": "array", "items": {"type": "string"}},
+        "exclude": {"type": "array", "items": {"type": "string"}},
+        "regex": {"type": "boolean"},
+        "case_sensitive": {"type": "boolean"},
+        "context": {"type": "integer"},
+        "before": {"type": "integer"},
+        "after": {"type": "integer"},
+        "max_results": {"type": "integer"},
+        "max_per_file": {"type": "integer"},
+        "line_limit": {"type": "integer"},
+        "max_file_size_kb": {"type": "integer"},
+        "sort": {"type": "string", "enum_values": ["relevance", "path"]},
+        "preset": {"type": "string", "enum_values": ["all", "code", "python", "web", "docs", "config"]},
+        "include_tests": {"type": "boolean"},
+        "source_first": {"type": "boolean"},
+        "files_only": {"type": "boolean"},
+        "count": {"type": "boolean"},
+        "semantic": {"type": "boolean"},
+        "json": {"type": "boolean"},
+        "absolute_paths": {"type": "boolean"},
+        "all": {"type": "boolean"},
+    },
+    "common.memory-manager": {
+        "learned": {"type": "array", "items": {"type": "string"}},
+        "tags": {"type": "array", "items": {"type": "string"}},
+    },
+    "common.quality-resolver": {
+        "mode": {"type": "string", "enum_values": ["update", "create"]},
+    },
+    "common.roadmap-phase-advance": {
+        "target": {"type": "string", "enum_values": ["Pending", "Active", "Done"]},
+        "position": {"type": "integer"},
+    },
+    "common.roadmap-phase-create": {
+        "priority": {"type": "string", "enum_values": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "PRIORITY_UNSPECIFIED"]},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "tasks": {"type": "array", "items": {"type": "string"}},
+        "item_type": {"type": "string", "enum_values": ["ROADMAP", "EPIC", "FEATURE", "STORY", "BUG", "ISSUE"]},
+    },
+    "common.search-router": {
+        "intent": {"type": "string", "enum_values": ["error", "feature", "refactor", "docs", "symbol", "general"]},
+        "preset": {"type": "string", "enum_values": ["all", "code", "python", "web", "docs", "config"]},
+        "json": {"type": "boolean"},
+    },
+    "common.semantic-diff": {
+        "files": {"type": "array", "items": {"type": "string"}},
+        "format": {"type": "string", "enum_values": ["text", "json"]},
+    },
+    "common.semantic-search": {"limit": {"type": "integer"}},
+    "common.server-verification-report": {
+        "format": {"type": "string", "enum_values": ["text", "json"]},
+    },
+    "common.skill-resolver": {
+        "exclude": {"type": "array", "items": {"type": "string"}},
+        "max_skills": {"type": "integer"},
+        "json": {"type": "boolean"},
+    },
+    "common.smart-read": {
+        "mode": {"type": "string", "enum_values": ["auto", "skeleton", "range", "symbol", "full", "summary"]},
+        "offset": {"type": "integer"},
+        "limit": {"type": "integer"},
+        "around_line": {"type": "integer"},
+        "max_bytes": {"type": "integer"},
+        "max_tokens": {"type": "integer"},
+        "json": {"type": "boolean"},
+    },
+    "common.truth-keeper": {
+        "action": {"type": "string", "enum_values": ["set", "get", "delete", "list"]},
+    },
+}
+
+
 @dataclass
 class ToolSpec:
     capability_id: str
@@ -81,7 +188,14 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
             "type": _infer_type(default, param.get("type")) if default is not None else _infer_type(None, param.get("type")),
             "description": param.get("description", ""),
         }
-        if default is not None:
+        if param.get("items"):
+            prop["items"] = param["items"]
+        enum_values = param.get("enum_values") or []
+        if enum_values:
+            prop["enum"] = list(enum_values)
+        # Un valor vacío en un parámetro numérico representa ausencia en el
+        # catálogo histórico; no lo publiques como default inválido.
+        if default is not None and not (default == "" and prop["type"] != "string"):
             prop["default"] = _schema_default(default, param.get("type"))
         properties[name] = prop
         if param.get("required", False):
@@ -128,6 +242,7 @@ def _capability_to_raw(cap: profile_pb2.Capability) -> dict[str, Any]:
     "campo vacío" de "campo ausente") — se omite la clave `default` en ese
     caso, igual que cuando el JSON original no la traía.
     """
+    overrides = _COMMON_PARAMETER_OVERRIDES.get(cap.id, {})
     parameters = []
     for p in cap.parameters:
         param: dict[str, Any] = {
@@ -135,7 +250,9 @@ def _capability_to_raw(cap: profile_pb2.Capability) -> dict[str, Any]:
             "type": p.type,
             "required": p.required,
             "description": p.description,
+            "enum_values": list(p.enum_values),
         }
+        param.update(overrides.get(p.name, {}))
         if p.default:
             param["default"] = p.default
         parameters.append(param)

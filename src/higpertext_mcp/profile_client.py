@@ -287,7 +287,7 @@ def _capability_to_dict(c: profile_pb2.Capability) -> dict:
         "entrypoint": c.entrypoint,
         "language": c.language,
         "parameters": [
-            {"name": p.name, "type": p.type, "required": p.required, "description": p.description, "default": p.default}
+            {"name": p.name, "type": p.type, "required": p.required, "description": p.description, "default": p.default, "enum_values": list(p.enum_values)}
             for p in c.parameters
         ],
         "requires_pat": c.requires_pat,
@@ -315,6 +315,7 @@ async def create_capability(
         profile_pb2.Parameter(
             name=p.get("name", ""), type=p.get("type", "string"), required=bool(p.get("required", False)),
             description=p.get("description", ""), default=str(p["default"]) if p.get("default") is not None else "",
+            enum_values=p.get("enum_values", []),
         )
         for p in (parameters or [])
     ]
@@ -356,6 +357,51 @@ async def delete_capability(capability_id: str) -> None:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.CapabilityServiceStub(channel)
         await stub.DeleteCapability(profile_pb2.DeleteCapabilityRequest(id=capability_id), timeout=_CALL_TIMEOUT_S)
+
+
+async def get_semantic_graph_status(*, project_id: str, root_path: str) -> dict:
+    """Consulta el estado del snapshot del grafo en el profile server."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SemanticGraphServiceStub(channel)
+        response = await stub.GetSemanticGraphStatus(
+            profile_pb2.SemanticGraphStatusRequest(project_id=project_id, root_path=root_path),
+            timeout=_CALL_TIMEOUT_S,
+        )
+    return {
+        "exists": response.exists,
+        "project_id": response.project_id,
+        "root_path": response.root_path,
+        "root_hash": response.root_hash,
+        "revision": response.revision,
+        "symbol_count": response.symbol_count,
+        "relation_count": response.relation_count,
+        "indexed_at": response.indexed_at.ToJsonString() if response.HasField("indexed_at") else None,
+    }
+
+
+async def query_semantic_graph(
+    *, project_id: str, root_path: str, symbol: str, depth: int = 2,
+    limit: int = 50, type: str = "", files_only: bool = False,
+) -> dict:
+    """Consulta símbolos del grafo centralizado, sin leer archivos locales."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.SemanticGraphServiceStub(channel)
+        response = await stub.QuerySemanticGraph(
+            profile_pb2.QuerySemanticGraphRequest(
+                project_id=project_id, root_path=root_path, symbol=symbol,
+                depth=depth, limit=limit, type=type, files_only=files_only,
+            ),
+            timeout=_CALL_TIMEOUT_S,
+        )
+    return {
+        "symbols": [
+            {"name": item.name, "type": item.type, "file": item.file, "line": item.line}
+            for item in response.symbols
+        ],
+        "total": response.total,
+        "revision": response.revision,
+        "indexed_at": response.indexed_at.ToJsonString() if response.HasField("indexed_at") else None,
+    }
 
 
 async def create_governance_rule(
