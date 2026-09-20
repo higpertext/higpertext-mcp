@@ -3,6 +3,7 @@
 import grpc
 import warnings
 
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from learning.v1 import learning_pb2 as learning_dot_v1_dot_learning__pb2
 
 GRPC_GENERATED_VERSION = '1.83.1'
@@ -54,6 +55,21 @@ class LearningServiceStub:
                 request_serializer=learning_dot_v1_dot_learning__pb2.ListClassificationsRequest.SerializeToString,
                 response_deserializer=learning_dot_v1_dot_learning__pb2.ListClassificationsResponse.FromString,
                 _registered_method=True)
+        self.RecordLearning = channel.unary_unary(
+                '/learning.v1.LearningService/RecordLearning',
+                request_serializer=learning_dot_v1_dot_learning__pb2.RecordLearningEventRequest.SerializeToString,
+                response_deserializer=learning_dot_v1_dot_learning__pb2.RecordLearningEventResponse.FromString,
+                _registered_method=True)
+        self.ListLearningEvents = channel.unary_unary(
+                '/learning.v1.LearningService/ListLearningEvents',
+                request_serializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.SerializeToString,
+                response_deserializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.FromString,
+                _registered_method=True)
+        self.GetLearningStats = channel.unary_unary(
+                '/learning.v1.LearningService/GetLearningStats',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=learning_dot_v1_dot_learning__pb2.GetLearningStatsResponse.FromString,
+                _registered_method=True)
 
 
 class LearningServiceServicer:
@@ -83,6 +99,24 @@ class LearningServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RecordLearning(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListLearningEvents(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetLearningStats(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_LearningServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -105,6 +139,21 @@ def add_LearningServiceServicer_to_server(servicer, server):
                     servicer.ListClassifications,
                     request_deserializer=learning_dot_v1_dot_learning__pb2.ListClassificationsRequest.FromString,
                     response_serializer=learning_dot_v1_dot_learning__pb2.ListClassificationsResponse.SerializeToString,
+            ),
+            'RecordLearning': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordLearning,
+                    request_deserializer=learning_dot_v1_dot_learning__pb2.RecordLearningEventRequest.FromString,
+                    response_serializer=learning_dot_v1_dot_learning__pb2.RecordLearningEventResponse.SerializeToString,
+            ),
+            'ListLearningEvents': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListLearningEvents,
+                    request_deserializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.FromString,
+                    response_serializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.SerializeToString,
+            ),
+            'GetLearningStats': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetLearningStats,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=learning_dot_v1_dot_learning__pb2.GetLearningStatsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -215,6 +264,87 @@ class LearningService:
             '/learning.v1.LearningService/ListClassifications',
             learning_dot_v1_dot_learning__pb2.ListClassificationsRequest.SerializeToString,
             learning_dot_v1_dot_learning__pb2.ListClassificationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordLearning(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/learning.v1.LearningService/RecordLearning',
+            learning_dot_v1_dot_learning__pb2.RecordLearningEventRequest.SerializeToString,
+            learning_dot_v1_dot_learning__pb2.RecordLearningEventResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListLearningEvents(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/learning.v1.LearningService/ListLearningEvents',
+            learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.SerializeToString,
+            learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetLearningStats(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/learning.v1.LearningService/GetLearningStats',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            learning_dot_v1_dot_learning__pb2.GetLearningStatsResponse.FromString,
             options,
             channel_credentials,
             insecure,

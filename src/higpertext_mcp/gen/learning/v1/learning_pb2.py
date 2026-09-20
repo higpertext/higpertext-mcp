@@ -23,9 +23,10 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1alearning/v1/learning.proto\x12\x0blearning.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcc\x02\n\x0cLearningText\x12\n\n\x02id\x18\x01 \x01(\t\x12\x19\n\x11learning_event_id\x18\x02 \x01(\t\x12\x12\n\nthought_id\x18\x03 \x01(\t\x12\x0b\n\x03seq\x18\x04 \x01(\x05\x12\x11\n\ttext_kind\x18\x05 \x01(\t\x12\x0e\n\x06source\x18\x06 \x01(\t\x12\x11\n\taction_id\x18\x07 \x01(\t\x12\x11\n\ttool_name\x18\x08 \x01(\t\x12\x0f\n\x07outcome\x18\t \x01(\t\x12\x0e\n\x06tokens\x18\n \x01(\x03\x12\x0f\n\x07\x63ontent\x18\x0b \x01(\t\x12\x13\n\x0boutput_text\x18\x0c \x01(\t\x12\x0f\n\x07profile\x18\r \x01(\t\x12\x12\n\nproject_id\x18\x0e \x01(\t\x12\x0f\n\x07user_id\x18\x0f \x01(\t\x12.\n\ncreated_at\x18\x10 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x19RecordLearningTextRequest\x12\'\n\x04text\x18\x01 \x01(\x0b\x32\x19.learning.v1.LearningText\"E\n\x1aRecordLearningTextResponse\x12\'\n\x04text\x18\x01 \x01(\x0b\x32\x19.learning.v1.LearningText\"|\n\x18ListLearningTextsRequest\x12\x19\n\x11learning_event_id\x18\x01 \x01(\t\x12\x0f\n\x07profile\x18\x02 \x01(\t\x12\x12\n\nproject_id\x18\x03 \x01(\t\x12\x11\n\ttext_kind\x18\x04 \x01(\t\x12\r\n\x05limit\x18\x05 \x01(\x05\"E\n\x19ListLearningTextsResponse\x12(\n\x05texts\x18\x01 \x03(\x0b\x32\x19.learning.v1.LearningText\"\xcf\x01\n\x16LearningClassification\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10learning_text_id\x18\x02 \x01(\t\x12\x10\n\x08scenario\x18\x03 \x01(\t\x12\x0e\n\x06labels\x18\x04 \x03(\t\x12\x12\n\nconfidence\x18\x05 \x01(\x01\x12\x12\n\nclassifier\x18\x06 \x01(\t\x12\x15\n\rmodel_version\x18\x07 \x01(\t\x12.\n\ncreated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"h\n\x1b\x43lassifyLearningTextRequest\x12\x18\n\x10learning_text_id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x11\n\ttool_name\x18\x04 \x01(\t\"[\n\x1c\x43lassifyLearningTextResponse\x12;\n\x0e\x63lassification\x18\x01 \x01(\x0b\x32#.learning.v1.LearningClassification\"W\n\x1aListClassificationsRequest\x12\x18\n\x10learning_text_id\x18\x01 \x01(\t\x12\x10\n\x08scenario\x18\x02 \x01(\t\x12\r\n\x05limit\x18\x03 \x01(\x05\"[\n\x1bListClassificationsResponse\x12<\n\x0f\x63lassifications\x18\x01 \x03(\x0b\x32#.learning.v1.LearningClassification2\x9b\x03\n\x0fLearningService\x12]\n\nRecordText\x12&.learning.v1.RecordLearningTextRequest\x1a\'.learning.v1.RecordLearningTextResponse\x12Z\n\tListTexts\x12%.learning.v1.ListLearningTextsRequest\x1a&.learning.v1.ListLearningTextsResponse\x12\x63\n\x0c\x43lassifyText\x12(.learning.v1.ClassifyLearningTextRequest\x1a).learning.v1.ClassifyLearningTextResponse\x12h\n\x13ListClassifications\x12\'.learning.v1.ListClassificationsRequest\x1a(.learning.v1.ListClassificationsResponseBIZGgithub.com/aomerge/higpertext-server-profile/gen/learning/v1;learningv1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x1alearning/v1/learning.proto\x12\x0blearning.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xcc\x02\n\x0cLearningText\x12\n\n\x02id\x18\x01 \x01(\t\x12\x19\n\x11learning_event_id\x18\x02 \x01(\t\x12\x12\n\nthought_id\x18\x03 \x01(\t\x12\x0b\n\x03seq\x18\x04 \x01(\x05\x12\x11\n\ttext_kind\x18\x05 \x01(\t\x12\x0e\n\x06source\x18\x06 \x01(\t\x12\x11\n\taction_id\x18\x07 \x01(\t\x12\x11\n\ttool_name\x18\x08 \x01(\t\x12\x0f\n\x07outcome\x18\t \x01(\t\x12\x0e\n\x06tokens\x18\n \x01(\x03\x12\x0f\n\x07\x63ontent\x18\x0b \x01(\t\x12\x13\n\x0boutput_text\x18\x0c \x01(\t\x12\x0f\n\x07profile\x18\r \x01(\t\x12\x12\n\nproject_id\x18\x0e \x01(\t\x12\x0f\n\x07user_id\x18\x0f \x01(\t\x12.\n\ncreated_at\x18\x10 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x19RecordLearningTextRequest\x12\'\n\x04text\x18\x01 \x01(\x0b\x32\x19.learning.v1.LearningText\"E\n\x1aRecordLearningTextResponse\x12\'\n\x04text\x18\x01 \x01(\x0b\x32\x19.learning.v1.LearningText\"|\n\x18ListLearningTextsRequest\x12\x19\n\x11learning_event_id\x18\x01 \x01(\t\x12\x0f\n\x07profile\x18\x02 \x01(\t\x12\x12\n\nproject_id\x18\x03 \x01(\t\x12\x11\n\ttext_kind\x18\x04 \x01(\t\x12\r\n\x05limit\x18\x05 \x01(\x05\"E\n\x19ListLearningTextsResponse\x12(\n\x05texts\x18\x01 \x03(\x0b\x32\x19.learning.v1.LearningText\"\xcf\x01\n\x16LearningClassification\x12\n\n\x02id\x18\x01 \x01(\t\x12\x18\n\x10learning_text_id\x18\x02 \x01(\t\x12\x10\n\x08scenario\x18\x03 \x01(\t\x12\x0e\n\x06labels\x18\x04 \x03(\t\x12\x12\n\nconfidence\x18\x05 \x01(\x01\x12\x12\n\nclassifier\x18\x06 \x01(\t\x12\x15\n\rmodel_version\x18\x07 \x01(\t\x12.\n\ncreated_at\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"h\n\x1b\x43lassifyLearningTextRequest\x12\x18\n\x10learning_text_id\x18\x01 \x01(\t\x12\x0c\n\x04text\x18\x02 \x01(\t\x12\x0e\n\x06source\x18\x03 \x01(\t\x12\x11\n\ttool_name\x18\x04 \x01(\t\"[\n\x1c\x43lassifyLearningTextResponse\x12;\n\x0e\x63lassification\x18\x01 \x01(\x0b\x32#.learning.v1.LearningClassification\"W\n\x1aListClassificationsRequest\x12\x18\n\x10learning_text_id\x18\x01 \x01(\t\x12\x10\n\x08scenario\x18\x02 \x01(\t\x12\r\n\x05limit\x18\x03 \x01(\x05\"[\n\x1bListClassificationsResponse\x12<\n\x0f\x63lassifications\x18\x01 \x03(\x0b\x32#.learning.v1.LearningClassification\"\x91\x03\n\rLearningEvent\x12\n\n\x02id\x18\x01 \x01(\t\x12\x15\n\rcapability_id\x18\x02 \x01(\t\x12\x0f\n\x07profile\x18\x03 \x01(\t\x12\x0f\n\x07outcome\x18\x04 \x01(\t\x12\x0f\n\x07summary\x18\x05 \x01(\t\x12\x0c\n\x04tags\x18\x06 \x03(\t\x12.\n\ncreated_at\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x12\n\nproject_id\x18\x08 \x01(\t\x12\x0f\n\x07user_id\x18\t \x01(\t\x12\x14\n\x0ctotal_tokens\x18\n \x01(\x03\x12\x15\n\ractions_total\x18\x0b \x01(\x05\x12\x17\n\x0f\x61\x63tions_success\x18\x0c \x01(\x05\x12\x17\n\x0f\x61\x63tions_failure\x18\r \x01(\x05\x12\x1d\n\x15\x66iles_modified_events\x18\x0e \x01(\x05\x12\x1d\n\x15\x66iles_modified_unique\x18\x0f \x01(\x05\x12\x14\n\x0c\x64uration_min\x18\x10 \x01(\x01\x12\x14\n\x0c\x63\x61pabilities\x18\x11 \x03(\t\"\xe2\x02\n\x1aRecordLearningEventRequest\x12\x15\n\rcapability_id\x18\x01 \x01(\t\x12\x0f\n\x07profile\x18\x02 \x01(\t\x12\x0f\n\x07outcome\x18\x03 \x01(\t\x12\x0f\n\x07summary\x18\x04 \x01(\t\x12\x0c\n\x04tags\x18\x05 \x03(\t\x12\x12\n\nproject_id\x18\x06 \x01(\t\x12\x0f\n\x07user_id\x18\x07 \x01(\t\x12\x14\n\x0ctotal_tokens\x18\x08 \x01(\x03\x12\x15\n\ractions_total\x18\t \x01(\x05\x12\x17\n\x0f\x61\x63tions_success\x18\n \x01(\x05\x12\x17\n\x0f\x61\x63tions_failure\x18\x0b \x01(\x05\x12\x1d\n\x15\x66iles_modified_events\x18\x0c \x01(\x05\x12\x1d\n\x15\x66iles_modified_unique\x18\r \x01(\x05\x12\x14\n\x0c\x64uration_min\x18\x0e \x01(\x01\x12\x14\n\x0c\x63\x61pabilities\x18\x0f \x03(\t\"H\n\x1bRecordLearningEventResponse\x12)\n\x05\x65vent\x18\x01 \x01(\x0b\x32\x1a.learning.v1.LearningEvent\"`\n\x19ListLearningEventsRequest\x12\x0f\n\x07profile\x18\x01 \x01(\t\x12\r\n\x05limit\x18\x02 \x01(\x05\x12\x12\n\nproject_id\x18\x03 \x01(\t\x12\x0f\n\x07user_id\x18\x04 \x01(\t\"H\n\x1aListLearningEventsResponse\x12*\n\x06\x65vents\x18\x01 \x03(\x0b\x32\x1a.learning.v1.LearningEvent\"\x9f\x01\n\x0cLearningStat\x12\x15\n\rcapability_id\x18\x01 \x01(\t\x12\x11\n\tsuccesses\x18\x02 \x01(\x03\x12\x10\n\x08\x66\x61ilures\x18\x03 \x01(\x03\x12\r\n\x05total\x18\x04 \x01(\x03\x12\x14\n\x0csuccess_rate\x18\x05 \x01(\x01\x12.\n\nupdated_at\x18\x06 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\"D\n\x18GetLearningStatsResponse\x12(\n\x05stats\x18\x01 \x03(\x0b\x32\x19.learning.v1.LearningStat2\xba\x05\n\x0fLearningService\x12]\n\nRecordText\x12&.learning.v1.RecordLearningTextRequest\x1a\'.learning.v1.RecordLearningTextResponse\x12Z\n\tListTexts\x12%.learning.v1.ListLearningTextsRequest\x1a&.learning.v1.ListLearningTextsResponse\x12\x63\n\x0c\x43lassifyText\x12(.learning.v1.ClassifyLearningTextRequest\x1a).learning.v1.ClassifyLearningTextResponse\x12h\n\x13ListClassifications\x12\'.learning.v1.ListClassificationsRequest\x1a(.learning.v1.ListClassificationsResponse\x12\x63\n\x0eRecordLearning\x12\'.learning.v1.RecordLearningEventRequest\x1a(.learning.v1.RecordLearningEventResponse\x12\x65\n\x12ListLearningEvents\x12&.learning.v1.ListLearningEventsRequest\x1a\'.learning.v1.ListLearningEventsResponse\x12Q\n\x10GetLearningStats\x12\x16.google.protobuf.Empty\x1a%.learning.v1.GetLearningStatsResponseBIZGgithub.com/aomerge/higpertext-server-profile/gen/learning/v1;learningv1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,26 +34,40 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'learning.v1.learning_pb2', 
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'ZGgithub.com/aomerge/higpertext-server-profile/gen/learning/v1;learningv1'
-  _globals['_LEARNINGTEXT']._serialized_start=77
-  _globals['_LEARNINGTEXT']._serialized_end=409
-  _globals['_RECORDLEARNINGTEXTREQUEST']._serialized_start=411
-  _globals['_RECORDLEARNINGTEXTREQUEST']._serialized_end=479
-  _globals['_RECORDLEARNINGTEXTRESPONSE']._serialized_start=481
-  _globals['_RECORDLEARNINGTEXTRESPONSE']._serialized_end=550
-  _globals['_LISTLEARNINGTEXTSREQUEST']._serialized_start=552
-  _globals['_LISTLEARNINGTEXTSREQUEST']._serialized_end=676
-  _globals['_LISTLEARNINGTEXTSRESPONSE']._serialized_start=678
-  _globals['_LISTLEARNINGTEXTSRESPONSE']._serialized_end=747
-  _globals['_LEARNINGCLASSIFICATION']._serialized_start=750
-  _globals['_LEARNINGCLASSIFICATION']._serialized_end=957
-  _globals['_CLASSIFYLEARNINGTEXTREQUEST']._serialized_start=959
-  _globals['_CLASSIFYLEARNINGTEXTREQUEST']._serialized_end=1063
-  _globals['_CLASSIFYLEARNINGTEXTRESPONSE']._serialized_start=1065
-  _globals['_CLASSIFYLEARNINGTEXTRESPONSE']._serialized_end=1156
-  _globals['_LISTCLASSIFICATIONSREQUEST']._serialized_start=1158
-  _globals['_LISTCLASSIFICATIONSREQUEST']._serialized_end=1245
-  _globals['_LISTCLASSIFICATIONSRESPONSE']._serialized_start=1247
-  _globals['_LISTCLASSIFICATIONSRESPONSE']._serialized_end=1338
-  _globals['_LEARNINGSERVICE']._serialized_start=1341
-  _globals['_LEARNINGSERVICE']._serialized_end=1752
+  _globals['_LEARNINGTEXT']._serialized_start=106
+  _globals['_LEARNINGTEXT']._serialized_end=438
+  _globals['_RECORDLEARNINGTEXTREQUEST']._serialized_start=440
+  _globals['_RECORDLEARNINGTEXTREQUEST']._serialized_end=508
+  _globals['_RECORDLEARNINGTEXTRESPONSE']._serialized_start=510
+  _globals['_RECORDLEARNINGTEXTRESPONSE']._serialized_end=579
+  _globals['_LISTLEARNINGTEXTSREQUEST']._serialized_start=581
+  _globals['_LISTLEARNINGTEXTSREQUEST']._serialized_end=705
+  _globals['_LISTLEARNINGTEXTSRESPONSE']._serialized_start=707
+  _globals['_LISTLEARNINGTEXTSRESPONSE']._serialized_end=776
+  _globals['_LEARNINGCLASSIFICATION']._serialized_start=779
+  _globals['_LEARNINGCLASSIFICATION']._serialized_end=986
+  _globals['_CLASSIFYLEARNINGTEXTREQUEST']._serialized_start=988
+  _globals['_CLASSIFYLEARNINGTEXTREQUEST']._serialized_end=1092
+  _globals['_CLASSIFYLEARNINGTEXTRESPONSE']._serialized_start=1094
+  _globals['_CLASSIFYLEARNINGTEXTRESPONSE']._serialized_end=1185
+  _globals['_LISTCLASSIFICATIONSREQUEST']._serialized_start=1187
+  _globals['_LISTCLASSIFICATIONSREQUEST']._serialized_end=1274
+  _globals['_LISTCLASSIFICATIONSRESPONSE']._serialized_start=1276
+  _globals['_LISTCLASSIFICATIONSRESPONSE']._serialized_end=1367
+  _globals['_LEARNINGEVENT']._serialized_start=1370
+  _globals['_LEARNINGEVENT']._serialized_end=1771
+  _globals['_RECORDLEARNINGEVENTREQUEST']._serialized_start=1774
+  _globals['_RECORDLEARNINGEVENTREQUEST']._serialized_end=2128
+  _globals['_RECORDLEARNINGEVENTRESPONSE']._serialized_start=2130
+  _globals['_RECORDLEARNINGEVENTRESPONSE']._serialized_end=2202
+  _globals['_LISTLEARNINGEVENTSREQUEST']._serialized_start=2204
+  _globals['_LISTLEARNINGEVENTSREQUEST']._serialized_end=2300
+  _globals['_LISTLEARNINGEVENTSRESPONSE']._serialized_start=2302
+  _globals['_LISTLEARNINGEVENTSRESPONSE']._serialized_end=2374
+  _globals['_LEARNINGSTAT']._serialized_start=2377
+  _globals['_LEARNINGSTAT']._serialized_end=2536
+  _globals['_GETLEARNINGSTATSRESPONSE']._serialized_start=2538
+  _globals['_GETLEARNINGSTATSRESPONSE']._serialized_end=2606
+  _globals['_LEARNINGSERVICE']._serialized_start=2609
+  _globals['_LEARNINGSERVICE']._serialized_end=3307
 # @@protoc_insertion_point(module_scope)

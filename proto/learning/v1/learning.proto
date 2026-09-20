@@ -5,6 +5,7 @@ package learning.v1;
 option go_package = "github.com/aomerge/higpertext-server-profile/gen/learning/v1;learningv1";
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 message LearningText {
   string id = 1;
@@ -63,9 +64,67 @@ message ListClassificationsRequest {
 }
 message ListClassificationsResponse { repeated LearningClassification classifications = 1; }
 
+message LearningEvent {
+  string id = 1;
+  string capability_id = 2;
+  string profile = 3;
+  string outcome = 4;
+  string summary = 5;
+  repeated string tags = 6;
+  google.protobuf.Timestamp created_at = 7;
+  string project_id = 8;
+  string user_id = 9;
+  int64 total_tokens = 10;
+  int32 actions_total = 11;
+  int32 actions_success = 12;
+  int32 actions_failure = 13;
+  int32 files_modified_events = 14;
+  int32 files_modified_unique = 15;
+  double duration_min = 16;
+  repeated string capabilities = 17;
+}
+
+message RecordLearningEventRequest {
+  string capability_id = 1;
+  string profile = 2;
+  string outcome = 3;
+  string summary = 4;
+  repeated string tags = 5;
+  string project_id = 6;
+  string user_id = 7;
+  int64 total_tokens = 8;
+  int32 actions_total = 9;
+  int32 actions_success = 10;
+  int32 actions_failure = 11;
+  int32 files_modified_events = 12;
+  int32 files_modified_unique = 13;
+  double duration_min = 14;
+  repeated string capabilities = 15;
+}
+message RecordLearningEventResponse { LearningEvent event = 1; }
+message ListLearningEventsRequest {
+  string profile = 1;
+  int32 limit = 2;
+  string project_id = 3;
+  string user_id = 4;
+}
+message ListLearningEventsResponse { repeated LearningEvent events = 1; }
+message LearningStat {
+  string capability_id = 1;
+  int64 successes = 2;
+  int64 failures = 3;
+  int64 total = 4;
+  double success_rate = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+message GetLearningStatsResponse { repeated LearningStat stats = 1; }
+
 service LearningService {
   rpc RecordText(RecordLearningTextRequest) returns (RecordLearningTextResponse);
   rpc ListTexts(ListLearningTextsRequest) returns (ListLearningTextsResponse);
   rpc ClassifyText(ClassifyLearningTextRequest) returns (ClassifyLearningTextResponse);
   rpc ListClassifications(ListClassificationsRequest) returns (ListClassificationsResponse);
+  rpc RecordLearning(RecordLearningEventRequest) returns (RecordLearningEventResponse);
+  rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
+  rpc GetLearningStats(google.protobuf.Empty) returns (GetLearningStatsResponse);
 }

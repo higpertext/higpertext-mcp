@@ -407,6 +407,28 @@ async def test_agent_renderer_scopes_and_prunes_stale_and_respects_unmanaged_fil
 
 
 @pytest.mark.anyio
+async def test_agent_renderer_filters_by_assistant(monkeypatch, tmp_path):
+    agents = [
+        {"id": "claude-only", "name": "claude-only", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": ["claude"]},
+        {"id": "codex-only", "name": "codex-only", "description": "d", "tools": [], "model": "gpt-5", "prompt": "p", "assistants": ["codex"]},
+        {"id": "all", "name": "all", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": []},
+    ]
+
+    async def fake_list_agents(*, profile="", project_id=""):
+        return agents
+
+    async def fake_resolve_project(root_path):
+        return {"id": "proj-123", "root_path": root_path}
+
+    monkeypatch.setattr(agent_renderer.profile_client, "list_agents", fake_list_agents)
+    monkeypatch.setattr(agent_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    await agent_renderer.render(tmp_path, "dev", ["claude", "codex"])
+    assert {p.stem for p in (tmp_path / ".claude/agents").iterdir()} == {"claude-only", "all"}
+    assert {p.stem for p in (tmp_path / ".codex/agents").iterdir()} == {"codex-only", "all"}
+
+
+@pytest.mark.anyio
 async def test_agent_renderer_targets_codex_toml_alongside_claude(monkeypatch, tmp_path):
     """Un mismo catálogo se materializa en formatos distintos por asistente,
     igual que hook_renderer con los 6 asistentes de hooks — acá con dos

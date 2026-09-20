@@ -145,6 +145,7 @@ message Agent {
   string effort = 12;           // opcional; "" = omitir
   repeated string profiles = 13; // vacío = global, misma semántica que Skill.profiles; NO se emite en el .md
   string project_id = 14;        // referencia blanda opcional a Project.id, igual que Skill.project_id; NO se emite en el .md
+  repeated string assistants = 17; // vacío = todos; si no, adaptadores donde se materializa
   google.protobuf.Timestamp created_at = 15;
   google.protobuf.Timestamp updated_at = 16;
 }
@@ -228,34 +229,6 @@ message AuditEvent {
   google.protobuf.Timestamp created_at = 13;
 }
 
-// ── Aprendizaje en vivo (Redis) ─────────────────────────────────────────────
-
-message LearningEvent {
-  string id = 1;
-  string capability_id = 2; // "session" para el resumen agregado que manda hook_session_stop
-  string profile = 3;
-  string outcome = 4; // success | failure
-  string summary = 5;
-  repeated string tags = 6;
-  google.protobuf.Timestamp created_at = 7;
-  string project_id = 8; // vacío = sin proyecto asociado (ver ProjectService)
-  string user_id = 9;    // vacío = sin usuario asociado (ver UserService)
-
-  // Resumen de sesión (capability_id="session", uno por sesión, emitido por
-  // hook_session_stop agregando la telemetría de Redis). En un
-  // LearningEvent normal de una capability puntual, estos campos quedan en
-  // su cero (0/0.0) — no se confunden con "cero tokens reales" porque solo
-  // se leen cuando capability_id == "session".
-  int64 total_tokens = 10;
-  int32 actions_total = 11;
-  int32 actions_success = 12;
-  int32 actions_failure = 13;
-  int32 files_modified_events = 14;   // cuenta ediciones (Edit/Write), no archivos únicos
-  int32 files_modified_unique = 15;   // archivos distintos tocados, deduplicados por path
-  double duration_min = 16;
-  repeated string capabilities = 17; // snapshot de capabilities efectivas al abrir la sesión
-}
-
 // ── Proyectos y usuarios (tenancy.db, separada de profile.db) ─────────────
 //
 // Ejes de scoping para datos de ejecución (Activity/LearningEvent). NO
@@ -285,34 +258,6 @@ message User {
   string display_name = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
-}
-
-// Thought es un bloque de "chain of thought" (thinking) de un turno del
-// asistente, relacionado 1:N con el LearningEvent de resumen de sesión
-// (capability_id="session") que lo contiene. seq es la posición del turno
-// dentro de la sesión (0-based) — junto con learning_event_id identifica de
-// forma única cada cadena de pensamiento: volver a mandar el mismo seq para
-// el mismo learning_event_id reemplaza esa entrada, no la duplica.
-message Thought {
-  string id = 1;
-  string learning_event_id = 2; // FK blanda a LearningEvent.id
-  int32 seq = 3;
-  string content = 4;
-  google.protobuf.Timestamp created_at = 5;
-  string action_id = 6;
-  string tool_name = 7;
-  string outcome = 8;
-  int64 tokens = 9;
-  string output_text = 10;
-}
-
-message LearningStat {
-  string capability_id = 1;
-  int64 successes = 2;
-  int64 failures = 3;
-  int64 total = 4;
-  double success_rate = 5; // successes / total; 0 when total == 0
-  google.protobuf.Timestamp updated_at = 6;
 }
 
 // ── Requests / Responses ─────────────────────────────────────────────────────
@@ -465,6 +410,7 @@ message CreateAgentRequest {
   string effort = 12;
   repeated string profiles = 13;
   string project_id = 14;
+  repeated string assistants = 15;
 }
 message CreateAgentResponse { Agent agent = 1; }
 message GetAgentRequest { string id = 1; }
@@ -491,6 +437,7 @@ message UpdateAgentRequest {
   string effort = 12;
   repeated string profiles = 13;
   string project_id = 14;
+  repeated string assistants = 15;
 }
 message UpdateAgentResponse { Agent agent = 1; }
 message DeleteAgentRequest { string id = 1; }
@@ -570,51 +517,6 @@ message ListAuditEventsRequest {
   int32 limit = 5;       // <=0 = 200; máximo 1000
 }
 message ListAuditEventsResponse { repeated AuditEvent events = 1; }
-
-message RecordLearningRequest {
-  string capability_id = 1;
-  string profile = 2;
-  string outcome = 3; // success | failure
-  string summary = 4;
-  repeated string tags = 5;
-  string project_id = 6; // vacío = sin proyecto asociado
-  string user_id = 7;    // vacío = sin usuario asociado
-  int64 total_tokens = 8;
-  int32 actions_total = 9;
-  int32 actions_success = 10;
-  int32 actions_failure = 11;
-  int32 files_modified_events = 12;
-  int32 files_modified_unique = 13;
-  double duration_min = 14;
-  repeated string capabilities = 15; // snapshot de capabilities efectivas de la sesión
-}
-message RecordLearningResponse { LearningEvent event = 1; }
-message ListLearningEventsRequest {
-  string profile = 1; // vacío = todos
-  int32 limit = 2;    // <=0 = 200; máximo 1000
-  string project_id = 3; // vacío = todos los proyectos
-  string user_id = 4;    // vacío = todos los usuarios
-}
-message ListLearningEventsResponse { repeated LearningEvent events = 1; }
-message GetLearningStatsRequest {}
-message GetLearningStatsResponse { repeated LearningStat stats = 1; }
-
-message ThoughtInput {
-  int32 seq = 1;
-  string content = 2;
-  string action_id = 3;
-  string tool_name = 4;
-  string outcome = 5;
-  int64 tokens = 6;
-  string output_text = 7;
-}
-message RecordThoughtsRequest {
-  string learning_event_id = 1;
-  repeated ThoughtInput thoughts = 2;
-}
-message RecordThoughtsResponse { repeated Thought thoughts = 1; }
-message ListThoughtsRequest { string learning_event_id = 1; }
-message ListThoughtsResponse { repeated Thought thoughts = 1; }
 
 message ResolveProjectRequest { string root_path = 1; }
 message ResolveProjectResponse { Project project = 1; }
@@ -702,15 +604,6 @@ service GovernanceService {
 service ActivityService {
   rpc RecordActivity(RecordActivityRequest) returns (RecordActivityResponse);
   rpc ListActivities(ListActivitiesRequest) returns (ListActivitiesResponse);
-}
-
-service LearningService {
-  rpc RecordLearning(RecordLearningRequest) returns (RecordLearningResponse);
-  rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
-  rpc GetLearningStats(GetLearningStatsRequest) returns (GetLearningStatsResponse);
-
-  rpc RecordThoughts(RecordThoughtsRequest) returns (RecordThoughtsResponse);
-  rpc ListThoughts(ListThoughtsRequest) returns (ListThoughtsResponse);
 }
 
 service AuditService {

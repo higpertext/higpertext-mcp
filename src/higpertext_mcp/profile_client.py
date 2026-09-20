@@ -19,6 +19,7 @@ import grpc
 sys.path.insert(0, str(Path(__file__).parent / "gen"))
 
 from higpertext_mcp import config
+from higpertext_mcp.gen.learning.v1 import learning_pb2, learning_pb2_grpc
 from higpertext_mcp.gen.profile.v1 import profile_pb2, profile_pb2_grpc
 
 _CALL_TIMEOUT_S = 2.0
@@ -513,6 +514,7 @@ def _agent_to_dict(a: profile_pb2.Agent) -> dict:
         "permission_mode": a.permission_mode, "skills": list(a.skills), "memory": a.memory,
         "background": a.background if a.HasField("background") else None,
         "color": a.color, "effort": a.effort,
+        "assistants": list(a.assistants),
         "profiles": list(a.profiles),  # vacío = agent global (común a todo el sistema)
         "project_id": a.project_id,    # referencia blanda opcional a Project.id (tenancy.db)
     }
@@ -522,6 +524,7 @@ async def create_agent(
     *, id: str, name: str = "", description: str = "", tools: list[str] | None = None,
     model: str = "", prompt: str = "", permission_mode: str = "", skills: list[str] | None = None,
     memory: str = "", background: bool | None = None, color: str = "", effort: str = "",
+    assistants: list[str] | None = None,
     profiles: list[str] | None = None, project_id: str = "",
 ) -> dict:
     """Da de alta un subagente de Claude Code. A diferencia de Skill, el
@@ -531,7 +534,8 @@ async def create_agent(
     req = profile_pb2.CreateAgentRequest(
         id=id, name=name or id, description=description, tools=tools or [], model=model,
         prompt=prompt, permission_mode=permission_mode, skills=skills or [], memory=memory,
-        color=color, effort=effort, profiles=profiles or [], project_id=project_id,
+        color=color, effort=effort, assistants=assistants or [], profiles=profiles or [],
+        project_id=project_id,
     )
     if background is not None:
         req.background = background
@@ -562,12 +566,14 @@ async def update_agent(
     *, id: str, name: str, description: str, tools: list[str] | None, model: str, prompt: str,
     permission_mode: str = "", skills: list[str] | None = None, memory: str = "",
     background: bool | None = None, color: str = "", effort: str = "",
+    assistants: list[str] | None = None,
     profiles: list[str] | None = None, project_id: str = "",
 ) -> dict:
     req = profile_pb2.UpdateAgentRequest(
         id=id, name=name, description=description, tools=tools or [], model=model, prompt=prompt,
         permission_mode=permission_mode, skills=skills or [], memory=memory,
-        color=color, effort=effort, profiles=profiles or [], project_id=project_id,
+        color=color, effort=effort, assistants=assistants or [], profiles=profiles or [],
+        project_id=project_id,
     )
     if background is not None:
         req.background = background
@@ -691,32 +697,49 @@ async def record_activity(
 async def record_thoughts(
     *, learning_event_id: str, thoughts: list[dict]
 ) -> None:
-    """Registra resúmenes explícitos de una sesión. Best-effort.
+    """Compatibilidad de API: delega el registro al servicio learning.v1.
 
     ``thoughts`` contiene metadatos de acciones observables; no debe usarse
     para enviar el razonamiento interno oculto del modelo.
     """
     if not learning_event_id or not thoughts:
         return
+    await record_learning_texts(learning_event_id=learning_event_id, thoughts=thoughts)
+
+
+async def record_learning_texts(*, learning_event_id: str, thoughts: list[dict]) -> None:
+    """Registra textos observables en el servicio de aprendizaje desacoplado.
+
+    ``record_thoughts`` actúa como puente de compatibilidad: durante la
+    migración escribe tanto en ``learning.v1`` como en el servicio legacy.
+    Nunca se envía razonamiento interno oculto.
+    """
+    if not learning_event_id or not thoughts:
+        return
     try:
         async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
-            stub = profile_pb2_grpc.LearningServiceStub(channel)
-            await stub.RecordThoughts(
-                profile_pb2.RecordThoughtsRequest(
-                    learning_event_id=learning_event_id,
-                    thoughts=[
-                        profile_pb2.ThoughtInput(
-                            seq=item["seq"], content=item["content"],
+            stub = learning_pb2_grpc.LearningServiceStub(channel)
+            for item in thoughts:
+                await stub.RecordText(
+                    learning_pb2.RecordLearningTextRequest(
+                        text=learning_pb2.LearningText(
+                            learning_event_id=learning_event_id,
+                            thought_id=item.get("thought_id", ""),
+                            seq=item["seq"],
+                            text_kind=item.get("text_kind", "thought"),
+                            source=item.get("source", "higpertext-mcp"),
                             action_id=item.get("action_id", ""),
                             tool_name=item.get("tool_name", ""),
                             outcome=item.get("outcome", ""),
                             tokens=item.get("tokens", 0),
+                            content=item.get("content", ""),
                             output_text=item.get("output_text", ""),
+                            profile=item.get("profile", ""),
+                            project_id=item.get("project_id", ""),
+                            user_id=item.get("user_id", ""),
                         )
-                        for item in thoughts
-                    ],
-                ),
-                timeout=_CALL_TIMEOUT_S,
-            )
-    except Exception as exc:  # noqa: BLE001 — el aprendizaje no debe tumbar el flujo principal
-        _warn(f"no se pudieron registrar thoughts en profile server: {exc}")
+                    ),
+                    timeout=_CALL_TIMEOUT_S,
+                )
+    except Exception as exc:  # noqa: BLE001 — aprendizaje best-effort
+        _warn(f"no se pudieron registrar textos de aprendizaje: {exc}")

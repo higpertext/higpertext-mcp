@@ -8,6 +8,7 @@ import grpc
 import pytest
 
 from higpertext_mcp import profile_client
+from higpertext_mcp.gen.learning.v1 import learning_pb2
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 
@@ -55,7 +56,18 @@ class _FakeActivityStub:
         return profile_pb2.RecordActivityResponse(activity=profile_pb2.Activity(id="fake-id"))
 
 
-def _patch_channel(monkeypatch, *, profile_stub=None, capability_stub=None, activity_stub=None):
+class _FakeLearningStub:
+    def __init__(self) -> None:
+        self.recorded: list[learning_pb2.RecordLearningTextRequest] = []
+
+    async def RecordText(self, request, timeout=None):
+        self.recorded.append(request)
+        return learning_pb2.RecordLearningTextResponse(text=request.text)
+
+
+def _patch_channel(
+    monkeypatch, *, profile_stub=None, capability_stub=None, activity_stub=None, learning_stub=None
+):
     @asynccontextmanager
     async def fake_insecure_channel(_addr):
         yield object()
@@ -69,6 +81,9 @@ def _patch_channel(monkeypatch, *, profile_stub=None, capability_stub=None, acti
     )
     monkeypatch.setattr(
         profile_client.profile_pb2_grpc, "ActivityServiceStub", lambda _channel: activity_stub
+    )
+    monkeypatch.setattr(
+        profile_client.learning_pb2_grpc, "LearningServiceStub", lambda _channel: learning_stub
     )
 
 
@@ -206,3 +221,31 @@ async def test_record_activity_is_best_effort_on_failure(monkeypatch):
     await profile_client.record_activity(
         capability_id="common.grep-search", profile="dev", status="failure"
     )
+
+
+@pytest.mark.anyio
+async def test_record_learning_texts_reaches_learning_service(monkeypatch):
+    learning_stub = _FakeLearningStub()
+    _patch_channel(monkeypatch, learning_stub=learning_stub)
+
+    await profile_client.record_learning_texts(
+        learning_event_id="event-1",
+        thoughts=[
+            {
+                "seq": 2,
+                "content": "Se ejecutó una validación.",
+                "tool_name": "Bash",
+                "outcome": "success",
+                "tokens": 1975,
+                "output_text": "Bash (success), 1975 tokens estimados.",
+            }
+        ],
+    )
+
+    assert len(learning_stub.recorded) == 1
+    text = learning_stub.recorded[0].text
+    assert text.learning_event_id == "event-1"
+    assert text.text_kind == "thought"
+    assert text.tool_name == "Bash"
+    assert text.tokens == 1975
+    assert text.output_text == "Bash (success), 1975 tokens estimados."

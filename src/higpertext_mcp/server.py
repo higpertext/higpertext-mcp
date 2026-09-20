@@ -301,22 +301,7 @@ _SKILL_TOOL = types.Tool(
 )
 _AGENT_TOOL = types.Tool(
     name=AGENT_TOOL_NAME,
-    description=(
-        "Administra el catálogo persistente de subagentes (AgentService): crear, consultar, "
-        "listar, actualizar o borrar. A diferencia de higpertext-skill, no se manda un archivo "
-        "completo: los campos van estructurados (`name`, `description`, `tools`, `model`, "
-        "`prompt` = system prompt, y opcionales `permission_mode`/`skills`/`memory`/"
-        "`background`/`color`/`effort`) y es higpertext-render-adapters el que sintetiza el "
-        "archivo nativo por asistente — `.claude/agents/<id>.md` (YAML frontmatter + cuerpo) "
-        "para Claude Code, `.codex/agents/<id>.toml` para Codex CLI (que no tiene equivalente "
-        "para `tools`/`permission_mode`/`skills`/`memory`/`color`, así que esos campos se "
-        "omiten del .toml en vez de forzarse). `profiles`/`project_id` vacíos (default) "
-        "significan agent global, compartido por todo el sistema; seteá `profiles` para "
-        "atarlo a uno o más perfiles, o `project_id` para atarlo a un único proyecto puntual. "
-        "Un archivo preexistente sin la marca de ownership del renderer nunca se sobreescribe "
-        "ni se borra automáticamente. Tras crear/editar/borrar, corré higpertext-render-adapters "
-        "para reflejar el cambio en los destinos de cada asistente."
-    ),
+    description="Administra agentes y su materialización en los adaptadores configurados.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -333,6 +318,7 @@ _AGENT_TOOL = types.Tool(
             "background": {"type": "boolean", "description": "opcional — sin setear = omitido del frontmatter"},
             "color": {"type": "string", "description": "opcional — frontmatter `color`"},
             "effort": {"type": "string", "description": "opcional — frontmatter `effort`"},
+            "assistants": {"type": "array", "items": {"type": "string", "enum": ["claude", "codex"]}, "description": "adaptadores donde se materializa; vacío = todos"},
             "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, el agent solo es visible para estos perfiles"},
             "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
             "project_id": {"type": "string", "description": "vacío = no atado a un proyecto puntual"},
@@ -682,7 +668,8 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
                         memory=args.get("memory", ""), background=args.get("background"),
                         color=args.get("color", ""), effort=args.get("effort", ""),
-                        profiles=args.get("profiles"), project_id=args.get("project_id", ""),
+                        assistants=args.get("assistants"), profiles=args.get("profiles"),
+                        project_id=args.get("project_id", ""),
                     )
                     summary = f"Agent '{data['id']}' creado."
                 elif action == "get":
@@ -701,7 +688,8 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
                         memory=args.get("memory", ""), background=args.get("background"),
                         color=args.get("color", ""), effort=args.get("effort", ""),
-                        profiles=args.get("profiles"), project_id=args.get("project_id", ""),
+                        assistants=args.get("assistants"), profiles=args.get("profiles"),
+                        project_id=args.get("project_id", ""),
                     )
                     summary = f"Agent '{data['id']}' actualizado."
                 elif action == "delete":

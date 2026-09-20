@@ -156,12 +156,19 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, d
         written: list[str] = []
         skipped: list[str] = []
         for agent in visible:
+            targets = agent.get("assistants") or []
+            if targets and assistant not in targets:
+                continue
             path = dir_path / f"{agent['id']}{ext}"
             if path.exists() and not _is_managed(path):
                 skipped.append(str(path.relative_to(root)))
                 continue
             path.write_text(render_one(agent), encoding="utf-8")
             written.append(str(path.relative_to(root)))
+        want_ids = {
+            agent["id"] for agent in visible
+            if not (agent.get("assistants") or []) or assistant in agent["assistants"]
+        }
         removed = _prune(dir_path, ext, want_ids)
         result[rel_dir] = {"written": written, "pruned": removed, "skipped_unmanaged": skipped}
     return result
