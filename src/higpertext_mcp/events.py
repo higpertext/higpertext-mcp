@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from higpertext_mcp import adapter_catalog
+
 
 class EventType(str, Enum):
     SESSION_STARTED = "SESSION_STARTED"
@@ -62,83 +64,25 @@ _COMMON_LIMITATIONS = (
 )
 
 
+_EVENT_TYPES = {
+    "PreToolUse": EventType.ACTION_REQUESTED,
+    "PostToolUse": EventType.ACTION_COMPLETED,
+    "UserPromptSubmit": EventType.PROMPT_RECEIVED,
+    "Stop": EventType.SESSION_FINISHED,
+    "PreCompact": EventType.CONTEXT_COMPACTING,
+}
+
+
+def _capabilities(spec: adapter_catalog.AdapterSpec) -> AdapterCapabilities:
+    native_events = {event: _EVENT_TYPES[event] for event in spec.hook_events if event in _EVENT_TYPES}
+    supported = set(native_events.values())
+    unsupported = tuple(event for event in EventType if event not in supported)
+    limitations = _COMMON_LIMITATIONS + spec.limitations
+    return AdapterCapabilities(spec.id, native_events, unsupported, limitations)
+
+
 ADAPTERS: dict[str, AdapterCapabilities] = {
-    "claude": AdapterCapabilities(
-        "claude",
-        {
-            "PreToolUse": EventType.ACTION_REQUESTED,
-            "PostToolUse": EventType.ACTION_COMPLETED,
-            "UserPromptSubmit": EventType.PROMPT_RECEIVED,
-            "PreCompact": EventType.CONTEXT_COMPACTING,
-            "Stop": EventType.SESSION_FINISHED,
-        },
-        (EventType.SESSION_STARTED, EventType.PLAN_CREATED, EventType.ACTION_AUTHORIZED),
-        _COMMON_LIMITATIONS,
-    ),
-    "codex": AdapterCapabilities(
-        "codex",
-        {
-            "PreToolUse": EventType.ACTION_REQUESTED,
-            "PostToolUse": EventType.ACTION_COMPLETED,
-            "UserPromptSubmit": EventType.PROMPT_RECEIVED,
-            "PreCompact": EventType.CONTEXT_COMPACTING,
-            "Stop": EventType.SESSION_FINISHED,
-        },
-        (EventType.SESSION_STARTED, EventType.PLAN_CREATED, EventType.ACTION_AUTHORIZED),
-        _COMMON_LIMITATIONS,
-    ),
-    "opencode": AdapterCapabilities(
-        "opencode",
-        {"PreToolUse": EventType.ACTION_REQUESTED, "PostToolUse": EventType.ACTION_COMPLETED},
-        (
-            EventType.SESSION_STARTED,
-            EventType.PROMPT_RECEIVED,
-            EventType.PLAN_CREATED,
-            EventType.ACTION_AUTHORIZED,
-            EventType.CONTEXT_COMPACTING,
-            EventType.SESSION_FINISHED,
-        ),
-        _COMMON_LIMITATIONS,
-    ),
-    "gemini": AdapterCapabilities(
-        "gemini",
-        {
-            "PreToolUse": EventType.ACTION_REQUESTED,
-            "PostToolUse": EventType.ACTION_COMPLETED,
-            "UserPromptSubmit": EventType.PROMPT_RECEIVED,
-            "PreCompact": EventType.CONTEXT_COMPACTING,
-        },
-        (EventType.SESSION_STARTED, EventType.PLAN_CREATED, EventType.ACTION_AUTHORIZED, EventType.SESSION_FINISHED),
-        _COMMON_LIMITATIONS,
-    ),
-    "copilot": AdapterCapabilities(
-        "copilot",
-        {
-            "PreToolUse": EventType.ACTION_REQUESTED,
-            "PostToolUse": EventType.ACTION_COMPLETED,
-            "UserPromptSubmit": EventType.PROMPT_RECEIVED,
-            "PreCompact": EventType.CONTEXT_COMPACTING,
-            "Stop": EventType.SESSION_FINISHED,
-        },
-        (EventType.SESSION_STARTED, EventType.PLAN_CREATED, EventType.ACTION_AUTHORIZED),
-        _COMMON_LIMITATIONS,
-    ),
-    "antigravity": AdapterCapabilities(
-        "antigravity",
-        {
-            "PreToolUse": EventType.ACTION_REQUESTED,
-            "PostToolUse": EventType.ACTION_COMPLETED,
-            "Stop": EventType.SESSION_FINISHED,
-        },
-        (
-            EventType.SESSION_STARTED,
-            EventType.PROMPT_RECEIVED,
-            EventType.PLAN_CREATED,
-            EventType.ACTION_AUTHORIZED,
-            EventType.CONTEXT_COMPACTING,
-        ),
-        _COMMON_LIMITATIONS,
-    ),
+    name: _capabilities(spec) for name, spec in adapter_catalog.ADAPTERS.items()
 }
 
 

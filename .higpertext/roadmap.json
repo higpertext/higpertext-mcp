@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "title": "Centralizar y normalizar adaptadores de agentes",
+  "phases": [
+    {
+      "id": "adapter-catalog",
+      "name": "Catálogo central",
+      "description": "Definir en un único módulo los destinos, capacidades, eventos y limitaciones de cada adaptador.",
+      "status": "done",
+      "skills": ["common.build"]
+    },
+    {
+      "id": "renderer-integration",
+      "name": "Integración de renderizadores",
+      "description": "Conectar instrucciones, hooks, skills y agents al catálogo central sin materializar destinos incompatibles.",
+      "status": "done",
+      "skills": ["common.build"]
+    },
+    {
+      "id": "tests-docs",
+      "name": "Pruebas y documentación",
+      "description": "Cubrir la matriz por adaptador, actualizar la documentación y verificar artefactos generados.",
+      "status": "done",
+      "skills": ["common.build", "common.review"]
+    }
+  ]
+}

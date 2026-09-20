@@ -58,14 +58,11 @@ siguen compartiendo el mismo `project_id`, pero cada checkout conserva su
 propio `.higpertext` y sus propios archivos `.claude`, `.codex`, etc. Nunca se
 generan archivos en el directorio del servidor MCP.
 
-En el transporte STDIO, el server resuelve la raíz del proyecto por el
-**cwd del proceso** en el que se lanza (no por el cwd de `higpertext-mcp`).
-También se puede fijar explícitamente con:
-
-- dejar que el cliente MCP lo lance con `cwd` = raíz del proyecto destino
-  (patrón estándar en Claude Code: el `.mcp.json` vive en la raíz del
-  proyecto destino, y el cliente lanza el proceso ahí), o
-- forzarla explícitamente con la variable de entorno `HIGPERTEXT_PROJECT_ROOT`.
+En el transporte STDIO, el server requiere seleccionar explícitamente la raíz
+del proyecto destino mediante `HIGPERTEXT_PROJECT_ROOT`. En el transporte HTTP
+se debe enviar `root_path` o `project_id` a las tools que operan sobre un
+proyecto. No se usa el `cwd` del servidor como fallback, porque podría ser la
+raíz del propio MCP y no la del proyecto destino.
 
 En Docker, el despliegue HTTP monta el conjunto de proyectos en `/projects`.
 `HIGPERTEXT_PROJECTS_ROOT` permite cambiar la raíz host que se monta; por
@@ -225,6 +222,29 @@ cliente MCP y confirmá que la lista de tools no está vacía. Si está vacía:
 
 - revisá que `.higpertext/config/environment.json` tenga `active_profile` seteado, y
 - que ese perfil (`src/config/profiles/<perfil>.json`) declare `capabilities` reales.
+
+### Compatibilidad por adaptador
+
+La matriz vigente se mantiene en
+`src/higpertext_mcp/adapter_catalog.py`. `higpertext-render-adapters` consulta
+esa matriz antes de escribir archivos, por lo que no genera skills, agents o
+hooks en destinos que no los declaran compatibles.
+
+- Claude: `CLAUDE.md`, `.claude/settings.json`, `.claude/skills/` y
+  `.claude/agents/`.
+- Codex: `AGENTS.md`, `.codex/hooks.json`, `.agents/skills/` y
+  `.codex/agents/`.
+- Gemini: `GEMINI.md`, `.gemini/settings.json` y `.gemini/skills/`. Sus hooks
+  deben escribir únicamente JSON por stdout.
+- Copilot: `.github/copilot-instructions.md`, `.github/hooks/*.json` y
+  `.github/agents/*.md` y `.github/skills/`.
+- OpenCode: `AGENTS.md`, `.opencode/skills/`, `.opencode/agents/` y un plugin
+  JavaScript específico para los hooks clásicos.
+- Antigravity: bridge experimental; no hay aquí un protocolo público estable
+  que permita declararlo nativo.
+
+Después de actualizar el catálogo o el profile server, volvé a ejecutar
+`higpertext-render-adapters` y reconectá el cliente MCP.
 
 ## 6. Tests (para desarrollo del propio server)
 

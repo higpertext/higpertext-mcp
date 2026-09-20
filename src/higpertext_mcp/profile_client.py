@@ -223,8 +223,8 @@ async def create_profile(
 async def _resolve_profile(channel, id_or_name: str) -> profile_pb2.Profile:
     """GetProfile busca por id (UUID interno) — un caller normalmente solo
     conoce el `name` (slug) que le dio a create_profile, así que si el intento
-    directo por id falla, se cae a ListProfiles+filtro por name, mismo
-    criterio que usa render-hooks del lado Go."""
+    directo por id falla, se cae a ListProfiles+filtro por name, mismo criterio
+    que usa el profile server para resolver perfiles."""
     stub = profile_pb2_grpc.ProfileServiceStub(channel)
     try:
         resp = await stub.GetProfile(profile_pb2.GetProfileRequest(id=id_or_name), timeout=_CALL_TIMEOUT_S)

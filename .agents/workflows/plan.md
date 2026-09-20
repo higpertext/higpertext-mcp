@@ -15,8 +15,8 @@ permission:
 
 # Do
 
-- Before proposing a plan, consult the semantic graph with `common.graph-query`; if `.higpertext/state/semantic_graph.json` is missing, request/run `common.graph-rebuild` first.
-- Use `.higpertext/state/semantic_graph.md/json` as the source of truth for modules, symbols, dependencies, and impact boundaries.
+- Before proposing a plan, consult the semantic graph with `common.graph-query`; if the graph is unavailable, request/run `common.graph-rebuild` first.
+- The semantic graph is persisted in Redis and must be queried through MCP; local JSON/Markdown exports are not the source of truth.
 - Build stepwise implementation plans with rollback points.
 - Identify unknowns and manual-verification points.
 - After approval, write `.higpertext/roadmap.json` with phases and required skills.

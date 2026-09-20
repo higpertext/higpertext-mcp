@@ -4,22 +4,10 @@ from __future__ import annotations
 import json
 
 from higpertext_mcp import events
+from higpertext_mcp import adapter_catalog
 
-EVENTS = {
-    "opencode": {"PreToolUse": "tool.execute.before", "PostToolUse": "tool.execute.after"},
-    "claude": {e: e for e in ("PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "PreCompact")},
-    "codex": {e: e for e in ("PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "PreCompact")},
-    "gemini": {"PreToolUse": "BeforeTool", "PostToolUse": "AfterTool", "UserPromptSubmit": "BeforeAgent", "PreCompact": "PreCompress"},
-    "copilot": {"PreToolUse": "preToolUse", "PostToolUse": "postToolUse", "UserPromptSubmit": "userPromptSubmitted", "Stop": "agentStop", "PreCompact": "preCompact"},
-    "antigravity": {"PreToolUse": "PreToolUse", "PostToolUse": "PostToolUse", "Stop": "Stop"},
-}
-TOOLS = {
-    "opencode": {"Bash": "bash", "Read": "read", "Write": "write", "Edit": "edit"},
-    "claude": {}, "codex": {},
-    "gemini": {"Bash": "run_shell_command", "PowerShell": "run_shell_command", "Read": "read_file", "Write": "write_file", "Edit": "replace"},
-    "copilot": {"Bash": "bash", "PowerShell": "powershell", "Read": "view", "Write": "create", "Edit": "edit"},
-    "antigravity": {"Bash": "run_command", "PowerShell": "run_command", "Read": "view_file", "Write": "write_to_file", "Edit": "replace_file_content|multi_replace_file_content"},
-}
+EVENTS = {name: dict(spec.hook_events) for name, spec in adapter_catalog.ADAPTERS.items()}
+TOOLS = {name: dict(spec.tool_aliases) for name, spec in adapter_catalog.ADAPTERS.items()}
 
 
 def native_matcher(assistant: str, matcher: str) -> str:

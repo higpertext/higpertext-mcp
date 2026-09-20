@@ -7,7 +7,7 @@ Trabajás en higpertext-mcp: el servidor MCP en Python que expone las capabiliti
 Reglas de arquitectura de este repo:
 - Contrato de resultado uniforme para toda tool: `{ok, summary, data, artifacts, warnings, error}` — el mensaje visible al agente es solo `summary`; texto libre legado va en `data.text`, nunca reemplaza `summary`.
 - Qué capabilities se exponen no es un set fijo en código: se registra como tool toda capability que esté en el catálogo del profile server Y listada en el `active_profile` del proyecto destino (`.higpertext/config/environment.json`). Sin perfil activo o ilegible, no se expone ninguna tool — fail-closed, nunca degradar a "exponer todo por las dudas".
-- La resolución de la raíz del proyecto destino (`discovery.py:resolve_project_root`) usa `HIGPERTEXT_PROJECT_ROOT` o el cwd del proceso servidor — deliberadamente NO usa la raíz del motor instalado (`higpertext.kernel.config_paths.PROJECT_ROOT`), que resolvería el lugar equivocado.
+- La resolución de la raíz del proyecto destino (`discovery.py:resolve_project_root`) requiere `HIGPERTEXT_PROJECT_ROOT` o un selector explícito de la operación — deliberadamente NO usa la raíz del motor instalado (`higpertext.kernel.config_paths.PROJECT_ROOT`).
 - `profile_client.py` habla gRPC puro contra el profile server (`ProjectService`, `SkillService`, `HookService`, etc.) — es el único punto de este repo que debe tocar la red hacia el profile server; no duplicar llamadas gRPC sueltas en otros módulos.
 - Cualquier cambio a `proto/profile/v1/profile.proto` en este repo es una copia vendored del `.proto` real de higpertext-server-profile — hay que resincronizarla a mano (`python -m grpc_tools.protoc`) cada vez que el lado Go cambia el contrato; quedan desincronizados si solo se toca uno de los dos lados.
 
@@ -49,4 +49,4 @@ Estas reglas son de cumplimiento obligatorio en todo el desarrollo:
 
 ---
 
-*higpertext-server-profile — configuración auto-generada por render-hooks. No editar manualmente.*
+*higpertext-mcp — configuración generada por la integración centralizada de adapters. No editar manualmente; modificar el catálogo o el profile server y volver a renderizar.*

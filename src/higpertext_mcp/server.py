@@ -20,6 +20,7 @@ from mcp.server.stdio import stdio_server
 
 from higpertext_mcp import (
     annotations,
+    adapter_catalog,
     adapter_renderer,
     agent_renderer,
     discovery,
@@ -88,7 +89,7 @@ _RENDER_ADAPTERS_TOOL = types.Tool(
         "properties": {
             "project_id": {"type": "string", "description": "ID de un proyecto registrado en ProjectService."},
             "root_path": {"type": "string", "description": "Una ruta registrada del proyecto destino."},
-            "assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_renderer.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."},
+            "assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_catalog.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."},
         },
         "oneOf": [{"required": ["project_id"]}, {"required": ["root_path"]}],
         "additionalProperties": False,
@@ -318,7 +319,7 @@ _AGENT_TOOL = types.Tool(
             "background": {"type": "boolean", "description": "opcional — sin setear = omitido del frontmatter"},
             "color": {"type": "string", "description": "opcional — frontmatter `color`"},
             "effort": {"type": "string", "description": "opcional — frontmatter `effort`"},
-            "assistants": {"type": "array", "items": {"type": "string", "enum": ["claude", "codex"]}, "description": "adaptadores donde se materializa; vacío = todos"},
+            "assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_catalog.assistants_with("agents"))}, "description": "adaptadores donde se materializa; vacío = todos compatibles"},
             "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, el agent solo es visible para estos perfiles"},
             "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
             "project_id": {"type": "string", "description": "vacío = no atado a un proyecto puntual"},

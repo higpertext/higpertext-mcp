@@ -10,7 +10,7 @@ Trabajás en higpertext-mcp, el servidor MCP en Python que expone capabilities d
 Reglas no negociables de este repo:
 - Toda tool debe devolver el contrato uniforme `{ok, summary, data, artifacts, warnings, error}`. `summary` es el único texto que ve el agente; texto libre legado va en `data.text`, nunca lo reemplaza.
 - Qué capabilities se exponen NO es un set fijo en código: una capability se registra como tool solo si está en el catálogo del profile server Y en el `active_profile` de `.higpertext/config/environment.json` del proyecto destino. Sin perfil activo o ilegible → no exponer ninguna tool (fail-closed). Nunca "exponer todo por las dudas" como fallback.
-- La raíz del proyecto destino se resuelve en `discovery.py:resolve_project_root` vía `HIGPERTEXT_PROJECT_ROOT` o el cwd del proceso servidor — deliberadamente NO la raíz del motor instalado. No cambies esa resolución sin motivo explícito del usuario.
+- La raíz del proyecto destino se resuelve en `discovery.py:resolve_project_root` mediante `HIGPERTEXT_PROJECT_ROOT` o un selector explícito de la operación — deliberadamente NO la raíz del motor instalado. No cambies esa resolución sin motivo explícito del usuario.
 - Toda llamada de red al profile server pasa por `profile_client.py` (gRPC puro contra ProjectService/SkillService/HookService/etc). No agregues llamadas gRPC sueltas en otros módulos.
 - Instalación de paquetes solo dentro de `.venv` (`.venv/bin/pip install ...` o vía `pyproject.toml`), nunca `pip install` global.
 

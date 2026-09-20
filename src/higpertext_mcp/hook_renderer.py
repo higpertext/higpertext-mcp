@@ -9,15 +9,9 @@ import warnings
 from pathlib import Path
 
 from higpertext_mcp import hook_protocol, profile_client
+from higpertext_mcp import adapter_catalog
 
-_SETTINGS_PATH = {
-    "opencode": ".opencode/plugins/higpertext.js",
-    "claude": ".claude/settings.json",
-    "codex": ".codex/hooks.json",
-    "gemini": ".gemini/settings.json",
-    "copilot": ".github/hooks/higpertext.json",
-    "antigravity": ".agents/hooks.json",
-}
+_SETTINGS_PATH = {name: spec.hook_settings_path for name, spec in adapter_catalog.ADAPTERS.items()}
 _ID = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
 
 
@@ -137,10 +131,10 @@ def _plan(config: dict, assistant: str, hooks: list) -> dict:
 
 
 async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, list[str]]:
-    selected = list(dict.fromkeys(assistants)) or list(_SETTINGS_PATH)
-    invalid = set(selected) - set(_SETTINGS_PATH)
+    selected = list(dict.fromkeys(assistants)) or list(adapter_catalog.SUPPORTED)
+    invalid = sorted(set(selected) - set(adapter_catalog.SUPPORTED))
     if invalid:
-        raise ValueError(f"hook adapters not supported: {', '.join(sorted(invalid))}; OpenCode requires a version-specific plugin bridge")
+        raise ValueError(f"hook adapters not supported: {', '.join(invalid)}")
     plans = []
     # Validate every destination before touching any file.
     for assistant in selected:

@@ -19,14 +19,14 @@ import shutil
 from pathlib import Path
 
 from higpertext_mcp import discovery, profile_client
+from higpertext_mcp import adapter_catalog
 
 # Multiple assistants can share a directory (codex/antigravity both use
 # .agents/skills) — rendering is deduplicated by directory, not by assistant.
 _SKILLS_DIR = {
-    "claude": ".claude/skills",
-    "gemini": ".gemini/skills",
-    "codex": ".agents/skills",
-    "antigravity": ".agents/skills",
+    name: spec.skills_dir
+    for name, spec in adapter_catalog.ADAPTERS.items()
+    if spec.supports_skills
 }
 
 
@@ -54,9 +54,13 @@ def _prune(dir_path: Path, want_ids: set[str]) -> list[str]:
 
 
 async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, dict[str, list[str]]]:
-    # A diferencia de hook_renderer, un asistente sin concepto de skills (hoy
-    # copilot/opencode) no es un error — simplemente no recibe nada acá.
-    selected = [a for a in dict.fromkeys(assistants) if a in _SKILLS_DIR] or list(_SKILLS_DIR)
+    # Cada adapter declara su directorio nativo en adapter_catalog. Los
+    # adapters que comparten una ruta se deduplican más abajo.
+    selected = list(dict.fromkeys(assistants)) or list(adapter_catalog.SUPPORTED)
+    invalid = sorted(set(selected) - set(adapter_catalog.SUPPORTED))
+    if invalid:
+        raise ValueError(f"skill adapters not supported: {', '.join(invalid)}")
+    selected = [a for a in selected if a in _SKILLS_DIR]
 
     project = await profile_client.resolve_project(str(discovery.canonical_project_path(root)))
     project_id = project.get("id", "")

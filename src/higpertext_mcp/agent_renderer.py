@@ -22,7 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from higpertext_mcp import discovery, profile_client
+from higpertext_mcp import adapter_catalog, discovery, profile_client
 
 _MARKER_TEXT = "managed_by: higpertext-mcp"
 
@@ -67,6 +67,41 @@ def _render_claude(agent: dict) -> str:
     return "\n".join(lines) + "\n\n" + body + "\n\n" + f"<!-- {_MARKER_TEXT} -->" + "\n"
 
 
+def _render_copilot(agent: dict) -> str:
+    """Render the repository-level Copilot custom-agent format.
+
+    Copilot agents use Markdown with YAML frontmatter.  Only fields documented
+    by Copilot are emitted; Claude-specific options are intentionally omitted.
+    """
+    lines = ["---", f"name: {agent['name']}", f"description: {agent['description']}"]
+    if agent.get("tools"):
+        lines.append(f"tools: [{', '.join(agent['tools'])}]")
+    if agent.get("model"):
+        lines.append(f"model: {agent['model']}")
+    lines.append("---")
+    body = (agent.get("prompt") or "").rstrip("\n")
+    return "\n".join(lines) + "\n\n" + body + "\n\n" + f"<!-- {_MARKER_TEXT} -->" + "\n"
+
+
+def _render_opencode(agent: dict) -> str:
+    """Render an OpenCode project agent.
+
+    OpenCode uses Markdown agents with YAML frontmatter.  The common agent
+    contract maps cleanly to its required description and a subagent mode;
+    provider-specific fields are intentionally not copied across adapters.
+    """
+    lines = [
+        "---",
+        f"description: {agent['description']}",
+        "mode: subagent",
+    ]
+    if agent.get("model"):
+        lines.append(f"model: {agent['model']}")
+    lines.append("---")
+    body = (agent.get("prompt") or "").rstrip("\n")
+    return "\n".join(lines) + "\n\n" + body + "\n\n" + f"<!-- {_MARKER_TEXT} -->" + "\n"
+
+
 # ── Codex CLI: .codex/agents/<id>.toml ────────────────────────────────────
 #
 # Campos soportados por Codex (name, description, developer_instructions,
@@ -103,9 +138,20 @@ def _render_codex(agent: dict) -> str:
 
 # Declaración única por asistente: directorio destino, extensión de archivo,
 # función de síntesis. Agregar un asistente nuevo es sumar una entrada acá.
+_FORMAT_RENDERERS: dict[str, Callable[[dict], str]] = {
+    "claude-markdown": _render_claude,
+    "copilot-markdown": _render_copilot,
+    "codex-toml": _render_codex,
+    "opencode-markdown": _render_opencode,
+}
 _ASSISTANTS: dict[str, dict[str, object]] = {
-    "claude": {"dir": ".claude/agents", "ext": ".md", "render": _render_claude},
-    "codex": {"dir": ".codex/agents", "ext": ".toml", "render": _render_codex},
+    spec.id: {
+        "dir": spec.agents_dir,
+        "ext": spec.agents_extension,
+        "render": _FORMAT_RENDERERS[spec.agents_format],
+    }
+    for spec in adapter_catalog.ADAPTERS.values()
+    if spec.supports_agents
 }
 
 
@@ -130,12 +176,11 @@ def _prune(dir_path: Path, ext: str, want_ids: set[str]) -> list[str]:
 
 
 async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, dict[str, list[str]]]:
-    # Hoy Claude Code y Codex tienen concepto nativo de subagente — a
-    # diferencia de hook_renderer, que sí falla fuerte en asistentes no
-    # soportados (cada hook aplica a todos los asistentes), acá no tener
-    # destino para un asistente pedido no es un error: no todo asistente
-    # tiene subagentes (gemini/copilot/opencode/antigravity, por ahora no).
-    selected = [a for a in dict.fromkeys(assistants) if a in _ASSISTANTS] or list(_ASSISTANTS)
+    selected = list(dict.fromkeys(assistants)) or list(adapter_catalog.SUPPORTED)
+    invalid = sorted(set(selected) - set(adapter_catalog.SUPPORTED))
+    if invalid:
+        raise ValueError(f"agent adapters not supported: {', '.join(invalid)}")
+    selected = [a for a in selected if a in _ASSISTANTS]
 
     project = await profile_client.resolve_project(str(discovery.canonical_project_path(root)))
     project_id = project.get("id", "")

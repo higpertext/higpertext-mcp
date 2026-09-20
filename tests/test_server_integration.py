@@ -187,16 +187,17 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
     # skill_renderer.render() por separado (ver test_skill_renderer_writes_
     # scoped_skills_across_assistants), igual que hook_renderer con los hooks.
     expected = {
-        "AGENTS.md", "CLAUDE.md", ".clauderules", "GEMINI.md", "opencode.json",
-        ".codex/rules/higpertext_rules.md", ".claude/rules/dev.md",
-        ".gemini/workflows/plan.md",
-        ".github/copilot-instructions.md", ".agents/mcp_config.json",
-        ".agents/settings.json", ".agents/workflows/spec.md",
-        ".opencode/rules/dev.md",
+        "AGENTS.md", "CLAUDE.md", "GEMINI.md", "opencode.json",
+        ".claude/rules/dev.md", ".github/copilot-instructions.md",
+        ".agents/mcp_config.json", ".agents/settings.json",
     }
     assert expected <= set(result["files"])
-    assert "common.graph-query" in (tmp_path / ".agents/workflows/plan.md").read_text()
-    assert "Active subagents" not in (tmp_path / ".agents/workflows/plan.md").read_text()
+    assert "common.graph-query" in (tmp_path / "AGENTS.md").read_text()
+    assert "semantic_graph.json" not in (tmp_path / "AGENTS.md").read_text()
+    assert ".codex/rules/higpertext_rules.md" not in set(result["files"])
+    assert ".opencode/rules/dev.md" not in set(result["files"])
+    assert not (tmp_path / ".gemini/workflows").exists()
+    assert not (tmp_path / ".agents/workflows").exists()
     assert not (tmp_path / ".agents/agents").exists()
     assert not (tmp_path / ".agents/subagents").exists()
     assert not (tmp_path / ".gemini/subagents").exists()
@@ -312,6 +313,24 @@ async def test_skill_renderer_scopes_by_project_and_profile_and_prunes_stale(mon
     assert output[".claude/skills"]["pruned"] == ["stale-skill"]
 
 
+@pytest.mark.anyio
+async def test_skill_renderer_targets_official_copilot_and_opencode_paths(monkeypatch, tmp_path):
+    async def fake_list_skills(*, enabled_only=False):
+        return [{"id": "common.build", "content": "---\nname: common.build\ndescription: d\n---\n", "profiles": [], "project_id": ""}]
+
+    async def fake_resolve_project(root_path):
+        return {"id": "proj-123", "root_path": root_path}
+
+    monkeypatch.setattr(skill_renderer.profile_client, "list_skills", fake_list_skills)
+    monkeypatch.setattr(skill_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    result = await skill_renderer.render(tmp_path, "dev", ["copilot", "opencode"])
+
+    assert (tmp_path / ".github/skills/common.build/SKILL.md").exists()
+    assert (tmp_path / ".opencode/skills/common.build/SKILL.md").exists()
+    assert set(result) == {".github/skills", ".opencode/skills"}
+
+
 def test_agent_render_md_omits_unset_optional_fields():
     agent = {
         "id": "mcp-test-runner", "name": "mcp-test-runner", "description": "runs tests",
@@ -344,6 +363,16 @@ def test_agent_render_codex_toml_omits_fields_without_codex_equivalent():
     # fuerza un mapeo aproximado (tools/permission_mode/skills/memory/color).
     for absent in ("tools", "sandbox_mode", "skills", "memory", "color", "acceptEdits", "blue"):
         assert absent not in rendered
+    assert agent_renderer._MARKER_TEXT in rendered
+
+
+def test_agent_render_opencode_uses_native_markdown_frontmatter():
+    rendered = agent_renderer._render_opencode({
+        "name": "reviewer", "description": "reviews changes", "model": "gpt-5",
+        "prompt": "Review the patch.",
+    })
+    assert rendered.startswith("---\ndescription: reviews changes\nmode: subagent\nmodel: gpt-5\n---\n")
+    assert "name:" not in rendered.split("---", 2)[1]
     assert agent_renderer._MARKER_TEXT in rendered
 
 

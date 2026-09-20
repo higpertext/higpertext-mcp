@@ -13,6 +13,19 @@ La traducción se implementa en `higpertext_mcp.events` y
 observar y sus limitaciones. En particular, `ACTION_AUTHORIZED` no lo emite
 un hook: la autorización efectiva pertenece al gateway/controller.
 
+## Catálogo central de adaptadores
+
+La matriz de compatibilidad vive en
+`src/higpertext_mcp/adapter_catalog.py`. Es la única fuente de verdad para los
+destinos nativos, eventos, aliases de tools, skills y agents, y el
+estado de cada integración. Los renderizadores consultan ese catálogo y no
+deben declarar asistentes o rutas por separado.
+
+Un adaptador puede ser `native` (formato documentado), `bridge` (puente local)
+o no tener una feature concreta. Que exista un hook no convierte el evento en
+una garantía de seguridad: la autorización efectiva sigue perteneciendo al
+gateway/controller.
+
 Servidor MCP que expone capabilities de `higpertext-cli` como tools reales
 (function-calling), en vez del interceptor de texto sobre Bash que usaba antes el motor.
 
