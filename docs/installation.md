@@ -246,6 +246,32 @@ hooks en destinos que no los declaran compatibles.
 Después de actualizar el catálogo o el profile server, volvé a ejecutar
 `higpertext-render-adapters` y reconectá el cliente MCP.
 
+### Modelos de agentes por adaptador
+
+`higpertext-agent` conserva `model` como modelo base y acepta
+`model_overrides` para seleccionar el modelo nativo de cada destino. Por
+ejemplo, un agente global de Claude puede usar `sonnet` como base y un modelo
+de Codex distinto:
+
+```json
+{
+  "action": "create",
+  "id": "reviewer",
+  "name": "reviewer",
+  "description": "Revisa cambios",
+  "model": "sonnet",
+  "model_overrides": { "codex": "gpt-5.3-codex" },
+  "prompt": "Revisá el cambio y reportá riesgos."
+}
+```
+
+La matriz del catálogo valida modelos Claude (`claude-*`, `opus`, `sonnet`,
+`haiku`) y Codex (`gpt-*`, `o1`, `o3`, `o4`) antes de escribir archivos. Si un
+agente apunta explícitamente a un adaptador con un modelo incompatible, el
+render falla sin escribir artefactos. Si el agente es global, simplemente no
+se materializa en el destino incompatible: así un agente `sonnet` no termina
+en `.codex/agents/` por accidente.
+
 ## 6. Tests (para desarrollo del propio server)
 
 ```bash

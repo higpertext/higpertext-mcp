@@ -557,6 +557,7 @@ def _agent_to_dict(a: profile_pb2.Agent) -> dict:
     return {
         "id": a.id, "name": a.name, "description": a.description,
         "tools": list(a.tools), "model": a.model, "prompt": a.prompt,
+        "model_overrides": dict(a.model_overrides),
         "permission_mode": a.permission_mode, "skills": list(a.skills), "memory": a.memory,
         "background": a.background if a.HasField("background") else None,
         "color": a.color, "effort": a.effort,
@@ -568,7 +569,7 @@ def _agent_to_dict(a: profile_pb2.Agent) -> dict:
 
 async def create_agent(
     *, id: str, name: str = "", description: str = "", tools: list[str] | None = None,
-    model: str = "", prompt: str = "", permission_mode: str = "", skills: list[str] | None = None,
+    model: str = "", model_overrides: dict[str, str] | None = None, prompt: str = "", permission_mode: str = "", skills: list[str] | None = None,
     memory: str = "", background: bool | None = None, color: str = "", effort: str = "",
     assistants: list[str] | None = None,
     profiles: list[str] | None = None, project_id: str = "",
@@ -579,6 +580,7 @@ async def create_agent(
     cliente."""
     req = profile_pb2.CreateAgentRequest(
         id=id, name=name or id, description=description, tools=tools or [], model=model,
+        model_overrides=model_overrides or {},
         prompt=prompt, permission_mode=permission_mode, skills=skills or [], memory=memory,
         color=color, effort=effort, assistants=assistants or [], profiles=profiles or [],
         project_id=project_id,
@@ -610,13 +612,14 @@ async def list_agents(*, profile: str = "", project_id: str = "") -> list[dict]:
 
 async def update_agent(
     *, id: str, name: str, description: str, tools: list[str] | None, model: str, prompt: str,
-    permission_mode: str = "", skills: list[str] | None = None, memory: str = "",
+    model_overrides: dict[str, str] | None = None, permission_mode: str = "", skills: list[str] | None = None, memory: str = "",
     background: bool | None = None, color: str = "", effort: str = "",
     assistants: list[str] | None = None,
     profiles: list[str] | None = None, project_id: str = "",
 ) -> dict:
     req = profile_pb2.UpdateAgentRequest(
-        id=id, name=name, description=description, tools=tools or [], model=model, prompt=prompt,
+        id=id, name=name, description=description, tools=tools or [], model=model,
+        model_overrides=model_overrides or {}, prompt=prompt,
         permission_mode=permission_mode, skills=skills or [], memory=memory,
         color=color, effort=effort, assistants=assistants or [], profiles=profiles or [],
         project_id=project_id,

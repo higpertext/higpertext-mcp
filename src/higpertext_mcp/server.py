@@ -312,7 +312,8 @@ _AGENT_TOOL = types.Tool(
             "name": {"type": "string", "description": "requerido en create/update — frontmatter `name`, normalmente == id"},
             "description": {"type": "string", "description": "requerido en create/update — frontmatter `description`"},
             "tools": {"type": "array", "items": {"type": "string"}, "description": "frontmatter `tools`; vacío = sin restricción"},
-            "model": {"type": "string", "description": "requerido en create/update — frontmatter `model`, ej. 'sonnet'"},
+            "model": {"type": "string", "description": "requerido en create/update — modelo base; se usa cuando el adaptador no tiene override"},
+            "model_overrides": {"type": "object", "additionalProperties": {"type": "string"}, "description": "opcional — modelo por adaptador, ej. {\"codex\": \"gpt-5.3-codex\"}; prevalece sobre model"},
             "prompt": {"type": "string", "description": "requerido en create/update — cuerpo markdown, system prompt del subagente"},
             "permission_mode": {"type": "string", "description": "opcional — frontmatter `permissionMode`"},
             "skills": {"type": "array", "items": {"type": "string"}, "description": "opcional — frontmatter `skills`"},
@@ -544,6 +545,11 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     summary = f"Profile '{args['id']}' borrado."
                 else:
                     raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
+                if action in {"create", "update", "delete"}:
+                    # The active profile controls the dynamic capability set.
+                    # Tell clients to re-run tools/list immediately after a
+                    # mutation instead of waiting for a later capability call.
+                    await _notify_if_tools_changed(server, state)
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar el profile: {exc}"
@@ -666,7 +672,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 if action == "create":
                     data = await profile_client.create_agent(
                         id=args["id"], name=args.get("name", ""), description=args.get("description", ""),
-                        tools=args.get("tools"), model=args.get("model", ""), prompt=args.get("prompt", ""),
+                        tools=args.get("tools"), model=args.get("model", ""), model_overrides=args.get("model_overrides"), prompt=args.get("prompt", ""),
                         permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
                         memory=args.get("memory", ""), background=args.get("background"),
                         color=args.get("color", ""), effort=args.get("effort", ""),
@@ -686,7 +692,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 elif action == "update":
                     data = await profile_client.update_agent(
                         id=args["id"], name=args["name"], description=args["description"],
-                        tools=args.get("tools"), model=args["model"], prompt=args["prompt"],
+                        tools=args.get("tools"), model=args["model"], model_overrides=args.get("model_overrides"), prompt=args["prompt"],
                         permission_mode=args.get("permission_mode", ""), skills=args.get("skills"),
                         memory=args.get("memory", ""), background=args.get("background"),
                         color=args.get("color", ""), effort=args.get("effort", ""),

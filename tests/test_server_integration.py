@@ -459,7 +459,7 @@ async def test_agent_renderer_filters_by_assistant(monkeypatch, tmp_path):
     agents = [
         {"id": "claude-only", "name": "claude-only", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": ["claude"]},
         {"id": "codex-only", "name": "codex-only", "description": "d", "tools": [], "model": "gpt-5", "prompt": "p", "assistants": ["codex"]},
-        {"id": "all", "name": "all", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": []},
+        {"id": "all", "name": "all", "description": "d", "tools": [], "model": "sonnet", "model_overrides": {"codex": "gpt-5.3-codex"}, "prompt": "p", "assistants": []},
     ]
 
     async def fake_list_agents(*, profile="", project_id=""):
@@ -474,6 +474,7 @@ async def test_agent_renderer_filters_by_assistant(monkeypatch, tmp_path):
     await agent_renderer.render(tmp_path, "dev", ["claude", "codex"])
     assert {p.stem for p in (tmp_path / ".claude/agents").iterdir()} == {"claude-only", "all"}
     assert {p.stem for p in (tmp_path / ".codex/agents").iterdir()} == {"codex-only", "all"}
+    assert 'model = "gpt-5.3-codex"' in (tmp_path / ".codex/agents/all.toml").read_text()
 
 
 @pytest.mark.anyio
@@ -483,7 +484,7 @@ async def test_agent_renderer_targets_codex_toml_alongside_claude(monkeypatch, t
     destinos de extensión y contenido totalmente distintos (.md YAML+MD vs
     .toml)."""
     agents = [
-        {"id": "global-agent", "name": "global-agent", "description": "d", "tools": [], "model": "sonnet",
+        {"id": "global-agent", "name": "global-agent", "description": "d", "tools": [], "model": "sonnet", "model_overrides": {"codex": "gpt-5.3-codex"},
          "prompt": "global prompt", "profiles": [], "project_id": ""},
     ]
 
@@ -501,7 +502,7 @@ async def test_agent_renderer_targets_codex_toml_alongside_claude(monkeypatch, t
     assert (tmp_path / ".claude/agents/global-agent.md").exists()
     codex_path = tmp_path / ".codex/agents/global-agent.toml"
     assert codex_path.exists()
-    assert codex_path.read_text(encoding="utf-8") == agent_renderer._render_codex(agents[0])
+    assert codex_path.read_text(encoding="utf-8") == agent_renderer._render_codex({**agents[0], "model": "gpt-5.3-codex"})
     assert output[".claude/agents"]["written"] == [".claude/agents/global-agent.md"]
     assert output[".codex/agents"]["written"] == [".codex/agents/global-agent.toml"]
 
@@ -509,6 +510,42 @@ async def test_agent_renderer_targets_codex_toml_alongside_claude(monkeypatch, t
     output_claude_only = await agent_renderer.render(tmp_path, "dev", ["claude"])
     assert list(output_claude_only.keys()) == [".claude/agents"]
     assert codex_path.exists()
+
+
+@pytest.mark.anyio
+async def test_agent_renderer_skips_claude_only_global_agent_for_codex(monkeypatch, tmp_path):
+    agents = [{"id": "global-agent", "name": "global-agent", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": []}]
+
+    async def fake_list_agents(*, profile="", project_id=""):
+        return agents
+
+    async def fake_resolve_project(root_path):
+        return {"id": "proj-123", "root_path": root_path}
+
+    monkeypatch.setattr(agent_renderer.profile_client, "list_agents", fake_list_agents)
+    monkeypatch.setattr(agent_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    result = await agent_renderer.render(tmp_path, "dev", ["codex"])
+    assert not (tmp_path / ".codex/agents/global-agent.toml").exists()
+    assert result[".codex/agents"]["written"] == []
+
+
+@pytest.mark.anyio
+async def test_agent_renderer_rejects_explicit_incompatible_target_before_writing(monkeypatch, tmp_path):
+    agents = [{"id": "bad-codex", "name": "bad-codex", "description": "d", "tools": [], "model": "sonnet", "prompt": "p", "assistants": ["codex"]}]
+
+    async def fake_list_agents(*, profile="", project_id=""):
+        return agents
+
+    async def fake_resolve_project(root_path):
+        return {"id": "proj-123", "root_path": root_path}
+
+    monkeypatch.setattr(agent_renderer.profile_client, "list_agents", fake_list_agents)
+    monkeypatch.setattr(agent_renderer.profile_client, "resolve_project", fake_resolve_project)
+
+    with pytest.raises(ValueError, match="model_overrides.codex"):
+        await agent_renderer.render(tmp_path, "dev", ["codex"])
+    assert not (tmp_path / ".codex").exists()
 
 
 @pytest.mark.anyio

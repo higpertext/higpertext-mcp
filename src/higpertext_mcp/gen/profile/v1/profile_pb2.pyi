@@ -172,7 +172,14 @@ class HookDefinition(_message.Message):
     def __init__(self, id: _Optional[str] = ..., event: _Optional[str] = ..., matcher: _Optional[str] = ..., script: _Optional[str] = ..., description: _Optional[str] = ..., timeout: _Optional[int] = ..., enabled: _Optional[bool] = ..., assistants: _Optional[_Iterable[str]] = ..., profiles: _Optional[_Iterable[str]] = ..., capability_id: _Optional[str] = ..., priority: _Optional[int] = ..., source_code: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class Agent(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants", "created_at", "updated_at")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants", "model_overrides", "created_at", "updated_at")
+    class ModelOverridesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -188,6 +195,7 @@ class Agent(_message.Message):
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
+    MODEL_OVERRIDES_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     id: str
@@ -205,9 +213,10 @@ class Agent(_message.Message):
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
     assistants: _containers.RepeatedScalarFieldContainer[str]
+    model_overrides: _containers.ScalarMap[str, str]
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., model_overrides: _Optional[_Mapping[str, str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GovernanceRule(_message.Message):
     __slots__ = ("id", "description", "severity", "scopes", "automated", "capability", "source", "numeric_threshold", "created_at", "updated_at", "pattern", "weight")
@@ -718,7 +727,14 @@ class GetSharedHookAssetsResponse(_message.Message):
     def __init__(self, assets: _Optional[_Union[SharedHookAssets, _Mapping]] = ...) -> None: ...
 
 class CreateAgentRequest(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants", "model_overrides")
+    class ModelOverridesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -734,6 +750,7 @@ class CreateAgentRequest(_message.Message):
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
+    MODEL_OVERRIDES_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     description: str
@@ -749,7 +766,8 @@ class CreateAgentRequest(_message.Message):
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
     assistants: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ...) -> None: ...
+    model_overrides: _containers.ScalarMap[str, str]
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., model_overrides: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class CreateAgentResponse(_message.Message):
     __slots__ = ("agent",)
@@ -784,7 +802,14 @@ class ListAgentsResponse(_message.Message):
     def __init__(self, agents: _Optional[_Iterable[_Union[Agent, _Mapping]]] = ...) -> None: ...
 
 class UpdateAgentRequest(_message.Message):
-    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants")
+    __slots__ = ("id", "name", "description", "tools", "model", "prompt", "permission_mode", "skills", "memory", "background", "color", "effort", "profiles", "project_id", "assistants", "model_overrides")
+    class ModelOverridesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     ID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
@@ -800,6 +825,7 @@ class UpdateAgentRequest(_message.Message):
     PROFILES_FIELD_NUMBER: _ClassVar[int]
     PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
     ASSISTANTS_FIELD_NUMBER: _ClassVar[int]
+    MODEL_OVERRIDES_FIELD_NUMBER: _ClassVar[int]
     id: str
     name: str
     description: str
@@ -815,7 +841,8 @@ class UpdateAgentRequest(_message.Message):
     profiles: _containers.RepeatedScalarFieldContainer[str]
     project_id: str
     assistants: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ...) -> None: ...
+    model_overrides: _containers.ScalarMap[str, str]
+    def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., model_overrides: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class UpdateAgentResponse(_message.Message):
     __slots__ = ("agent",)
@@ -1074,6 +1101,18 @@ class RemoveProjectPathResponse(_message.Message):
     PROJECT_FIELD_NUMBER: _ClassVar[int]
     project: Project
     def __init__(self, project: _Optional[_Union[Project, _Mapping]] = ...) -> None: ...
+
+class DeleteProjectRequest(_message.Message):
+    __slots__ = ("project_id",)
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    def __init__(self, project_id: _Optional[str] = ...) -> None: ...
+
+class DeleteProjectResponse(_message.Message):
+    __slots__ = ("message",)
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    message: str
+    def __init__(self, message: _Optional[str] = ...) -> None: ...
 
 class ResolveUserRequest(_message.Message):
     __slots__ = ("identifier", "display_name")

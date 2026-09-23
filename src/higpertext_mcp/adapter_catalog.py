@@ -26,6 +26,9 @@ class AdapterSpec:
     agents_dir: str | None = None
     agents_extension: str | None = None
     agents_format: str | None = None
+    # None means that the adapter delegates model validation to its provider.
+    # A non-empty tuple contains supported exact names or prefixes ending in *.
+    model_patterns: tuple[str, ...] | None = None
     # This repository does not invent a workflow convention.  Playbooks are
     # rendered as native skills or agents when the target supports them.
     workflows_dir: str | None = None
@@ -47,6 +50,16 @@ class AdapterSpec:
     @property
     def supports_workflows(self) -> bool:
         return self.workflows_dir is not None
+
+    def supports_model(self, model: str) -> bool:
+        if not model:
+            return False
+        if self.model_patterns is None:
+            return True
+        return any(
+            model.startswith(pattern[:-1]) if pattern.endswith("*") else model == pattern
+            for pattern in self.model_patterns
+        )
 
 
 def _mapping(value: dict[str, str]) -> Mapping[str, str]:
@@ -76,6 +89,7 @@ ADAPTERS: Mapping[str, AdapterSpec] = MappingProxyType({
         agents_dir=".claude/agents",
         agents_extension=".md",
         agents_format="claude-markdown",
+        model_patterns=("claude-*", "opus", "sonnet", "haiku"),
         limitations=("ACTION_AUTHORIZED belongs to the gateway/controller, not a hook.",),
     ),
     "codex": AdapterSpec(
@@ -89,6 +103,7 @@ ADAPTERS: Mapping[str, AdapterSpec] = MappingProxyType({
         agents_dir=".codex/agents",
         agents_extension=".toml",
         agents_format="codex-toml",
+        model_patterns=("gpt-*", "o1", "o3", "o4"),
         limitations=("ACTION_AUTHORIZED belongs to the gateway/controller, not a hook.",),
     ),
     "gemini": AdapterSpec(

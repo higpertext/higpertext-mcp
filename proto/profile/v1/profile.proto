@@ -125,7 +125,7 @@ message HookDefinition {
 
 // ── Agents ─────────────────────────────────────────────────────────────────
 
-// Agent almacena la definición de un subagente de Claude Code (.claude/agents/*.md):
+// Agent almacena una definición de subagente independiente del asistente destino.
 // front matter YAML estructurado + prompt (cuerpo markdown = system prompt del
 // subagente). A diferencia de Skill, el front matter no viaja como blob opaco:
 // cada campo es estructurado para permitir CRUD granular vía higpertext-agent,
@@ -136,7 +136,7 @@ message Agent {
   string name = 2;              // frontmatter `name` — normalmente == id
   string description = 3;       // frontmatter `description` — usado por Claude Code para auto-invocación
   repeated string tools = 4;    // frontmatter `tools`, ej. ["Read","Grep","Bash"]; vacío = sin restricción
-  string model = 5;             // frontmatter `model`, ej. "sonnet"
+  string model = 5;             // modelo base; se usa cuando no existe un override del adaptador
   string prompt = 6;            // cuerpo markdown = system prompt del subagente
   string permission_mode = 7;   // opcional; "" = omitir del frontmatter
   repeated string skills = 8;   // opcional; vacío = omitir
@@ -147,6 +147,7 @@ message Agent {
   repeated string profiles = 13; // vacío = global, misma semántica que Skill.profiles; NO se emite en el .md
   string project_id = 14;        // referencia blanda opcional a Project.id, igual que Skill.project_id; NO se emite en el .md
   repeated string assistants = 17; // vacío = todos; si no, adaptadores donde se materializa
+  map<string, string> model_overrides = 18; // modelo por adaptador, ej. {"codex": "gpt-5.3-codex"}
   google.protobuf.Timestamp created_at = 15;
   google.protobuf.Timestamp updated_at = 16;
 }
@@ -412,6 +413,7 @@ message CreateAgentRequest {
   repeated string profiles = 13;
   string project_id = 14;
   repeated string assistants = 15;
+  map<string, string> model_overrides = 16;
 }
 message CreateAgentResponse { Agent agent = 1; }
 message GetAgentRequest { string id = 1; }
@@ -439,6 +441,7 @@ message UpdateAgentRequest {
   repeated string profiles = 13;
   string project_id = 14;
   repeated string assistants = 15;
+  map<string, string> model_overrides = 16;
 }
 message UpdateAgentResponse { Agent agent = 1; }
 message DeleteAgentRequest { string id = 1; }

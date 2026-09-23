@@ -37,6 +37,25 @@ def _visible(agent: dict, project_id: str, profile: str) -> bool:
     return bool(profile) and profile in profiles
 
 
+def _for_adapter(agent: dict, assistant: str) -> dict | None:
+    """Return an adapter-specific agent or None when a global agent is incompatible.
+
+    An explicit target is configuration intent, so an incompatible model there
+    is an error. A global agent is intentionally broad; it is simply omitted
+    from adapters for which its base model has no compatible override.
+    """
+    overrides = agent.get("model_overrides") or {}
+    model = overrides.get(assistant, agent.get("model", ""))
+    if adapter_catalog.get(assistant).supports_model(model):
+        return {**agent, "model": model}
+    if agent.get("assistants"):
+        raise ValueError(
+            f"agent '{agent['id']}' usa el modelo '{model}' incompatible con el adaptador '{assistant}'; "
+            f"configure model_overrides.{assistant} o quite ese destino"
+        )
+    return None
+
+
 # ── Claude Code: .claude/agents/<id>.md — YAML frontmatter + cuerpo markdown ──
 
 _CLAUDE_FRONTMATTER_ORDER = ("permission_mode", "skills", "memory", "background", "color", "effort")
@@ -187,7 +206,17 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, d
 
     agents = await profile_client.list_agents()
     visible = [a for a in agents if _visible(a, project_id, profile)]
-    want_ids = {a["id"] for a in visible}
+    planned: dict[str, list[dict]] = {}
+    for assistant in sorted(selected):
+        target_agents: list[dict] = []
+        for agent in visible:
+            targets = agent.get("assistants") or []
+            if targets and assistant not in targets:
+                continue
+            adapted = _for_adapter(agent, assistant)
+            if adapted is not None:
+                target_agents.append(adapted)
+        planned[assistant] = target_agents
 
     result: dict[str, dict[str, list[str]]] = {}
     for assistant in sorted(selected):
@@ -200,20 +229,14 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, d
         dir_path.mkdir(parents=True, exist_ok=True)
         written: list[str] = []
         skipped: list[str] = []
-        for agent in visible:
-            targets = agent.get("assistants") or []
-            if targets and assistant not in targets:
-                continue
+        for agent in planned[assistant]:
             path = dir_path / f"{agent['id']}{ext}"
             if path.exists() and not _is_managed(path):
                 skipped.append(str(path.relative_to(root)))
                 continue
             path.write_text(render_one(agent), encoding="utf-8")
             written.append(str(path.relative_to(root)))
-        want_ids = {
-            agent["id"] for agent in visible
-            if not (agent.get("assistants") or []) or assistant in agent["assistants"]
-        }
+        want_ids = {agent["id"] for agent in planned[assistant]}
         removed = _prune(dir_path, ext, want_ids)
         result[rel_dir] = {"written": written, "pruned": removed, "skipped_unmanaged": skipped}
     return result

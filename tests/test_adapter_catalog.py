@@ -19,6 +19,13 @@ def test_catalog_declares_feature_boundaries():
     assert adapter_catalog.get("antigravity").documentation_url == ""
 
 
+def test_catalog_declares_models_for_strict_agent_adapters():
+    assert adapter_catalog.get("claude").supports_model("sonnet")
+    assert not adapter_catalog.get("claude").supports_model("gpt-5.3-codex")
+    assert adapter_catalog.get("codex").supports_model("gpt-5.3-codex")
+    assert not adapter_catalog.get("codex").supports_model("sonnet")
+
+
 def test_catalog_rejects_unknown_adapters():
     try:
         adapter_catalog.specs_for(["unknown"])
