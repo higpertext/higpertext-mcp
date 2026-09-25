@@ -6,4 +6,19 @@ build/
 dist/
 .pytest_cache/
 .memory/
+.higpertext/state/renders/
+.higpertext
+.codex
+.github
+# Agent/model configuration files (not project config, not for the public repo)
+.claude
+.codex
+.agents
+.gemini
+.opencode
 .grok
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+opencode.json
+.clauderules
