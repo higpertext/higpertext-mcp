@@ -69,6 +69,18 @@ En Docker, el despliegue HTTP monta el conjunto de proyectos en `/projects`.
 defecto usa `/home/aomerge/Documentos/Proyects`. El MCP traduce las rutas host
 recibidas por las tools a esa ruta estable dentro del contenedor.
 
+Para aplicar un límite adicional de seguridad, configurá
+`HIGPERTEXT_ALLOWED_PROJECT_ROOTS` en el proceso del MCP con una o más rutas
+host canónicas separadas por `:`. Toda selección `root_path` fuera de esas
+raíces se rechaza antes de consultar o escribir en el proyecto. En un servidor
+HTTP multiusuario esta variable debe ser administrada por el despliegue, nunca
+aceptada como argumento de una tool.
+
+La versión actual todavía no autentica al usuario final ni implementa
+membresías por proyecto en este repositorio; esa autorización debe vivir en el
+gateway/profile server antes de exponer un MCP HTTP a varios tenants. El límite
+de raíces reduce el alcance del proceso, pero no sustituye autenticación.
+
 > **No uses `~` en `command`.** Postman y Claude Code lanzan el proceso con
 > `spawn()` directo (sin pasar por una shell), que no expande `~` a tu home —
 > el intento de ejecutar la ruta literal falla con `EACCES`/`ENOENT`. Escribí

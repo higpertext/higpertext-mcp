@@ -63,15 +63,14 @@ def test_build_input_schema_no_default_stays_string():
     assert result["properties"]["pattern"]["type"] == "string"
 
 
-def test_build_description_includes_contract_rules():
+def test_build_description_omits_parameters_and_contract_rules():
     definition = {
         "description": "Busca patrones.",
+        "parameters": [{"name": "pattern", "required": True, "description": "patrón"}],
         "contract": {"rules": ["Debe indicar coincidencias.", "Debe respetar límites."]},
     }
     result = schema._build_description(definition)
-    assert "Busca patrones." in result
-    assert "Debe indicar coincidencias." in result
-    assert "Debe respetar límites." in result
+    assert result == "Busca patrones."
 
 
 def test_build_description_without_contract():
@@ -119,7 +118,7 @@ def test_tool_spec_from_capability_builds_schema_and_description():
     assert spec.input_schema["properties"]["path"]["default"] == "."
     assert spec.input_schema["required"] == ["pattern"]
     assert "Busca patrones." in spec.description
-    assert "Debe indicar coincidencias." in spec.description
+    assert "Debe indicar coincidencias." not in spec.description
     assert "Si no hay resultados: No hay resultados." in spec.description
     assert spec.raw["entrypoint"] == "capabilities/common/scripts/core/search/grep_search.py"
     assert spec.raw["language"] == "python"

@@ -139,6 +139,13 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, l
     # Validate every destination before touching any file.
     for assistant in selected:
         hooks = await profile_client.list_hooks(profile, assistant)
+        # Un hook "para todos los asistentes" (assistants vacío) con un evento
+        # que este adapter no tiene (ej. Stop en gemini/opencode) no aplica
+        # acá — no debe abortar el render de los demás hooks ni adapters.
+        unsupported = [h.id for h in hooks if h.event not in hook_protocol.EVENTS[assistant]]
+        if unsupported:
+            warnings.warn(f"{assistant}: sin soporte de evento para {', '.join(unsupported)}; omitidos", stacklevel=2)
+            hooks = [h for h in hooks if h.event in hook_protocol.EVENTS[assistant]]
         path = root / _SETTINGS_PATH[assistant]
         if assistant == "opencode":
             config = _opencode_plan(path, hooks)

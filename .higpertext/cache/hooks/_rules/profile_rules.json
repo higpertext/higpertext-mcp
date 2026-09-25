@@ -1,10 +1,28 @@
 {
   "rules": [
     {
+      "pattern": "\\bmkfs(?:\\.\\w+)?\\s+/dev/|\\bdd\\b[^;&|\\n]*\\bof=/dev/(?:sd|hd|vd|xvd|nvme|mmcblk|disk)|>\\s*/dev/(?:sd|hd|vd|xvd|nvme|mmcblk)\\w*|\\bfind\\s+/(?:\\s|$)[^;&|\\n]*-delete\\b|:\\(\\)\\s*\\{\\s*:\\s*\\|\\s*:\\s*&\\s*\\}\\s*;\\s*:",
+      "severity": "block",
+      "capability": "",
+      "reason": "Bloquea operaciones destructivas de disco/sistema: mkfs sobre /dev, dd con of=/dev/<disco>, redirección a un dispositivo de bloque, find / ... -delete y fork bombs. Aplica a asistentes y a pasos run/script de htx-flow."
+    },
+    {
+      "pattern": "\\brm\\b(?=[^;&|\\n]*\\s(?:-[A-Za-z]*[rR][A-Za-z]*|--recursive)\\b)(?:\\s+[^\\s;&|]+)*?\\s+[\"']?(?:/\\*?|~/?\\*?|\\$HOME/?\\*?|\\$\\{HOME\\}/?\\*?|\\.\\./?|/(?:home|etc|usr|var|bin|sbin|boot|lib|lib64|opt|root|srv|sys|proc|dev|mnt|media|run|snap)/?\\*?)[\"']?(?=\\s|$|[;&|)])|\\brm\\b[^;&|\\n]*--no-preserve-root",
+      "severity": "block",
+      "capability": "",
+      "reason": "Bloquea borrados recursivos sobre la raíz, el home o directorios del sistema (rm -r/-rf sobre /, /*, ~, $HOME, .., /home, /etc, /usr, /var, ... y --no-preserve-root). Borrar rutas concretas de proyecto/cache/tmp sigue permitido. Aplica a asistentes y a pasos run/script de htx-flow."
+    },
+    {
       "pattern": "(?<!venv[/\\\\]bin[/\\\\])(?<!Scripts[/\\\\])\\bpip\\s+install\\b|(?<!venv[/\\\\]bin[/\\\\])(?<!Scripts[/\\\\])\\bpip3\\s+install\\b",
       "severity": "block",
       "capability": "",
       "reason": "Las instalaciones de paquetes deben hacerse en el entorno controlado .venv. Usa '.venv/bin/pip install <paquete>' o gestiona dependencias desde pyproject.toml."
+    },
+    {
+      "pattern": "(?:^|[;&|]\\s*|/|-m\\s+)pytest\\b(?![^|;&\\n]*(\\s-q\\b|\\s-qq\\b|--tb))(?![^\\n]*\\|\\s*(tail|head|grep))",
+      "severity": "context",
+      "capability": "",
+      "reason": "Corré pytest con salida acotada (-q --tb=short, o | tail -N) o delegá la corrida a un subagente de tests: la salida completa de una suite llena el contexto sin aportar más que los fallos."
     }
   ]
 }

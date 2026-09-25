@@ -244,6 +244,34 @@ async def get_profile(profile_id: str) -> dict:
         return _profile_to_dict(await _resolve_profile(channel, profile_id))
 
 
+async def get_profile_bundle(profile_id: str) -> dict:
+    """Devuelve la vista de administración que consume el menú de perfiles.
+
+    El perfil sigue siendo la fuente de permisos; skills y hooks se leen de sus
+    catálogos respectivos y se filtran acá para que la UI no tenga que
+    reconstruir relaciones gRPC ni mezclar scopes globales con los del perfil.
+    """
+    profile = await get_profile(profile_id)
+    skills = await list_skills(profile=profile["name"])
+    hooks = await list_hooks_raw()
+    profile_hooks = [
+        hook for hook in hooks
+        if not hook["profiles"] or profile["name"] in hook["profiles"]
+    ]
+    global_hooks = [hook for hook in hooks if not hook["profiles"]]
+    capabilities = [
+        _capability_to_dict(capability)
+        for capability in await list_allowed_capabilities(profile["name"])
+    ]
+    return {
+        "profile": profile,
+        "skills": skills,
+        "hooks": profile_hooks,
+        "global_hooks": global_hooks,
+        "capabilities": capabilities,
+    }
+
+
 async def list_profiles() -> list[dict]:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.ProfileServiceStub(channel)

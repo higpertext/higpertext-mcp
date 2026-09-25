@@ -22,8 +22,12 @@ ninguno de esos lee un JSON por-capability.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
+import os
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from higpertext_mcp import discovery, events, execution, memory, profile_client, runner, tracing
@@ -72,6 +76,60 @@ def _params_to_argv(capability_id: str, params: dict) -> list[str]:
     return argv
 
 
+def _localize_params(params: dict) -> dict:
+    """Traduce rutas absolutas del host a su path montado en el MCP.
+
+    El agente ve rutas del host; dentro del contenedor el proyecto vive en
+    ``HIGPERTEXT_PROJECTS_MOUNT``. Sin esta traducción toda lectura con ruta
+    absoluta falla con "no existe" y el agente reintenta a ciegas.
+    """
+    localized = {}
+    for key, value in params.items():
+        if isinstance(value, str) and value.startswith(("/", "~")):
+            value = str(discovery.local_project_path(value))
+        localized[key] = value
+    return localized
+
+
+def _hostify(text: str) -> str:
+    """Inversa de `_localize_params` sobre la salida: el agente recibe rutas host."""
+    mount = os.environ.get("HIGPERTEXT_PROJECTS_MOUNT", "/projects").rstrip("/")
+    host = os.environ.get("HIGPERTEXT_HOST_PROJECTS_ROOT", "").rstrip("/")
+    if not host or not text:
+        return text
+    return text.replace(mount + "/", host + "/")
+
+
+# Separadores y banners puramente visuales ("=====", "╔──", "[*] Buscando en")
+# que los scripts legados imprimen para humanos: tokens sin información.
+# No incluye "-": `---` es contenido real en YAML/Markdown.
+_DECORATIVE_LINE = re.compile(r"^\s*[=─━═]{5,}\s*$|^\s*[╔╚][─━═].*$|^\s*\[\*\] ")
+
+
+def _strip_decoration(text: str) -> str:
+    text = text.strip()
+    try:
+        json.loads(text)
+        return text  # JSON: salida estructurada, intacta.
+    except json.JSONDecodeError:
+        pass
+    lines = [line for line in text.splitlines() if not _DECORATIVE_LINE.match(line)]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+@contextlib.contextmanager
+def _cwd(path: Path):
+    """Los scripts resuelven rutas relativas contra el cwd. `run_inprocess`
+    es síncrono (no cede el event loop), así que el chdir no se mezcla con
+    otros requests concurrentes."""
+    previous = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
 def _result_data(output: str) -> dict[str, Any]:
     """Convierte JSON emitido por una capability en datos; encapsula texto legado.
 
@@ -86,11 +144,22 @@ def _result_data(output: str) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {"items": parsed}
 
 
+_ERROR_SUMMARY_CHARS = 600
+
+
 def _summary(output: str, ok: bool) -> str:
+    """Primera línea en éxito; en error, el diagnóstico completo recortado.
+
+    Un error resumido a su primera línea ("[ERROR] <path>") le oculta al
+    agente la causa y lo empuja a reintentar a ciegas.
+    """
+    if not ok:
+        text = output.strip()
+        return text[:_ERROR_SUMMARY_CHARS] if text else "Capability failed."
     line = next((line.strip() for line in output.splitlines() if line.strip()), "")
     if line:
         return line[:240]
-    return "Capability completed." if ok else "Capability failed."
+    return "Capability completed."
 
 
 async def _record_activity_best_effort(
@@ -124,8 +193,8 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
             error="; ".join(validation.errors),
         )
 
-    argv = _params_to_argv(capability_id, validation.params)
     root = discovery.resolve_project_root()
+    argv = _params_to_argv(capability_id, _localize_params(validation.params))
     trace_id = tracing.current()
     trace_data = {"capability_id": capability_id, "params": validation.params}
     await memory.record_trace_event(
@@ -151,7 +220,8 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
     await memory.record_trace_event(
         root, trace_id=trace_id, event=events.EventType.ACTION_STARTED.value, data=trace_data
     )
-    result = execution.run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
+    with _cwd(root):
+        result = execution.run_inprocess(lambda: runner.run_module(script_path, argv[1:]), args=argv)
 
     contract_ok, contract_errors = True, []
     if result.returncode == 0:
@@ -160,13 +230,15 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         )
 
     ok = result.returncode == 0 and contract_ok
-    output = result.stdout.strip() or result.stderr.strip()
+    stdout = _hostify(_strip_decoration(result.stdout))
+    stderr = _hostify(result.stderr.strip())
+    output = stdout or stderr
     error = None
     if not ok:
         if contract_errors:
             output = (output + "\n" if output else "") + "[CONTRATO] " + "; ".join(contract_errors)
-        elif result.stderr.strip() and result.stderr.strip() not in output:
-            output = f"{output}\n{result.stderr.strip()}".strip()
+        elif stderr and stderr not in output:
+            output = f"{output}\n{stderr}".strip()
         error = output or "Capability failed without diagnostic output."
 
     await _record_activity_best_effort(
@@ -194,7 +266,7 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
     return CapabilityResult(
         ok=ok,
         summary=_summary(output, ok),
-        data=_result_data(result.stdout.strip()) if ok else {},
+        data=_result_data(stdout) if ok else {},
         artifacts=[],
         warnings=list(validation.warnings),
         error=error,

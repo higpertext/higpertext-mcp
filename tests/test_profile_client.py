@@ -160,6 +160,44 @@ async def test_list_allowed_capabilities_fails_closed_on_rpc_error(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_get_profile_bundle_groups_profile_scoped_and_global_assets(monkeypatch):
+    monkeypatch.setattr(
+        profile_client,
+        "get_profile",
+        lambda _id: _async_value({"name": "dev", "capabilities": ["custom.echo"]}),
+    )
+    monkeypatch.setattr(
+        profile_client,
+        "list_skills",
+        lambda **kwargs: _async_value([{"id": "common.build", "profiles": []}]),
+    )
+    monkeypatch.setattr(
+        profile_client,
+        "list_hooks_raw",
+        lambda: _async_value([
+            {"id": "global-hook", "profiles": []},
+            {"id": "profile-hook", "profiles": ["dev"]},
+            {"id": "other-hook", "profiles": ["other"]},
+        ]),
+    )
+    monkeypatch.setattr(
+        profile_client,
+        "list_allowed_capabilities",
+        lambda _profile: _async_value([profile_pb2.Capability(id="custom.echo")]),
+    )
+
+    bundle = await profile_client.get_profile_bundle("dev")
+
+    assert [item["id"] for item in bundle["hooks"]] == ["global-hook", "profile-hook"]
+    assert [item["id"] for item in bundle["global_hooks"]] == ["global-hook"]
+    assert [item["id"] for item in bundle["capabilities"]] == ["custom.echo"]
+
+
+async def _async_value(value):
+    return value
+
+
+@pytest.mark.anyio
 async def test_get_capability_script_returns_source_and_language(monkeypatch):
     _patch_channel(
         monkeypatch,

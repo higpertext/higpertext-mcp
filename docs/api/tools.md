@@ -26,6 +26,83 @@ activo del proyecto la lista en `capabilities` — ver
 Respuesta de referencia para todos los ejemplos: ver el contrato
 `{ok, summary, data, artifacts, warnings, error}` en [README.md](./README.md#contrato-de-resultado-de-una-tool).
 
+## Herramientas administrativas
+
+Flujo de boards y roadmap para el frontend:
+
+```json
+{ "action": "overview", "board_name": "Roadmap" }
+```
+
+Acciones disponibles: `list_boards`, `overview`, `migrate`, `create`, `update`,
+`move`, `delete`, `delete_board`, `task_create`, `task_update` y `task_delete`.
+Para mover una actividad se usa `target` (`Pending`, `Active` o `Done`). La
+migración de fases existentes es repetible: identifica cada fase por el tag
+`roadmap:<phase_id>` y no duplica tarjetas ya importadas.
+
+Vista operativa para el menú (proyecto, perfil, skills, hooks, capabilities y
+manifiestos de render):
+
+```json
+{
+  "render_limit": 10
+}
+```
+
+En un gateway multi-proyecto se puede seleccionar el proyecto con
+`project_id` o `root_path`; en stdio se usa `HIGPERTEXT_PROJECT_ROOT`.
+Después de materializar configuración, `higpertext-render-adapters` devuelve
+un `render_id` y deja el manifiesto en
+`.higpertext/state/renders/rnd_<id>.json` para consultar historial y detectar
+drift.
+
+Vista unificada de un perfil para un menú de administración:
+
+```json
+{
+  "action": "view",
+  "id": "developer"
+}
+```
+
+La respuesta incluye `profile`, `skills`, `hooks`, `global_hooks` y
+`capabilities`. Los hooks globales también se pueden consultar desde el catálogo
+independiente con:
+
+```json
+{ "action": "list_global" }
+```
+
+Para trabajar con una capability como script editable:
+
+```json
+{ "action": "source", "id": "custom.echo", "include_files": true }
+```
+
+Validar el source Python:
+
+```json
+{ "action": "validate", "id": "custom.echo" }
+```
+
+Probar o ejecutar una capability autorizada:
+
+```json
+{
+  "action": "test",
+  "id": "custom.echo",
+  "arguments": { "value": "hola" }
+}
+```
+
+`test` y `run` usan el runner MCP actual y requieren que la capability esté
+habilitada por el perfil activo. La ejecución aislada en worker (sin acceso de
+red y con límites de recursos) queda como siguiente fase del profile server.
+
+El catálogo actual todavía no expone `UpdateCapability`; para editar y guardar
+una capability existente hace falta sincronizar ese nuevo RPC con
+`higpertext-server-profile`.
+
 ---
 
 ## `common-grep-search` (capability_id: `common.grep-search`)

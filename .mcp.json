@@ -2,7 +2,10 @@
   "mcpServers": {
     "higpertext": {
       "type": "http",
-      "url": "http://127.0.0.1:8790/mcp/"
+      "url": "http://127.0.0.1:8790/mcp/",
+      "headers": {
+        "X-Higpertext-Project-Root": "/home/aomerge/Documentos/Proyects/higpertext-mcp"
+      }
     }
   }
 }

@@ -10,6 +10,7 @@ ningún JSON por-capability, así que no hay razón para duplicarla.
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib.util
 import inspect
 import sys
@@ -18,7 +19,18 @@ from pathlib import Path
 from higpertext_mcp import discovery, profile_client
 
 _CACHE_DIR_NAME = ".higpertext/cache/capabilities"
-_script_cache: dict[str, Path] = {}
+_script_cache: dict[tuple[Path, str], Path] = {}
+
+
+def _package_name(parent: Path) -> str:
+    """Devuelve un paquete sintético único por carpeta de caché.
+
+    El MCP puede atender varios proyectos en el mismo proceso. Si todos usan
+    el nombre basado sólo en ``capabilities``, los imports relativos pueden
+    resolver helpers del primer proyecto atendido.
+    """
+    digest = hashlib.sha256(str(parent.resolve()).encode("utf-8")).hexdigest()[:16]
+    return f"higpertext_mcp_dynamic_{digest}"
 
 
 def _module_from_script(script_path: Path):
@@ -28,7 +40,7 @@ def _module_from_script(script_path: Path):
     ejecutar los scripts que el profile server le entrega.
     """
     parent = script_path.parent
-    package = f"higpertext_mcp_dynamic_{parent.name}"
+    package = _package_name(parent)
     if package not in sys.modules:
         spec = importlib.util.spec_from_loader(package, loader=None, is_package=True)
         if spec is None:
@@ -58,7 +70,9 @@ async def resolve_script(capability_id: str) -> Path:
     """Path local (cacheado en memoria por proceso) al script de la capability,
     descargado del profile server y escrito a `.higpertext/cache/capabilities/`.
     """
-    cached = _script_cache.get(capability_id)
+    root = discovery.resolve_project_root()
+    cache_key = (root, capability_id)
+    cached = _script_cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -67,7 +81,6 @@ async def resolve_script(capability_id: str) -> Path:
         raise RuntimeError(f"no se pudo obtener el script de {capability_id} del profile server")
     source_code_b64, _language, extra_files = fetched
 
-    root = discovery.resolve_project_root()
     path = _cache_path(root, capability_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(base64.b64decode(source_code_b64))
@@ -78,11 +91,14 @@ async def resolve_script(capability_id: str) -> Path:
     # busca junto a sí mismo, sin importar qué otra capability los haya
     # escrito ahí primero (mismo contenido, se pisan sin problema).
     for filename, content_b64 in extra_files.items():
-        dest = path.parent / filename
+        relative = Path(filename)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"helper de capability fuera del cache permitido: {filename!r}")
+        dest = path.parent / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(base64.b64decode(content_b64))
 
-    _script_cache[capability_id] = path
+    _script_cache[cache_key] = path
     return path
 
 

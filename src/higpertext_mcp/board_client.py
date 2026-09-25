@@ -30,6 +30,13 @@ from higpertext_mcp.gen.board.v1 import board_pb2, board_pb2_grpc
 _CALL_TIMEOUT_S = 2.0
 
 
+def _timestamp(value: Any) -> str | None:
+    """Serializa timestamps protobuf sin filtrar el objeto protobuf al MCP."""
+    if value is None or (getattr(value, "seconds", 0) == 0 and getattr(value, "nanos", 0) == 0):
+        return None
+    return value.ToDatetime().isoformat()
+
+
 def run_async(coro: Coroutine[Any, Any, Any]) -> Any:
     """Corre una corrutina desde código sync, sin asumir que el hilo actual
     esté libre de event loop. Las capabilities de roadmap corren dentro de
@@ -76,11 +83,17 @@ def _warn(message: str) -> None:
 
 
 def _board_to_dict(b: board_pb2.Board) -> dict:
-    return {"id": b.id, "name": b.name, "description": b.description, "project_id": b.project_id}
+    return {
+        "id": b.id, "name": b.name, "description": b.description, "project_id": b.project_id,
+        "created_at": _timestamp(b.created_at), "updated_at": _timestamp(b.updated_at),
+    }
 
 
 def _column_to_dict(c: board_pb2.Column) -> dict:
-    return {"id": c.id, "board_id": c.board_id, "name": c.name, "position": c.position}
+    return {
+        "id": c.id, "board_id": c.board_id, "name": c.name, "position": c.position,
+        "created_at": _timestamp(c.created_at),
+    }
 
 
 def _activity_to_dict(a: board_pb2.BoardActivity) -> dict:
@@ -96,6 +109,9 @@ def _activity_to_dict(a: board_pb2.BoardActivity) -> dict:
         "position": a.position,
         "type": board_pb2.WorkItemType.Name(a.type),
         "parent_id": a.parent_id,
+        "created_at": _timestamp(a.created_at),
+        "updated_at": _timestamp(a.updated_at),
+        "closed_at": _timestamp(a.closed_at) if a.HasField("closed_at") else None,
     }
 
 
@@ -107,8 +123,11 @@ def _task_to_dict(t: board_pb2.Task) -> dict:
         "done": t.done,
         "position": t.position,
         "acceptance_criteria": [
-            {"id": c.id, "description": c.description, "done": c.done} for c in t.acceptance_criteria
+            {"id": c.id, "description": c.description, "done": c.done, "created_at": _timestamp(c.created_at)}
+            for c in t.acceptance_criteria
         ],
+        "created_at": _timestamp(t.created_at),
+        "updated_at": _timestamp(t.updated_at),
     }
 
 
@@ -124,11 +143,33 @@ async def resolve_board(*, project_id: str, name: str) -> dict:
         return _board_to_dict(resp.board)
 
 
+async def list_boards(project_id: str = "") -> list[dict]:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.BoardServiceStub(channel)
+        resp = await stub.ListBoards(
+            board_pb2.ListBoardsRequest(project_id=project_id), timeout=_CALL_TIMEOUT_S
+        )
+        return [_board_to_dict(board) for board in resp.boards]
+
+
+async def get_board(board_id: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.BoardServiceStub(channel)
+        resp = await stub.GetBoard(board_pb2.GetBoardRequest(id=board_id), timeout=_CALL_TIMEOUT_S)
+        return _board_to_dict(resp.board)
+
+
 async def get_activity(activity_id: str) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.ActivityServiceStub(channel)
         resp = await stub.GetActivity(board_pb2.GetActivityRequest(id=activity_id), timeout=_CALL_TIMEOUT_S)
         return _activity_to_dict(resp.activity)
+
+
+async def delete_board(board_id: str) -> None:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.BoardServiceStub(channel)
+        await stub.DeleteBoard(board_pb2.DeleteBoardRequest(id=board_id), timeout=_CALL_TIMEOUT_S)
 
 
 async def list_columns(board_id: str) -> list[dict]:
@@ -190,6 +231,34 @@ async def list_activities(board_id: str, column_id: str = "") -> list[dict]:
         return [_activity_to_dict(a) for a in resp.activities]
 
 
+async def update_activity(
+    *, activity_id: str, title: str, description: str = "", assignee_user_id: str = "",
+    priority: str = "PRIORITY_UNSPECIFIED", tags: list[str] | None = None,
+) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.ActivityServiceStub(channel)
+        resp = await stub.UpdateActivity(
+            board_pb2.UpdateActivityRequest(
+                id=activity_id,
+                title=title,
+                description=description,
+                assignee_user_id=assignee_user_id,
+                priority=board_pb2.Priority.Value(priority.upper()),
+                tags=tags or [],
+            ),
+            timeout=_CALL_TIMEOUT_S,
+        )
+        return _activity_to_dict(resp.activity)
+
+
+async def delete_activity(activity_id: str) -> None:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.ActivityServiceStub(channel)
+        await stub.DeleteActivity(
+            board_pb2.DeleteActivityRequest(id=activity_id), timeout=_CALL_TIMEOUT_S
+        )
+
+
 async def move_activity(*, activity_id: str, target_column_id: str, position: int = 0) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.ActivityServiceStub(channel)
@@ -229,6 +298,13 @@ async def list_tasks(board_activity_id: str) -> list[dict]:
         return [_task_to_dict(t) for t in resp.tasks]
 
 
+async def get_task(task_id: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.TaskServiceStub(channel)
+        resp = await stub.GetTask(board_pb2.GetTaskRequest(id=task_id), timeout=_CALL_TIMEOUT_S)
+        return _task_to_dict(resp.task)
+
+
 async def update_task(*, task_id: str, title: str, done: bool, position: int = 0) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.TaskServiceStub(channel)
@@ -237,3 +313,9 @@ async def update_task(*, task_id: str, title: str, done: bool, position: int = 0
             timeout=_CALL_TIMEOUT_S,
         )
         return _task_to_dict(resp.task)
+
+
+async def delete_task(task_id: str) -> None:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.TaskServiceStub(channel)
+        await stub.DeleteTask(board_pb2.DeleteTaskRequest(id=task_id), timeout=_CALL_TIMEOUT_S)

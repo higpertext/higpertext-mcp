@@ -11,36 +11,90 @@ Code, Postman, etc.) lanza el proceso y conversa por stdin/stdout.
 - [../installation.md](../installation.md) — instalación, configuración en
   `.mcp.json` y cómo probarlo desde Postman.
 
+## Administración de perfiles y catálogo
+
+`higpertext-profile` con `{"action":"view","id":"<perfil>"}` devuelve una
+vista agregada para el menú: el perfil, sus skills visibles, sus hooks efectivos,
+los hooks globales y sus capabilities autorizadas. Así el menú no necesita
+consultar cinco catálogos ni reconstruir scopes.
+
+`higpertext-hook-admin` mantiene el catálogo global separado. Usá
+`{"action":"list_global"}` para consultar únicamente hooks con `profiles=[]`.
+
+`higpertext-capability` permite `create`, `source`, `validate`, `test` y `run`.
+`test`/`run` sólo aceptan capabilities habilitadas por el perfil activo del
+proyecto; una capability existente en el catálogo pero no autorizada no se puede
+ejecutar desde esta superficie administrativa.
+
+La edición persistente de un hook o de una capability existente requiere los
+RPC `UpdateHook`/`UpdateCapability` en `higpertext-server-profile`; el contrato
+actual sólo ofrece crear, consultar y borrar. Esta entrega no borra y recrea
+objetos automáticamente para simular una edición.
+
+`higpertext-system-overview` concentra la información que necesita el menú de
+operación: proyecto seleccionado, `active_profile`, bundle del perfil (skills,
+hooks efectivos, hooks globales y capabilities autorizadas) y los últimos
+renderizados. Acepta `project_id` o `root_path` en gateways multi-proyecto; en
+stdio usa `HIGPERTEXT_PROJECT_ROOT`. Los renderizados se registran en
+`.higpertext/state/renders/rnd_<id>.json` con rutas, resultado, estado y hashes
+SHA-256 de los archivos generados, sin copiar su contenido.
+
+`higpertext-roadmap-board` es el contrato único del frontend para el flujo de
+trabajo. `overview` devuelve board, columnas, actividades y tasks; `create`,
+`update`, `move` y `delete` gestionan tarjetas; `task_create`, `task_update` y
+`task_delete` gestionan el checklist; `list_boards` descubre los boards del
+proyecto y `migrate` importa `.higpertext/roadmap.json` de forma idempotente
+usando tags `roadmap:<phase_id>`. El board persistente vive en
+`higpertext-server-profile`; el JSON local se conserva como fuente de migración
+y respaldo legible.
+
 ## Contrato de resultado de una tool
 
-Toda tool (sin importar la capability que envuelva) devuelve
-`structuredContent` con esta forma fija — es el contrato real, no una
-transcripción de terminal:
+Los clientes MCP (Claude Code entre ellos) le muestran al modelo el
+`structuredContent` serializado cuando existe, no solo el `content` de texto.
+Por eso el resultado de una capability tiene tres formas, según lo que emita:
+
+**Texto legado** (stdout que no es JSON): el texto va plano en `content`, **sin**
+`structuredContent`. Evita escapar `\n`/`\"` y repetir la primera línea como
+`summary`. Los `warnings`, si hay, se agregan al final del texto.
+
+**Datos estructurados** (stdout JSON): `content` = `summary`, y
+`structuredContent` con el sobre, **sin campos vacíos** (`artifacts: []`,
+`warnings: []`, `error: null` se omiten):
 
 ```json
-{
-  "ok": true,
-  "summary": "Resultado breve para el agente",
-  "data": {},
-  "artifacts": [],
-  "warnings": [],
-  "error": null
-}
+{"ok": true, "summary": "Resultado breve para el agente", "data": {"matches": ["src/a.py:1"]}}
 ```
+
+**Error**: `isError: true`; `content` y `summary` llevan el diagnóstico (hasta
+600 caracteres), no solo su primera línea — el agente necesita la causa para
+no reintentar a ciegas. `structuredContent` = `{"ok": false, "summary", "error"}`.
 
 - `ok`: `false` si la capability falló (`returncode != 0`) o violó su
   `contract.rules` técnico.
-- `summary`: primera línea no vacía de la salida de la capability, recortada a
-  240 caracteres. Es lo único que aparece en el `content` de texto del tool.
-- `data`: `stdout` de la capability parseado como JSON si es un objeto; si es
-  una lista, se envuelve como `{"items": [...]}`; si no es JSON válido (texto
-  plano legado), se envuelve como `{"text": "<stdout>"}`.
-- `warnings`: normalizaciones no destructivas que aplicó la validación de
-  parámetros (ej. un alias resuelto a su nombre canónico).
-- `error`: solo presente si `ok = false` — mensaje de contrato o el
-  stderr/stdout combinado de la capability.
+- `summary`: en éxito, primera línea no vacía de la salida (240 caracteres).
+- `data`: stdout parseado como JSON si es un objeto; si es una lista,
+  `{"items": [...]}`; texto legado, `{"text": "<stdout>"}` (ver arriba).
+- `trace_id`: viaja en `_meta`, fuera de la vista del modelo.
 
-Ver `src/higpertext_mcp/dispatch.py` para la implementación exacta.
+Antes de devolverse, la salida de texto pierde los separadores y banners
+puramente visuales (`=====`, `╔──`, `[*] …`) y las rutas del contenedor
+(`HIGPERTEXT_PROJECTS_MOUNT`) se reescriben a rutas del host. En la entrada, un
+parámetro con ruta absoluta del host se traduce a su ruta montada, y las rutas
+relativas se resuelven contra la raíz del proyecto seleccionado.
+
+Ver `src/higpertext_mcp/dispatch.py` y `server.py:capability_call_result`.
+
+## Selección del proyecto en el gateway HTTP
+
+El gateway HTTP es compartido por todos los proyectos del host. Cada cliente
+declara su proyecto con el header `X-Higpertext-Project-Root: <ruta host>`,
+que `higpertext-render-adapters` / `higpertext-configure-project` escriben en
+`.mcp.json` (y en `.agents/mcp_config.json` y `opencode.json`). El gateway lo
+traduce a la ruta montada, lo valida contra `HIGPERTEXT_ALLOWED_PROJECT_ROOTS`
+y lo usa como raíz del request: perfil activo, tools expuestas y `cwd` de las
+capabilities salen de ese proyecto. Una raíz que el contenedor no ve responde
+400 (nunca cae a otro proyecto). Sin header se usa `HIGPERTEXT_PROJECT_ROOT`.
 
 ## Qué tools ves realmente
 

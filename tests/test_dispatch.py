@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from higpertext_mcp import dispatch, events, schema
 from higpertext_mcp.gen.profile.v1 import profile_pb2
@@ -87,7 +88,8 @@ async def test_call_capability_real_grep_search_on_this_repo(monkeypatch, tmp_pa
     capability_data = schema.tool_spec_from_capability(cap).raw
     result = await dispatch.call_capability(
         "common.grep-search",
-        {"pattern": "def call_capability", "path": "src", "max_results": "5"},
+        # Absoluta: las relativas se resuelven contra la raíz declarada (tmp_path).
+        {"pattern": "def call_capability", "path": str(Path(__file__).parents[1] / "src"), "max_results": "5"},
         capability_data,
     )
     assert result.ok

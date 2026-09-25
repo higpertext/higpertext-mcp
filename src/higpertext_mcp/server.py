@@ -10,6 +10,8 @@ nivel (`list_tools`/`call_tool` como handlers explícitos) es el que soporta eso
 from __future__ import annotations
 
 import asyncio
+import ast
+import base64
 import json
 import sys
 
@@ -23,12 +25,15 @@ from higpertext_mcp import (
     adapter_catalog,
     adapter_renderer,
     agent_renderer,
+    board_client,
     discovery,
     dispatch,
     external,
     hook_renderer,
     project_config,
     profile_client,
+    render_registry,
+    roadmap_board,
     resources,
     schema,
     skill_renderer,
@@ -44,6 +49,68 @@ HOOK_TOOL_NAME = "higpertext-hook-admin"
 SKILL_TOOL_NAME = "higpertext-skill"
 AGENT_TOOL_NAME = "higpertext-agent"
 GOVERNANCE_EXCEPTION_TOOL_NAME = "higpertext-governance-exception"
+SYSTEM_OVERVIEW_TOOL_NAME = "higpertext-system-overview"
+BOARD_TOOL_NAME = "higpertext-roadmap-board"
+
+_SYSTEM_OVERVIEW_TOOL = types.Tool(
+    name=SYSTEM_OVERVIEW_TOOL_NAME,
+    description=(
+        "Vista operativa unificada para el menú de higpertext: proyecto, perfil activo, "
+        "skills, hooks, capabilities autorizadas y últimos renderizados. En stdio usa "
+        "HIGPERTEXT_PROJECT_ROOT; en HTTP acepta project_id o root_path."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "project_id": {"type": "string", "description": "ID de proyecto registrado."},
+            "root_path": {"type": "string", "description": "Ruta registrada del proyecto."},
+            "render_limit": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100},
+        },
+        "additionalProperties": False,
+    },
+    annotations=types.ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True),
+)
+
+_BOARD_TOOL = types.Tool(
+    name=BOARD_TOOL_NAME,
+    description=(
+        "Flujo completo de roadmap y tablero del proyecto: consulta boards, columnas, "
+        "actividades y tasks; crea/mueve/edita elementos y migra el roadmap JSON "
+        "existente al board persistente. El frontend puede usar esta tool como su "
+        "contrato único de Kanban."
+    ),
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": [
+                "overview", "list_boards", "create", "update", "delete",
+                "move", "delete_board", "task_create", "task_update", "task_delete", "migrate",
+            ]},
+            "project_id": {"type": "string"},
+            "root_path": {"type": "string"},
+            "board_name": {"type": "string", "default": "Roadmap"},
+            "title": {"type": "string"},
+            "description": {"type": "string"},
+            "activity_id": {"type": "string"},
+            "board_activity_id": {"type": "string"},
+            "task_id": {"type": "string"},
+            "parent_id": {"type": "string"},
+            "column": {"type": "string", "enum": ["Pending", "Active", "Done"]},
+            "target": {"type": "string", "enum": ["Pending", "Active", "Done"]},
+            "position": {"type": "integer", "minimum": 0},
+            "priority": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "PRIORITY_UNSPECIFIED"]},
+            "item_type": {"type": "string", "enum": ["ROADMAP", "EPIC", "FEATURE", "STORY", "BUG", "ISSUE"]},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "assignee_user_id": {"type": "string"},
+            "done": {"type": "boolean"},
+            "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+            "tasks": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["action"],
+        "additionalProperties": False,
+    },
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
+)
 
 _CONFIGURE_TOOL = types.Tool(
     name=CONFIGURE_TOOL_NAME,
@@ -141,8 +208,8 @@ _HOOK_TOOL = types.Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "get", "list", "delete", "get_shared_assets", "set_shared_assets"]},
-            "id": {"type": "string", "description": "requerido en create/get/delete"},
+            "action": {"type": "string", "enum": ["create", "get", "list", "list_global", "delete", "get_shared_assets", "set_shared_assets"]},
+            "id": {"type": "string", "description": "requerido en create/get/delete; el scope global se determina por profiles=[]"},
             "event": {"type": "string", "enum": ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "PreCompact"], "description": "requerido en create"},
             "matcher": {"type": "string", "description": "ej. 'Bash', 'Write|Edit', vacío = todos los tools"},
             "description": {"type": "string"},
@@ -196,7 +263,7 @@ _PROFILE_TOOL = types.Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "get", "list", "update", "delete"]},
+            "action": {"type": "string", "enum": ["create", "get", "view", "list", "update", "delete"]},
             "id": {"type": "string", "description": "requerido en get/update/delete — acepta el UUID interno o el name/slug"},
             "name": {"type": "string", "description": "slug único, requerido en create"},
             "description": {"type": "string"},
@@ -205,6 +272,7 @@ _PROFILE_TOOL = types.Tool(
             "subprofiles": {"type": "array", "items": {"type": "string"}},
             "rules": {"type": "array", "items": {"type": "string"}},
             "hooks_global": {"type": "array", "items": {"type": "string"}},
+            "include_body": {"type": "boolean", "description": "solo para list: true incluye system_prompt y rules. Default false."},
         },
         "required": ["action"],
         "additionalProperties": False,
@@ -214,17 +282,17 @@ _PROFILE_TOOL = types.Tool(
 _CAPABILITY_TOOL = types.Tool(
     name=CAPABILITY_TOOL_NAME,
     description=(
-        "Administra el backend de Capabilities (CapabilityService): crear una capability "
-        "nueva (el script que un agente puede invocar), consultarla, listar el catálogo "
-        "completo o borrarla. No hay 'update' — para editar, borrá y volvé a crear con el "
-        "mismo id. Para que una capability recién creada quede utilizable por un agente, "
-        "agregá su id a un Profile (ver higpertext-profile)."
+        "Administra el backend de Capabilities (CapabilityService): crear, consultar el "
+        "source, validar, probar y ejecutar scripts. `run` y `test` sólo aceptan una "
+        "capability ya autorizada por el perfil activo del proyecto. La ejecución usa "
+        "el runner MCP actual; para producción multi-tenant debe envolverse en un worker "
+        "aislado. Para que una capability quede visible al agente, agregá su id a un Profile."
     ),
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "get", "list", "delete"]},
-            "id": {"type": "string", "description": "requerido en create/get/delete, ej. 'custom.my-tool'"},
+            "action": {"type": "string", "enum": ["create", "get", "source", "validate", "test", "run", "list", "delete"]},
+            "id": {"type": "string", "description": "requerido en create/get/source/validate/test/run/delete, ej. 'custom.my-tool'"},
             "name": {"type": "string"},
             "description": {"type": "string"},
             "entrypoint": {"type": "string", "description": "path relativo identificador, ej. 'capabilities/custom/scripts/my_tool.py' (solo metadata, no se lee del disco)"},
@@ -232,6 +300,8 @@ _CAPABILITY_TOOL = types.Tool(
             "version": {"type": "string", "default": "1.0.0"},
             "source_code": {"type": "string", "description": "contenido del script en texto plano (requerido en create)"},
             "extra_files": {"type": "object", "additionalProperties": {"type": "string"}, "description": "helpers hermanos: filename -> contenido en texto plano"},
+            "arguments": {"type": "object", "description": "parámetros de la capability para test/run", "additionalProperties": True},
+            "include_files": {"type": "boolean", "description": "source/validate: incluye helpers auxiliares"},
             "parameters": {
                 "type": "array",
                 "items": {
@@ -259,6 +329,7 @@ _CAPABILITY_TOOL = types.Tool(
                 },
                 "additionalProperties": False,
             },
+            "include_body": {"type": "boolean", "description": "solo para list: true incluye parameters y contract. Default false."},
         },
         "required": ["action"],
         "additionalProperties": False,
@@ -295,6 +366,7 @@ _SKILL_TOOL = types.Tool(
             "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
             "project_id": {"type": "string", "description": "vacío = no atada a un proyecto puntual"},
             "enabled_only": {"type": "boolean", "description": "solo para list: solo skills con enabled=true"},
+            "include_body": {"type": "boolean", "description": "solo para list: true incluye content. Default false."},
         },
         "required": ["action"],
         "additionalProperties": False,
@@ -325,12 +397,43 @@ _AGENT_TOOL = types.Tool(
             "profiles": {"type": "array", "items": {"type": "string"}, "description": "vacío = global; si no, el agent solo es visible para estos perfiles"},
             "profile": {"type": "string", "description": "solo para list: filtra por perfil"},
             "project_id": {"type": "string", "description": "vacío = no atado a un proyecto puntual"},
+            "include_body": {"type": "boolean", "description": "solo para list: true incluye prompt. Default false."},
         },
         "required": ["action"],
         "additionalProperties": False,
     },
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
 )
+
+
+def catalog_list_view(items: list[dict], body_fields: tuple[str, ...], include_body: bool) -> list[dict]:
+    """Listados de catálogo sin el cuerpo largo.
+
+    `get` sigue devolviendo el documento completo. El listado, por defecto,
+    deja id/nombre/descripción y el tamaño del cuerpo para que ningún
+    adaptador arrastre system prompts, SKILL.md o prompts de agentes al
+    contexto. `include_body=true` restaura el objeto entero.
+    """
+    if include_body:
+        return items
+    slim: list[dict] = []
+    for item in items:
+        row = {key: value for key, value in item.items() if key not in body_fields}
+        for field in body_fields:
+            value = item.get(field)
+            if isinstance(value, str):
+                row[f"{field}_chars"] = len(value)
+            elif isinstance(value, list):
+                row[f"{field}_count"] = len(value)
+        slim.append(row)
+    return slim
+
+
+def _list_summary(count: int, noun: str, include_body: bool) -> str:
+    summary = f"{count} {noun}."
+    if not include_body:
+        summary += " Sin cuerpos; usá action=get para un id."
+    return summary
 
 
 async def _load_tools() -> dict[str, schema.ToolSpec]:
@@ -404,6 +507,42 @@ def _invalid_arguments_result(name: str, arguments: object, error: jsonschema.Va
     )
 
 
+def capability_call_result(result: dispatch.CapabilityResult) -> types.CallToolResult:
+    """Sobre MCP de una capability, sin relleno para el contexto del agente.
+
+    Los clientes (Claude Code entre ellos) le muestran al modelo el
+    `structuredContent` serializado cuando existe, no solo `summary`. Por eso:
+    - salida legada de texto: el texto va plano en `content`, sin sobre JSON
+      (evita escapar `\\n`/`\"` y duplicar la primera línea en `summary`);
+    - datos estructurados: sobre sin campos vacíos;
+    - error: `content` lleva el diagnóstico, no solo su primera línea.
+    `trace_id` viaja en `_meta`, fuera de la vista del modelo.
+    """
+    meta = {"trace_id": result.trace_id} if result.trace_id else None
+    if not result.ok:
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=result.summary)],
+            isError=True,
+            structuredContent={"ok": False, "summary": result.summary, "error": result.error},
+            _meta=meta,
+        )
+    if set(result.data) == {"text"}:
+        text = result.data["text"]
+        if result.warnings:
+            text += "\n\nWarnings: " + "; ".join(result.warnings)
+        return types.CallToolResult(content=[types.TextContent(type="text", text=text)], _meta=meta)
+    envelope = {
+        key: value
+        for key, value in result.to_dict().items()
+        if key != "trace_id" and value not in (None, [], {}, "")
+    }
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text=result.summary)],
+        structuredContent=envelope,
+        _meta=meta,
+    )
+
+
 def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     server = Server(SERVER_NAME)
     state: dict[str, dict[str, schema.ToolSpec]] = {"tools": {}}
@@ -416,7 +555,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return [_CONFIGURE_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local, *(await ext_pool.list_tools_merged())]
+        return [_CONFIGURE_TOOL, _SYSTEM_OVERVIEW_TOOL, _BOARD_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local, *(await ext_pool.list_tools_merged())]
 
     # La validación de entrada se hace acá para poder devolver un CallToolResult
     # útil al cliente. La validación automática del SDK corta antes del handler y
@@ -432,6 +571,8 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             tool.name: tool
             for tool in (
                 _CONFIGURE_TOOL,
+                _SYSTEM_OVERVIEW_TOOL,
+                _BOARD_TOOL,
                 _RENDER_ADAPTERS_TOOL,
                 _GOVERNANCE_RULE_TOOL,
                 _GOVERNANCE_EXCEPTION_TOOL,
@@ -453,12 +594,17 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 return _invalid_arguments_result(name, arguments, exc)
 
         if name == RENDER_ADAPTERS_TOOL_NAME:
+            root = None
+            project_id = ""
+            profile = ""
+            data: dict = {}
             try:
                 args = arguments if isinstance(arguments, dict) else {}
                 root, _project = await discovery.resolve_registered_project(
                     root_path=args.get("root_path", ""),
                     project_id=args.get("project_id", ""),
                 )
+                project_id = _project.get("id", "")
                 profile = discovery.active_profile(root) or ""
                 profile_data, caps, rules = await profile_client.profile_context(profile)
                 selected = args.get("assistants", [])
@@ -466,10 +612,32 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 data["hooks"] = await hook_renderer.render(root, profile, data["assistants"])
                 data["skills"] = await skill_renderer.render(root, profile, data["assistants"])
                 data["agents"] = await agent_renderer.render(root, profile, data["assistants"])
+                data["render"] = render_registry.record_render(
+                    root,
+                    project_id=project_id,
+                    profile=profile,
+                    assistants=data["assistants"],
+                    result=data,
+                )
                 summary = f"Configuración renderizada para: {', '.join(data['assistants'])}."
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudieron renderizar los adapters: {exc}"
+                if root is not None:
+                    try:
+                        render_registry.record_render(
+                            root,
+                            project_id=project_id,
+                            profile=profile,
+                            assistants=data.get("assistants", []),
+                            result=data,
+                            status="error",
+                            error=str(exc),
+                        )
+                    except Exception:  # noqa: BLE001
+                        # El manifiesto es best-effort y nunca debe ocultar el
+                        # diagnóstico principal del renderizado.
+                        pass
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == GOVERNANCE_RULE_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -528,10 +696,22 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 elif action == "get":
                     data = await profile_client.get_profile(args["id"])
                     summary = f"Profile '{data['name']}'."
+                elif action == "view":
+                    data = await profile_client.get_profile_bundle(args["id"])
+                    summary = (
+                        f"Profile '{data['profile']['name']}' con "
+                        f"{len(data['skills'])} skill(s), {len(data['hooks'])} hook(s) y "
+                        f"{len(data['capabilities'])} capability(ies)."
+                    )
                 elif action == "list":
-                    profiles = await profile_client.list_profiles()
+                    include_body = bool(args.get("include_body", False))
+                    profiles = catalog_list_view(
+                        await profile_client.list_profiles(),
+                        ("system_prompt", "rules"),
+                        include_body,
+                    )
                     data = {"profiles": profiles}
-                    summary = f"{len(profiles)} profile(s)."
+                    summary = _list_summary(len(profiles), "profile(s)", include_body)
                 elif action == "update":
                     data = await profile_client.update_profile(
                         id=args["id"], name=args.get("name", ""), description=args.get("description", ""),
@@ -544,7 +724,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = {"id": args["id"]}
                     summary = f"Profile '{args['id']}' borrado."
                 else:
-                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
+                    raise ValueError(f"action inválida: {action!r} (usar create|get|view|list|update|delete)")
                 if action in {"create", "update", "delete"}:
                     # The active profile controls the dynamic capability set.
                     # Tell clients to re-run tools/list immediately after a
@@ -571,16 +751,72 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 elif action == "get":
                     data = await profile_client.get_capability(args["id"])
                     summary = f"Capability '{data['id']}'."
+                elif action in {"source", "validate"}:
+                    fetched = await profile_client.get_capability_script(args["id"])
+                    if fetched is None:
+                        raise ValueError(f"no se pudo obtener el source de '{args['id']}'")
+                    source_b64, language, extra_files_b64 = fetched
+                    source = base64.b64decode(source_b64).decode("utf-8")
+                    if language.lower() in {"python", "py"}:
+                        try:
+                            ast.parse(source, filename=args["id"])
+                        except SyntaxError as exc:
+                            data = {"valid": False, "language": language, "error": str(exc)}
+                            summary = f"Capability '{args['id']}' tiene errores de sintaxis."
+                        else:
+                            data = {"valid": True, "language": language}
+                            summary = f"Source de '{args['id']}' válido."
+                    else:
+                        data = {"valid": None, "language": language, "warning": "validación no implementada para este runtime"}
+                        summary = f"Source de '{args['id']}' cargado; runtime '{language}' sin validador local."
+                    if action == "source":
+                        data["source_code"] = source
+                        if args.get("include_files"):
+                            data["extra_files"] = {
+                                filename: base64.b64decode(content).decode("utf-8")
+                                for filename, content in extra_files_b64.items()
+                            }
+                elif action in {"test", "run"}:
+                    root = discovery.resolve_project_root()
+                    allowed = await discovery.allowed_capabilities(root)
+                    capability = next((item for item in allowed if item.id == args["id"]), None)
+                    if capability is None:
+                        raise PermissionError(
+                            f"la capability '{args['id']}' no está habilitada en el perfil activo"
+                        )
+                    result = await dispatch.call_capability(
+                        capability.id,
+                        args.get("arguments") or {},
+                        profile_client._capability_to_dict(capability),
+                    )
+                    summary = f"Capability '{args['id']}' ejecutada en modo {action}: {result.summary}"
+                    result_data = result.to_dict()
+                    result_data["summary"] = summary
+                    result_data["data"] = {**result_data.get("data", {}), "mode": action}
+                    result_data["warnings"] = [
+                        *result_data.get("warnings", []),
+                        "ejecución en el runner MCP actual; no es un worker aislado",
+                    ]
+                    return types.CallToolResult(
+                        content=[types.TextContent(type="text", text=summary)],
+                        isError=not result.ok,
+                        structuredContent=result_data,
+                    )
                 elif action == "list":
-                    caps = await profile_client.list_capabilities_raw()
+                    include_body = bool(args.get("include_body", False))
+                    caps = catalog_list_view(
+                        await profile_client.list_capabilities_raw(),
+                        ("parameters", "contract"),
+                        include_body,
+                    )
                     data = {"capabilities": caps}
-                    summary = f"{len(caps)} capability(ies) en el catálogo."
+                    summary = _list_summary(len(caps), "capability(ies) en el catálogo", include_body)
                 elif action == "delete":
                     await profile_client.delete_capability(args["id"])
                     data = {"id": args["id"]}
                     summary = f"Capability '{args['id']}' borrada."
                 else:
-                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|delete)")
+                    raise ValueError(f"action inválida: {action!r} (usar create|get|source|validate|test|run|list|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar la capability: {exc}"
@@ -606,6 +842,10 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     hooks = await profile_client.list_hooks_raw()
                     data = {"hooks": hooks}
                     summary = f"{len(hooks)} hook(s) en el catálogo."
+                elif action == "list_global":
+                    hooks = [hook for hook in await profile_client.list_hooks_raw() if not hook["profiles"]]
+                    data = {"hooks": hooks, "scope": "global"}
+                    summary = f"{len(hooks)} hook(s) global(es)."
                 elif action == "delete":
                     await profile_client.delete_hook(args["id"])
                     data = {"id": args["id"]}
@@ -640,13 +880,18 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = await profile_client.get_skill(args["id"])
                     summary = f"Skill '{data['id']}'."
                 elif action == "list":
-                    skills = await profile_client.list_skills(
-                        enabled_only=bool(args.get("enabled_only", False)),
-                        profile=args.get("profile", ""),
-                        project_id=args.get("project_id", ""),
+                    include_body = bool(args.get("include_body", False))
+                    skills = catalog_list_view(
+                        await profile_client.list_skills(
+                            enabled_only=bool(args.get("enabled_only", False)),
+                            profile=args.get("profile", ""),
+                            project_id=args.get("project_id", ""),
+                        ),
+                        ("content",),
+                        include_body,
                     )
                     data = {"skills": skills}
-                    summary = f"{len(skills)} skill(s) en el catálogo."
+                    summary = _list_summary(len(skills), "skill(s) en el catálogo", include_body)
                 elif action == "update":
                     data = await profile_client.update_skill(
                         id=args["id"], name=args["name"], description=args["description"],
@@ -684,11 +929,16 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = await profile_client.get_agent(args["id"])
                     summary = f"Agent '{data['id']}'."
                 elif action == "list":
-                    agents = await profile_client.list_agents(
-                        profile=args.get("profile", ""), project_id=args.get("project_id", ""),
+                    include_body = bool(args.get("include_body", False))
+                    agents = catalog_list_view(
+                        await profile_client.list_agents(
+                            profile=args.get("profile", ""), project_id=args.get("project_id", ""),
+                        ),
+                        ("prompt",),
+                        include_body,
                     )
                     data = {"agents": agents}
-                    summary = f"{len(agents)} agent(s) en el catálogo."
+                    summary = _list_summary(len(agents), "agent(s) en el catálogo", include_body)
                 elif action == "update":
                     data = await profile_client.update_agent(
                         id=args["id"], name=args["name"], description=args["description"],
@@ -788,6 +1038,160 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         "error": {"code": "configuration_error", "message": message},
                     },
                 )
+        if name == SYSTEM_OVERVIEW_TOOL_NAME:
+            args = arguments if isinstance(arguments, dict) else {}
+            try:
+                if args.get("root_path") or args.get("project_id"):
+                    root, project = await discovery.resolve_registered_project(
+                        root_path=args.get("root_path", ""), project_id=args.get("project_id", "")
+                    )
+                else:
+                    root = discovery.resolve_project_root()
+                    project = {"id": "", "root_path": str(root), "name": root.name}
+                profile = discovery.active_profile(root)
+                data: dict = {
+                    "project": {**project, "local_root": str(root)},
+                    "active_profile": profile,
+                    "renders": render_registry.list_renders(
+                        root, limit=int(args.get("render_limit", 10))
+                    ),
+                    "profile": None,
+                    "warnings": [],
+                }
+                if profile:
+                    try:
+                        data["profile"] = await profile_client.get_profile_bundle(profile)
+                    except Exception as exc:  # noqa: BLE001
+                        data["warnings"].append(f"no se pudo cargar el catálogo del perfil: {type(exc).__name__}")
+                else:
+                    data["warnings"].append("no hay active_profile; no se cargó ningún catálogo")
+                summary = (
+                    f"Proyecto '{project.get('name') or root.name}' con perfil "
+                    f"'{profile or 'sin perfil'}' y {len(data['renders'])} render(s) registrado(s)."
+                )
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=summary)],
+                    structuredContent={"ok": True, "summary": summary, "data": data, "warnings": data["warnings"]},
+                )
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudo construir el overview del sistema: {exc}"
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=message)],
+                    isError=True,
+                    structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
+                )
+        if name == BOARD_TOOL_NAME:
+            args = arguments if isinstance(arguments, dict) else {}
+            action = args.get("action")
+            try:
+                if args.get("root_path") or args.get("project_id"):
+                    root, project = await discovery.resolve_registered_project(
+                        root_path=args.get("root_path", ""), project_id=args.get("project_id", "")
+                    )
+                else:
+                    root = discovery.resolve_project_root()
+                    project = await profile_client.resolve_project(str(root))
+                project_id = project.get("id", "")
+                board_name = args.get("board_name") or "Roadmap"
+
+                if action == "overview":
+                    data = await roadmap_board.board_overview(project_id=project_id, board_name=board_name)
+                    summary = (
+                        f"Board '{data['board']['name']}' con {len(data['columns'])} columna(s), "
+                        f"{len(data['activities'])} actividad(es) y "
+                        f"{sum(len(items) for items in data['tasks'].values())} task(s)."
+                    )
+                elif action == "list_boards":
+                    boards = await board_client.list_boards(project_id)
+                    data = {"boards": boards}
+                    summary = f"{len(boards)} board(s) para el proyecto."
+                elif action == "migrate":
+                    data = await roadmap_board.migrate_local_roadmap(
+                        root=root, project_id=project_id, board_name=board_name
+                    )
+                    summary = (
+                        f"Roadmap migrado a '{data['board']['name']}': "
+                        f"{data['created_count']} creado(s), {data['skipped_count']} omitido(s)."
+                    )
+                elif action == "delete_board":
+                    board = await board_client.resolve_board(project_id=project_id, name=board_name)
+                    await board_client.delete_board(board["id"])
+                    data = {"board_id": board["id"], "board_name": board_name}
+                    summary = f"Board '{board_name}' eliminado."
+                elif action == "create":
+                    board = await board_client.resolve_board(project_id=project_id, name=board_name)
+                    columns = await board_client.list_columns(board["id"])
+                    column_name = args.get("column") or (columns[0]["name"] if columns else board_client.COLUMN_PENDING)
+                    column_id = await board_client.resolve_column_id(board["id"], column_name)
+                    activity = await board_client.create_activity(
+                        board_id=board["id"], column_id=column_id, title=args["title"],
+                        description=args.get("description", ""),
+                        assignee_user_id=args.get("assignee_user_id", ""),
+                        priority=args.get("priority", "PRIORITY_UNSPECIFIED"),
+                        tags=args.get("tags", []), item_type=args.get("item_type", "ROADMAP"),
+                        parent_id=args.get("parent_id", ""),
+                    )
+                    data = {"board": board, "activity": activity}
+                    summary = f"Actividad '{activity['title']}' creada."
+                elif action == "update":
+                    current = await board_client.get_activity(args["activity_id"])
+                    activity = await board_client.update_activity(
+                        activity_id=current["id"], title=args.get("title", current["title"]),
+                        description=args.get("description", current["description"]),
+                        assignee_user_id=args.get("assignee_user_id", current["assignee_user_id"]),
+                        priority=args.get("priority", current["priority"]), tags=args.get("tags", current["tags"]),
+                    )
+                    data = {"activity": activity}
+                    summary = f"Actividad '{activity['title']}' actualizada."
+                elif action == "delete":
+                    await board_client.delete_activity(args["activity_id"])
+                    data = {"activity_id": args["activity_id"]}
+                    summary = f"Actividad '{args['activity_id']}' eliminada."
+                elif action == "move":
+                    current = await board_client.get_activity(args["activity_id"])
+                    target_column_id = await board_client.resolve_column_id(
+                        current["board_id"], args["target"]
+                    )
+                    activity = await board_client.move_activity(
+                        activity_id=current["id"], target_column_id=target_column_id,
+                        position=args.get("position", 0),
+                    )
+                    data = {"activity": activity}
+                    summary = f"Actividad '{activity['title']}' movida a '{args['target']}'."
+                elif action == "task_create":
+                    task = await board_client.create_task(
+                        board_activity_id=args["board_activity_id"], title=args["title"],
+                        acceptance_criteria=args.get("acceptance_criteria", []),
+                    )
+                    data = {"task": task}
+                    summary = f"Task '{task['title']}' creada."
+                elif action == "task_update":
+                    current = await board_client.get_task(args["task_id"])
+                    task = await board_client.update_task(
+                        task_id=current["id"], title=args.get("title", current["title"]),
+                        done=args.get("done", current["done"]), position=args.get("position", current["position"]),
+                    )
+                    data = {"task": task}
+                    summary = f"Task '{task['title']}' actualizada."
+                elif action == "task_delete":
+                    await board_client.delete_task(args["task_id"])
+                    data = {"task_id": args["task_id"]}
+                    summary = f"Task '{args['task_id']}' eliminada."
+                else:
+                    raise ValueError(
+                        "action inválida: usar overview|list_boards|migrate|create|update|delete|move|delete_board|task_create|task_update|task_delete"
+                    )
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=summary)],
+                    structuredContent={"ok": True, "summary": summary, "data": data},
+                )
+            except Exception as exc:  # noqa: BLE001
+                message = f"No se pudo operar el roadmap/board: {exc}"
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=message)],
+                    isError=True,
+                    structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
+                )
         tools = state["tools"]
         capability_id = state.get("name_to_id", {}).get(name)
         if capability_id is None:
@@ -808,11 +1212,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             )
         result = await dispatch.call_capability(capability_id, arguments, tools[capability_id].raw)
         await _notify_if_tools_changed(server, state)
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=result.summary)],
-            isError=not result.ok,
-            structuredContent=result.to_dict(),
-        )
+        return capability_call_result(result)
 
     @server.list_resources()
     async def list_resources() -> list[types.Resource]:
@@ -821,8 +1221,8 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 uri=resources.USAGE_URI,
                 name="Uso de tokens/costo de la sesión",
                 description=(
-                    "Telemetría real acumulada por el motor higpertext "
-                    "(.higpertext/state/telemetry.jsonl), agregada por tool."
+                    "Telemetría real de los hooks (Redis): tokens de contexto "
+                    "por tool, salidas más grandes y pico de contexto por sesión."
                 ),
                 mimeType="application/json",
             ),
@@ -841,7 +1241,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
     async def read_resource(uri) -> str:
         root = discovery.resolve_project_root()
         if str(uri) == resources.USAGE_URI:
-            return json.dumps(resources.summarize_usage(root), ensure_ascii=False, indent=2)
+            return json.dumps(await resources.summarize_usage(root), ensure_ascii=False)
         if str(uri) == resources.MEMORY_URI:
             data = await resources.read_memory(root)
             return json.dumps(data, ensure_ascii=False, indent=2)

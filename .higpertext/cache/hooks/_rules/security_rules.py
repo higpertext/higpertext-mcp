@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from .render import render_box
+
 RuleSeverity = Literal["continue", "context", "warn", "ask", "block"]
 
 
@@ -53,14 +55,12 @@ def evaluate_path_guard(tool_name: str, tool_input: dict[str, Any]) -> RuleResul
         return None
     return RuleResult(
         severity="block",
-        message="\n".join(
+        message=render_box(
+            "higpertext · Security Guard",
             [
-                "╔─ HIGPERTEXT  ·  Security Guard ───────────────────────────",
-                f"│  ✗  {tool_name} sobre ruta sensible bloqueado.",
-                f"│  Ruta: {path}",
-                "│  Usa una capacidad segura o pide aprobación humana explícita.",
-                "╚──────────────────────────────────────────────────────",
-            ]
+                f"✗ {tool_name} sobre ruta sensible bloqueado: {path}",
+                "Usa una capacidad segura o pide aprobación humana explícita.",
+            ],
         ),
     )
 
@@ -154,16 +154,8 @@ def _format_command_message(command: str, reason: str, severity: RuleSeverity) -
     else:
         marker = "✗"
         action = "Comando bloqueado por política de seguridad."
-    return "\n".join(
-        [
-            "╔─ HIGPERTEXT  ·  Security Guard ───────────────────────────",
-            f"│  {marker}  {reason}",
-            f"│  Severidad: {severity}",
-            f"│  Acción   : {action}",
-            f"│  Comando  : {command}",
-            "╚──────────────────────────────────────────────────────",
-        ]
-    )
+    # Sin eco del comando: el modelo ya lo tiene y puede ser un heredoc largo.
+    return render_box("higpertext · Security Guard", [f"{marker} {reason}", f"Severidad: {severity}", action])
 
 
 def _masking_patterns(root: Path) -> list[tuple[str, str]]:

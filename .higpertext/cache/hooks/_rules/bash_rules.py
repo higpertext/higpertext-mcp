@@ -129,7 +129,9 @@ def check_profile_rules(cmd: str, root: Path) -> RuleResult | None:
         weight = int(rule.get("weight", 0) or 0)
         if not (1 <= weight <= 5):
             weight = 5 if severity == "block" else 3
-        default_example = f"mcp__higpertext__{cap_id.replace('.', '_', 1)}" if cap_id else ""
+        # Nombre MCP real: el id se expone con "." -> "-" (common.grep-search
+        # -> common-grep-search); con "_" la sugerencia apuntaba a una tool inexistente.
+        default_example = f"mcp__higpertext__{cap_id.replace('.', '-')}" if cap_id else ""
         example = rule.get("example", default_example)
         return RuleResult(
             severity=severity,
@@ -139,7 +141,6 @@ def check_profile_rules(cmd: str, root: Path) -> RuleResult | None:
             message=render_box(
                 "HIGPERTEXT  ·  Regla de perfil",
                 [
-                    f"  Comando detectado : {cmd}",
                     *([f"  Capacidad         : {cap_id}"] if cap_id else []),
                     f"  Motivo            : {reason}",
                     *([f"  Uso               : {example}"] if example else []),

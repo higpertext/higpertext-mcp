@@ -8,6 +8,7 @@ levantar un profile server real, mismo criterio que `ExternalServerPool.
 from_sessions` usa para no depender de red real en tests."""
 
 import json
+import base64
 import tempfile
 from pathlib import Path
 
@@ -58,7 +59,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "higpertext-agent", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-system-overview", "higpertext-roadmap-board", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "higpertext-agent", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]
@@ -124,6 +125,11 @@ def test_admin_schemas_expose_dispatch_parameters():
     # visible to the MCP client instead of being hidden by an old schema.
     assert "profile" in skill_schema["properties"]
     assert "project_id" in skill_schema["properties"]
+    assert "view" in server_module._PROFILE_TOOL.inputSchema["properties"]["action"]["enum"]
+    assert "list_global" in server_module._HOOK_TOOL.inputSchema["properties"]["action"]["enum"]
+    capability_actions = server_module._CAPABILITY_TOOL.inputSchema["properties"]["action"]["enum"]
+    assert {"source", "validate", "test", "run"} <= set(capability_actions)
+    assert "arguments" in server_module._CAPABILITY_TOOL.inputSchema["properties"]
 
 
 def test_configure_project_accepts_project_selector():
@@ -184,8 +190,126 @@ async def test_configure_project_creates_missing_files(monkeypatch):
     assert json.loads((root / ".higpertext/config/mcp_external.json").read_text()) == {"servers": []}
     generated_mcp = json.loads((root / ".mcp.json").read_text())
     assert generated_mcp["mcpServers"]["higpertext"] == {
-        "type": "http", "url": "http://127.0.0.1:8790/mcp/"
+        "type": "http", "url": "http://127.0.0.1:8790/mcp/",
+        "headers": {"X-Higpertext-Project-Root": str(root.resolve())},
     }
+
+
+@pytest.mark.anyio
+async def test_profile_view_returns_unified_profile_section(monkeypatch, tmp_path):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    bundle = {
+        "profile": {"name": "dev"},
+        "skills": [{"id": "common.build"}],
+        "hooks": [{"id": "profile-hook"}],
+        "global_hooks": [{"id": "global-hook"}],
+        "capabilities": [{"id": "common.grep-search"}],
+    }
+    monkeypatch.setattr(server_module.profile_client, "get_profile_bundle", lambda _id: _async_value(bundle))
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("higpertext-profile", {"action": "view", "id": "dev"})
+
+    assert result.isError is False
+    assert result.structuredContent["data"] == bundle
+    assert "skill(s)" in result.structuredContent["summary"]
+
+
+@pytest.mark.anyio
+async def test_system_overview_returns_project_bundle_and_render_history(monkeypatch):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    bundle = {
+        "profile": {"name": "dev"},
+        "skills": [{"id": "common.build"}],
+        "hooks": [],
+        "global_hooks": [],
+        "capabilities": [],
+    }
+    monkeypatch.setattr(
+        server_module.profile_client,
+        "get_profile_bundle",
+        lambda _id: _async_value(bundle),
+    )
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("higpertext-system-overview", {"render_limit": 5})
+
+    assert result.isError is False
+    assert result.structuredContent["data"]["project"]["local_root"] == str(root.resolve())
+    assert result.structuredContent["data"]["active_profile"] == "dev"
+    assert result.structuredContent["data"]["profile"] == bundle
+    assert result.structuredContent["data"]["renders"] == []
+
+
+@pytest.mark.anyio
+async def test_roadmap_board_overview_is_frontend_contract(monkeypatch):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(
+        server_module.profile_client,
+        "resolve_project",
+        lambda _root: _async_value({"id": "project-1", "name": "demo", "root_path": str(root)}),
+    )
+    overview = {
+        "board": {"id": "board-1", "name": "Roadmap"},
+        "columns": [{"id": "pending", "name": "Pending"}],
+        "activities": [],
+        "tasks": {},
+    }
+    monkeypatch.setattr(server_module.roadmap_board, "board_overview", lambda **_: _async_value(overview))
+
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        result = await client.call_tool("higpertext-roadmap-board", {"action": "overview"})
+
+    assert result.isError is False
+    assert result.structuredContent["data"] == overview
+
+
+async def _async_value(value):
+    return value
+
+
+@pytest.mark.anyio
+async def test_capability_source_validate_and_run(monkeypatch, tmp_path):
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    capability = profile_pb2.Capability(
+        id="custom.echo",
+        language="python",
+        parameters=[profile_pb2.Parameter(name="value", required=False)],
+    )
+    _stub_profile_catalog(monkeypatch, {"dev": [capability]})
+    monkeypatch.setattr(
+        server_module.profile_client,
+        "get_capability_script",
+        lambda _id: _async_value((base64.b64encode(b"print('ok')").decode(), "python", {})),
+    )
+
+    async def fake_call(_id, _args, _definition):
+        return dispatch.CapabilityResult(ok=True, summary="executed", data={"text": "ok"}, artifacts=[], warnings=[])
+
+    monkeypatch.setattr(server_module.dispatch, "call_capability", fake_call)
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        source = await client.call_tool("higpertext-capability", {"action": "source", "id": "custom.echo"})
+        valid = await client.call_tool("higpertext-capability", {"action": "validate", "id": "custom.echo"})
+        run = await client.call_tool(
+            "higpertext-capability",
+            {"action": "run", "id": "custom.echo", "arguments": {"value": "x"}},
+        )
+
+    assert source.structuredContent["data"]["source_code"] == "print('ok')"
+    assert valid.structuredContent["data"]["valid"] is True
+    assert run.structuredContent["data"]["mode"] == "run"
+    assert run.structuredContent["ok"] is True
 
 
 def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
@@ -236,6 +360,7 @@ def test_adapter_renderer_adds_shared_mcp_for_any_adapter_and_preserves_servers(
     assert generated["mcpServers"]["higpertext"] == {
         "type": "http",
         "url": "http://127.0.0.1:8790/mcp/",
+        "headers": {"X-Higpertext-Project-Root": str(tmp_path.resolve())},
     }
 
 
@@ -367,6 +492,63 @@ async def test_skill_renderer_targets_official_copilot_and_opencode_paths(monkey
     assert (tmp_path / ".github/skills/common.build/SKILL.md").exists()
     assert (tmp_path / ".opencode/skills/common.build/SKILL.md").exists()
     assert set(result) == {".github/skills", ".opencode/skills"}
+
+
+def test_catalog_list_omits_bodies_unless_requested():
+    items = [{
+        "id": "common.plan",
+        "description": "planes",
+        "system_prompt": "x" * 40,
+        "rules": ["una", "dos"],
+        "content": "# cuerpo largo",
+        "prompt": "sos un agente",
+    }]
+    slim = server_module.catalog_list_view(items, ("system_prompt", "rules", "content", "prompt"), False)
+    assert "system_prompt" not in slim[0]
+    assert "content" not in slim[0]
+    assert "prompt" not in slim[0]
+    assert slim[0]["system_prompt_chars"] == 40
+    assert slim[0]["rules_count"] == 2
+    assert slim[0]["description"] == "planes"
+    full = server_module.catalog_list_view(items, ("content",), True)
+    assert full[0]["content"] == "# cuerpo largo"
+
+
+def test_grok_primary_tasks_keep_global_scope_and_native_frontmatter():
+    """common.plan/build/spec/review/compact son tareas globales del flujo.
+
+    No se filtran por el proyecto higpertext. En Grok el front matter nativo
+    reemplaza `mode: primary`; Claude sigue recibiendo el texto original.
+    """
+    raw = (
+        "---\n"
+        "name: common.plan\n"
+        "description: Analyze requested changes and produce safe, incremental implementation plans.\n"
+        "mode: primary\n"
+        "temperature: 0.1\n"
+        "permission:\n"
+        "  edit: deny\n"
+        "  bash: deny\n"
+        "---\n"
+        "\n"
+        "# When to use\n"
+        "\n"
+        "- At task intake for non-trivial work\n"
+        "\n"
+        "# Do\n"
+        "\n"
+        "- Consult the graph.\n"
+    )
+    native = skill_renderer.project_for_grok(raw)
+    assert "name: common-plan" in native
+    assert "when-to-use: At task intake for non-trivial work" in native
+    assert "allowed-tools: read_file, grep, list_dir" in native
+    assert "mode:" not in native.split("---", 2)[1]
+    assert "temperature:" not in native
+    assert "# Do" in native
+    assert skill_renderer.project_for_grok("---\nname: docs-api-style\ndescription: d\n---\n\nbody\n") == (
+        "---\nname: docs-api-style\ndescription: d\n---\n\nbody\n"
+    )
 
 
 def test_agent_render_md_omits_unset_optional_fields():
@@ -616,6 +798,11 @@ async def test_list_resources_exposes_usage_and_memory(monkeypatch):
 
     monkeypatch.setattr("higpertext_mcp.resources.memory.list_memory", fake_list_memory)
 
+    async def fake_load_telemetry(_root):
+        return []
+
+    monkeypatch.setattr("higpertext_mcp.resources.load_telemetry", fake_load_telemetry)
+
     server = server_module.build_server()
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_resources()
@@ -625,7 +812,13 @@ async def test_list_resources_exposes_usage_and_memory(monkeypatch):
 
         read = await client.read_resource("higpertext://session/usage")
         payload = json.loads(read.contents[0].text)
-        assert payload == {"total_tokens": 0, "total_cost_usd": 0.0, "calls": 0, "by_tool": {}}
+        assert payload == {
+            "tool_calls": 0, "tool_context_tokens": 0, "by_tool": {}, "top_outputs": [], "recent_sessions": [],
+            "context_misses": {
+                "truncated_outputs": 0, "refetched_after_truncation": 0, "saved_output_lookups": 0,
+                "miss_rate_pct": 0.0, "by_tool": {}, "repeat_calls": {},
+            },
+        }
 
         read = await client.read_resource("higpertext://session/memory")
         payload = json.loads(read.contents[0].text)

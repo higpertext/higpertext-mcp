@@ -40,6 +40,94 @@ def _visible(skill: dict, project_id: str, profile: str) -> bool:
     return bool(profile) and profile in profiles
 
 
+def _front_matter(content: str) -> tuple[str, str] | None:
+    if not content.startswith("---\n"):
+        return None
+    end = content.find("\n---\n", 4)
+    if end < 0:
+        return None
+    return content[4:end], content[end + 5 :]
+
+
+def _yaml_scalar(block: str, key: str) -> str:
+    prefix = f"{key}:"
+    for line in block.splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix) :].strip().strip("\"'")
+    return ""
+
+
+def _permission_allows(block: str, key: str) -> bool:
+    """Lee `permission.<key>: allow|deny` del front matter de una tarea."""
+    capture = False
+    for line in block.splitlines():
+        if line.startswith("permission:"):
+            capture = True
+            continue
+        if capture and line and not line.startswith((" ", "\t")):
+            break
+        stripped = line.strip()
+        if capture and stripped.startswith(f"{key}:"):
+            return stripped.split(":", 1)[1].strip() == "allow"
+    return False
+
+
+def _when_to_use(body: str, description: str) -> str:
+    capture = False
+    items: list[str] = []
+    for line in body.splitlines():
+        heading = line.strip().lower()
+        if heading in {"# when to use", "## when to use"}:
+            capture = True
+            continue
+        if capture and line.startswith("#"):
+            break
+        if capture and line.strip().startswith("- "):
+            items.append(line.strip()[2:].strip())
+    return "; ".join(items) if items else description
+
+
+def project_for_grok(content: str) -> str:
+    """Proyecta una tarea global `mode: primary` al contrato nativo de Grok.
+
+    Esas tareas no pertenecen a un solo proyecto: son el flujo de la
+    herramienta (spec, plan, build, review, compact). El front matter de
+    origen usa campos de otro asistente (`mode`, `temperature`, `permission`);
+    Grok decide cuándo invocarlas con `name`, `description` y `when-to-use`.
+    El cuerpo no se reescribe. El resto de skills se copia igual.
+    """
+    parts = _front_matter(content)
+    if parts is None:
+        return content
+    front, body = parts
+    if _yaml_scalar(front, "mode") != "primary":
+        return content
+    name = _yaml_scalar(front, "name").replace(".", "-").replace("_", "-")
+    description = _yaml_scalar(front, "description")
+    tools = ["read_file", "grep", "list_dir"]
+    if _permission_allows(front, "edit"):
+        tools.append("search_replace")
+    if _permission_allows(front, "bash"):
+        tools.append("run_terminal_command")
+    lines = [
+        "---",
+        f"name: {name}",
+        f"description: {description}",
+        f"when-to-use: {_when_to_use(body, description)}",
+        "user-invocable: true",
+        "allowed-tools: " + ", ".join(tools),
+        "---",
+        "",
+    ]
+    return "\n".join(lines) + body.lstrip("\n")
+
+
+def _materialize(rel_dir: str, content: str) -> str:
+    if rel_dir == ".grok/skills":
+        return project_for_grok(content)
+    return content
+
+
 def _prune(dir_path: Path, want_ids: set[str]) -> list[str]:
     if not dir_path.exists():
         return []
@@ -78,7 +166,7 @@ async def render(root: Path, profile: str, assistants: list[str]) -> dict[str, d
             skill_dir = dir_path / skill["id"]
             skill_dir.mkdir(parents=True, exist_ok=True)
             path = skill_dir / "SKILL.md"
-            path.write_text(skill["content"], encoding="utf-8")
+            path.write_text(_materialize(rel_dir, skill["content"]), encoding="utf-8")
             written.append(str(path.relative_to(root)))
         removed = _prune(dir_path, want_ids)
         result[rel_dir] = {"written": written, "pruned": removed}

@@ -72,6 +72,26 @@ def test_project_path_mapping_between_container_and_host(monkeypatch):
     assert discovery.local_project_path("/host/projects/frontend") == Path("/projects/frontend")
 
 
+def test_allowed_project_roots_reject_outside_path(monkeypatch, tmp_path):
+    allowed = tmp_path / "projects"
+    allowed.mkdir()
+    monkeypatch.setenv("HIGPERTEXT_ALLOWED_PROJECT_ROOTS", str(allowed))
+
+    assert discovery.canonical_project_path(allowed / "app") == (allowed / "app").resolve()
+    with pytest.raises(ValueError, match="raíces autorizadas"):
+        discovery.canonical_project_path(tmp_path / "private")
+
+
+def test_project_root_override_respects_allowed_roots(monkeypatch, tmp_path):
+    allowed = tmp_path / "projects"
+    allowed.mkdir()
+    monkeypatch.setenv("HIGPERTEXT_ALLOWED_PROJECT_ROOTS", str(allowed))
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(tmp_path / "private"))
+
+    with pytest.raises(ValueError, match="raíces autorizadas"):
+        discovery.resolve_project_root()
+
+
 @pytest.mark.anyio
 async def test_resolve_registered_project_accepts_any_registered_path(monkeypatch, tmp_path):
     registered_roots = [tmp_path / name for name in ("server", "frontend", "docs", "infra", "deploy")]
@@ -108,3 +128,20 @@ async def test_resolve_registered_project_by_id_uses_registered_primary_root(mon
 
     assert root == project_root.resolve()
     assert resolved == project
+
+
+@pytest.mark.anyio
+async def test_resolve_registered_project_by_id_respects_allowed_roots(monkeypatch, tmp_path):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("HIGPERTEXT_ALLOWED_PROJECT_ROOTS", str(allowed))
+
+    async def fake_list_projects():
+        return [{"id": "project-1", "root_path": str(outside)}]
+
+    monkeypatch.setattr(discovery.profile_client, "list_projects", fake_list_projects)
+
+    with pytest.raises(ValueError, match="raíces autorizadas"):
+        await discovery.resolve_registered_project(project_id="project-1")

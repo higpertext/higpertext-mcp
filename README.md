@@ -107,10 +107,12 @@ Agregar en `.mcp.json` del proyecto destino (el que tiene su propio
 }
 ```
 
-El servidor resuelve la raíz del proyecto por `cwd` del proceso (el cliente MCP
-local lo lanza con cwd = raíz del proyecto). Para forzar otra raíz, setear
-`HIGPERTEXT_PROJECT_ROOT` en el bloque `env` de la entrada del server en
-`.mcp.json`.
+El servidor no usa la raíz del motor ni el `cwd` como selección implícita. En
+stdio se debe configurar `HIGPERTEXT_PROJECT_ROOT`; en HTTP cada operación debe
+enviar `project_id` o `root_path`, que se valida contra el registro de proyectos.
+Para limitar adicionalmente el filesystem de una instancia HTTP/Docker, el
+operador puede definir `HIGPERTEXT_ALLOWED_PROJECT_ROOTS` con rutas host
+canónicas separadas por `:` (o por `os.pathsep` en la plataforma).
 
 **Limitación conocida (v1)**: la lista de tools se arma una sola vez, al conectar.
 Si cambiás de perfil (`htx profile load`) a mitad de sesión, hay que reconectar el

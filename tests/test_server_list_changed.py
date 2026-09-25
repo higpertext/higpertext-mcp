@@ -30,7 +30,9 @@ async def test_profile_change_triggers_tool_list_changed_notification(monkeypatc
     root = _make_project("dev")
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
 
-    grep_search = profile_pb2.Capability(id="common.grep-search")
+    grep_search = profile_pb2.Capability(
+        id="common.grep-search", parameters=[profile_pb2.Parameter(name="pattern")]
+    )
     git_diff = profile_pb2.Capability(id="git.diff")
     granted = [grep_search]
 

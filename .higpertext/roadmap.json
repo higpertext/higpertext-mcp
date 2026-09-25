@@ -29,6 +29,55 @@
       "description": "Exponer snapshots, consulta y estado del grafo semántico desde higpertext-server-profile, manteniendo el parser en higpertext-mcp y sincronizando ambos contratos protobuf.",
       "status": "done",
       "skills": ["common.plan", "common.build"]
+    },
+    {
+      "id": "route-isolation",
+      "name": "Aislamiento de rutas y cachés",
+      "description": "Centralizar límites de raíces autorizadas y evitar que el caché de scripts o imports relativos se compartan accidentalmente entre proyectos atendidos por el mismo proceso.",
+      "status": "done",
+      "skills": ["common.plan", "common.build", "common.review"]
+    },
+    {
+      "id": "identity-authorization",
+      "name": "Identidad y autorización por usuario",
+      "description": "Agregar identidad autenticada, membresías y autorización de project_id/root_path en el gateway y profile server; bloquear rutas no pertenecientes al tenant.",
+      "status": "pending",
+      "skills": ["common.plan", "common.build", "common.review"]
+    },
+    {
+      "id": "tenant-storage-audit",
+      "name": "Persistencia y auditoría multiusuario",
+      "description": "Segmentar memoria, trazas, logs y cuotas por tenant/proyecto/usuario, y completar auditoría y pruebas de aislamiento extremo a extremo.",
+      "status": "pending",
+      "skills": ["common.build", "common.review"]
+    },
+    {
+      "id": "profile-menu-view",
+      "name": "Vista unificada de perfiles",
+      "description": "Exponer una vista agregada con perfil, skills, hooks efectivos, hooks globales y capabilities para que el menú no reconstruya relaciones de catálogos.",
+      "status": "done",
+      "skills": ["common.build"]
+    },
+    {
+      "id": "system-overview-render-registry",
+      "name": "Vista operativa y manifiestos de render",
+      "description": "Exponer una vista unificada del proyecto y persistir manifiestos atómicos con hashes de cada render para auditoría, drift y recuperación.",
+      "status": "done",
+      "skills": ["common.build", "common.review"]
+    },
+    {
+      "id": "roadmap-board-frontend-contract",
+      "name": "Flujo de roadmap y boards para frontend",
+      "description": "Exponer un contrato MCP único para listar boards, consultar columnas/actividades/tasks, crear y mover trabajo, y migrar de forma idempotente el roadmap JSON existente.",
+      "status": "done",
+      "skills": ["common.build", "common.review"]
+    },
+    {
+      "id": "capability-lambda-workflow",
+      "name": "Flujo de capabilities tipo lambda",
+      "description": "Permitir leer source, validar, probar y ejecutar capabilities autorizadas, manteniendo publicación, versionado y worker aislado como evolución del profile server.",
+      "status": "active",
+      "skills": ["common.build", "common.review"]
     }
   ]
 }

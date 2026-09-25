@@ -12,6 +12,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from higpertext_mcp import discovery
+
 
 def _read_object(path: Path) -> dict[str, Any] | None:
     if not path.exists():
@@ -89,15 +91,25 @@ def create_project_configuration(root: Path, profile: str) -> dict[str, list[str
         mcp_config["mcpServers"] = servers
     if not isinstance(servers, dict):
         raise ValueError(f"{mcp_path}: 'mcpServers' debe ser un objeto")
-    if "higpertext" in servers:
+    entry = servers.get("higpertext")
+    headers = discovery.mcp_client_headers(root)
+    if entry is not None and not (
+        isinstance(entry, dict) and entry.get("type") == "http"
+        and not (entry.get("headers") or {}).items() >= headers.items()
+    ):
         skipped.append(str(mcp_path.relative_to(root)))
     else:
         # El despliegue soportado es Streamable HTTP en Docker. Esto evita
         # requerir una CLI o un virtualenv del MCP en cada proyecto cliente.
-        servers["higpertext"] = {
-            "type": "http",
-            "url": os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/"),
-        }
+        # El header selecciona este proyecto en el gateway compartido.
+        if entry is None:
+            servers["higpertext"] = {
+                "type": "http",
+                "url": os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/"),
+                "headers": headers,
+            }
+        else:
+            entry["headers"] = {**(entry.get("headers") or {}), **headers}
         _write_json(mcp_path, mcp_config)
         (created if not mcp_existed else updated).append(str(mcp_path.relative_to(root)))
 

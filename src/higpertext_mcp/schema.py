@@ -211,23 +211,17 @@ def _build_input_schema(parameters: list[dict]) -> dict[str, Any]:
 
 
 def _build_description(definition: dict) -> str:
+    """Descripción que ve el modelo al elegir la tool.
+
+    No repite los parámetros (ya viajan en `inputSchema` con su propia
+    descripción) ni `contract.rules`: esas reglas son la especificación para
+    quien implementa el script, no guía para quien lo llama — y duplicarlas
+    costaba ~2x tokens por tool en clientes que cargan todo el catálogo.
+    `on_empty` sí se conserva: evita que el agente reintente ante un vacío
+    legítimo.
+    """
     parts = [definition.get("description", "")]
-    parameters = definition.get("parameters", [])
-    if parameters:
-        parts.append("Parámetros:")
-        for parameter in parameters:
-            name = parameter.get("name", "")
-            if not name:
-                continue
-            required = "requerido" if parameter.get("required") else "opcional"
-            declared_type = parameter.get("type") or "string"
-            parts.append(f"- `{name}` ({declared_type}, {required}). {parameter.get('description', '')}".rstrip())
-    contract = definition.get("contract", {})
-    rules = contract.get("rules", [])
-    if rules:
-        parts.append("Reglas:")
-        parts.extend(f"- {rule}" for rule in rules)
-    on_empty = contract.get("on_empty")
+    on_empty = definition.get("contract", {}).get("on_empty")
     if on_empty:
         parts.append(f"Si no hay resultados: {on_empty}")
     return "\n".join(p for p in parts if p)

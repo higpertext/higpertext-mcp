@@ -222,3 +222,17 @@ def test_render_all_six(tmp_path, monkeypatch):
     result = asyncio.run(hook_renderer.render(tmp_path, "test", []))
     assert set(result) == set(hook_protocol.EVENTS)
     assert all((tmp_path / files[0]).exists() for files in result.values())
+
+
+def test_render_skips_hooks_with_events_the_adapter_lacks(tmp_path, monkeypatch):
+    async def listing(*args):
+        return [hook(), hook(id="hook_context_usage", event="Stop", matcher="")]
+    monkeypatch.setattr(hook_renderer.profile_client, "list_hooks", listing)
+
+    with pytest.warns(UserWarning, match="hook_context_usage"):
+        result = asyncio.run(hook_renderer.render(tmp_path, "test", ["claude", "gemini"]))
+
+    claude = json.loads((tmp_path / result["claude"][0]).read_text())
+    gemini = json.loads((tmp_path / result["gemini"][0]).read_text())
+    assert "Stop" in claude["hooks"]
+    assert set(gemini["hooks"]) == {hook_protocol.EVENTS["gemini"]["PreToolUse"]}

@@ -43,7 +43,22 @@ class _StreamableHTTPASGIApp:
         self.session_manager = session_manager
 
     async def __call__(self, scope, receive, send) -> None:
-        await self.session_manager.handle_request(scope, receive, send)
+        # El gateway es compartido: cada cliente declara su proyecto en un
+        # header. Sin header se usa HIGPERTEXT_PROJECT_ROOT (compatibilidad).
+        header = discovery.PROJECT_ROOT_HEADER.lower().encode()
+        selected = next((v for k, v in scope.get("headers", []) if k == header), None)
+        if selected is None:
+            await self.session_manager.handle_request(scope, receive, send)
+            return
+        try:
+            token = discovery.select_request_project(selected.decode())
+        except ValueError as exc:
+            await JSONResponse({"error": str(exc)}, status_code=400)(scope, receive, send)
+            return
+        try:
+            await self.session_manager.handle_request(scope, receive, send)
+        finally:
+            discovery.reset_request_project(token)
 
 
 def build_app() -> Starlette:

@@ -14,6 +14,7 @@ proyecto no es responsabilidad del profile server, solo *qué puede hacer* ese p
 
 from __future__ import annotations
 
+import contextvars
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,34 @@ from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 _WORKSPACE_DIR = ".higpertext"
 
+# Header con el que cada cliente declara la raíz host de su proyecto.
+PROJECT_ROOT_HEADER = "X-Higpertext-Project-Root"
+_request_root: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
+    "higpertext_request_root", default=None
+)
+
+
+def _configured_allowed_roots() -> tuple[Path, ...]:
+    """Lee límites de filesystem administrados por la instancia MCP.
+
+    El valor es opcional para conservar compatibilidad con stdio local. En
+    HTTP/Docker se recomienda configurarlo con rutas host canónicas separadas
+    por ``os.pathsep``; nunca debe venir de argumentos del caller.
+    """
+    raw = os.environ.get("HIGPERTEXT_ALLOWED_PROJECT_ROOTS", "")
+    if not raw.strip():
+        return ()
+    return tuple(Path(item).expanduser().resolve() for item in raw.split(os.pathsep) if item.strip())
+
+
+def _validate_allowed_root(path: Path) -> Path:
+    allowed = _configured_allowed_roots()
+    if not allowed:
+        return path
+    if not any(path == root or root in path.parents for root in allowed):
+        raise ValueError("la ruta del proyecto está fuera de las raíces autorizadas")
+    return path
+
 
 def canonical_project_path(path: Path) -> Path:
     """Convierte una ruta visible dentro del MCP a la ruta host registrada."""
@@ -32,7 +61,7 @@ def canonical_project_path(path: Path) -> Path:
     local_root = Path(local_root_value).expanduser() if local_root_value else None
     host_root = os.environ.get("HIGPERTEXT_HOST_PROJECT_ROOT")
     if host_root and local_root and path == local_root.resolve():
-        return Path(host_root).expanduser().resolve()
+        return _validate_allowed_root(Path(host_root).expanduser().resolve())
 
     mount = os.environ.get("HIGPERTEXT_PROJECTS_MOUNT", "/projects")
     host_projects = os.environ.get("HIGPERTEXT_HOST_PROJECTS_ROOT")
@@ -43,8 +72,8 @@ def canonical_project_path(path: Path) -> Path:
         except ValueError:
             pass
         else:
-            return (Path(host_projects).expanduser().resolve() / relative).resolve()
-    return path
+            return _validate_allowed_root((Path(host_projects).expanduser().resolve() / relative).resolve())
+    return _validate_allowed_root(path)
 
 
 def local_project_path(path: str | Path) -> Path:
@@ -68,16 +97,43 @@ def local_project_path(path: str | Path) -> Path:
     return path
 
 
+def select_request_project(host_root: str) -> contextvars.Token:
+    """Fija la raíz del proyecto para el request actual (selector explícito).
+
+    El gateway HTTP es compartido por todos los proyectos del host; el cliente
+    declara su raíz host en el header ``PROJECT_ROOT_HEADER`` (lo escribe
+    ``adapter_renderer`` en `.mcp.json`). Se traduce al path montado y se
+    valida contra las raíces autorizadas. Una raíz inexistente falla — nunca
+    cae a la raíz del proceso, que es otro proyecto.
+    """
+    local = local_project_path(_validate_allowed_root(Path(host_root).expanduser().resolve()))
+    if not local.is_dir():
+        raise ValueError(f"raíz de proyecto no visible para el MCP: {host_root}")
+    return _request_root.set(local)
+
+
+def reset_request_project(token: contextvars.Token) -> None:
+    _request_root.reset(token)
+
+
+def mcp_client_headers(root: Path) -> dict[str, str]:
+    """Headers que el cliente MCP del proyecto debe enviar al gateway HTTP."""
+    return {PROJECT_ROOT_HEADER: str(canonical_project_path(root))}
+
+
 def resolve_project_root() -> Path:
-    """Raíz configurada explícitamente para este proceso MCP.
+    """Raíz seleccionada explícitamente: la del request, o la del proceso MCP.
 
     No usa ``cwd``: el cwd pertenece al proceso del servidor, no necesariamente
     al proyecto desde el que el cliente invocó una tool.
     """
+    selected = _request_root.get()
+    if selected is not None:
+        return selected
     override = os.environ.get("HIGPERTEXT_PROJECT_ROOT")
     if not override:
         raise RuntimeError("no hay proyecto seleccionado; indique root_path o project_id")
-    return Path(override).expanduser().resolve()
+    return _validate_allowed_root(Path(override).expanduser().resolve())
 
 
 async def resolve_registered_project(*, root_path: str = "", project_id: str = "") -> tuple[Path, dict[str, Any]]:
@@ -97,7 +153,8 @@ async def resolve_registered_project(*, root_path: str = "", project_id: str = "
         project = next((p for p in projects if p.get("id") == project_id), None)
         if project is None:
             raise ValueError(f"proyecto registrado no encontrado: {project_id}")
-        return local_project_path(project["root_path"]), project
+        registered_root = _validate_allowed_root(Path(project["root_path"]).expanduser().resolve())
+        return local_project_path(registered_root), project
     raise ValueError("debe indicar root_path o project_id")
 
 
