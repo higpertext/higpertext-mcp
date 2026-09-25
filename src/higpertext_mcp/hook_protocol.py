@@ -30,6 +30,10 @@ def normalize(assistant: str, event: str, payload: dict) -> dict:
         name = payload.get("toolName", payload.get("tool_name", ""))
         args = payload.get("toolArgs", payload.get("tool_input", {}))
         result["tool_response"] = payload.get("toolResult", payload.get("tool_result", {}))
+    elif assistant == "grok":
+        name = payload.get("toolName", payload.get("tool_name", ""))
+        args = payload.get("toolInput", payload.get("tool_input", {}))
+        result["tool_response"] = payload.get("toolResponse", payload.get("tool_response", {}))
     else:
         name, args = payload.get("tool_name", ""), payload.get("tool_input", {})
     if isinstance(args, str):
@@ -65,7 +69,7 @@ def encode(assistant: str, event: str, output: dict) -> dict:
     reason = specific.get("permissionDecisionReason") or specific.get("additionalContext") or output.get("reason") or output.get("error") or "Blocked by higpertext hook"
     context = specific.get("additionalContext", "")
     native_event = EVENTS[assistant][event]
-    if assistant in {"claude", "codex", "opencode"}:
+    if assistant in {"claude", "codex", "opencode", "grok"}:
         if denied and event == "PreToolUse":
             return {"hookSpecificOutput": {"hookEventName": event, "permissionDecision": "deny", "permissionDecisionReason": reason}}
         if event == "PreToolUse" and "updatedInput" in specific and "permissionDecision" not in specific:

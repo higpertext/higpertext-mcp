@@ -185,6 +185,30 @@ ADAPTERS: Mapping[str, AdapterSpec] = MappingProxyType({
         status="bridge",
         limitations=("Hooks se materializan mediante un plugin JavaScript compatible con tool.execute.",),
     ),
+    "grok": AdapterSpec(
+        id="grok",
+        documentation_url="https://docs.x.ai",
+        instruction_files=(".grok/rules/{profile}.md",),
+        hook_settings_path=".grok/hooks/higpertext.json",
+        hook_events=_COMMON_HOOK_EVENTS,
+        tool_aliases=_mapping({
+            "Bash": "run_terminal_command",
+            "PowerShell": "run_terminal_command",
+            "Read": "read_file",
+            "Write": "search_replace",
+            "Edit": "search_replace",
+        }),
+        skills_dir=".grok/skills",
+        agents_dir=".grok/agents",
+        agents_extension=".md",
+        agents_format="grok-markdown",
+        model_patterns=("grok-*",),
+        status="native",
+        limitations=(
+            "ACTION_AUTHORIZED belongs to the gateway/controller, not a hook.",
+            "Los matchers se escriben con los nombres nativos de Grok; el runtime también acepta alias de Claude.",
+        ),
+    ),
 })
 
 SUPPORTED = tuple(ADAPTERS)

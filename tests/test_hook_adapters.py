@@ -63,6 +63,7 @@ def test_unsupported_is_explicit(tmp_path, assistant):
     ("gemini", {"tool_name": "run_shell_command", "tool_input": {"command": "echo harmless"}}),
     ("copilot", {"toolName": "bash", "toolArgs": '{"command":"echo harmless"}'}),
     ("antigravity", {"toolCall": {"name": "run_command", "args": {"CommandLine": "echo harmless"}}}),
+    ("grok", {"toolName": "run_terminal_command", "toolInput": {"command": "echo harmless"}}),
 ])
 def test_native_shell_payload_is_canonical(assistant, payload):
     result = hook_protocol.normalize(assistant, "PreToolUse", payload)
@@ -98,7 +99,7 @@ def test_unsupported_native_event_is_explicit():
 @pytest.mark.parametrize("assistant", hook_protocol.EVENTS)
 def test_deny_and_abstain_do_not_grant_permissions(assistant):
     result = hook_protocol.encode(assistant, "PreToolUse", {"continue": False})
-    if assistant in {"claude", "codex", "opencode"}:
+    if assistant in {"claude", "codex", "opencode", "grok"}:
         assert result["hookSpecificOutput"]["permissionDecision"] == "deny"
     elif assistant == "copilot":
         assert result["permissionDecision"] == "deny"
@@ -108,7 +109,7 @@ def test_deny_and_abstain_do_not_grant_permissions(assistant):
     assert "allow" not in json.dumps(permitted)
 
 
-@pytest.mark.parametrize("assistant", ["claude", "codex", "opencode"])
+@pytest.mark.parametrize("assistant", ["claude", "codex", "opencode", "grok"])
 def test_updated_input_explicitly_allows_pretooluse_rewrite(assistant):
     output = {
         "hookSpecificOutput": {

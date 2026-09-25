@@ -102,6 +102,23 @@ def _render_copilot(agent: dict) -> str:
     return "\n".join(lines) + "\n\n" + body + "\n\n" + f"<!-- {_MARKER_TEXT} -->" + "\n"
 
 
+def _render_grok(agent: dict) -> str:
+    """Render a Grok Build project agent (`.grok/agents/<id>.md`).
+
+    Grok discovers markdown agents with YAML frontmatter. The shared contract
+    maps to `name`, `description`, `tools` and `model`; Claude-only fields are
+    left out.
+    """
+    lines = ["---", f"name: {agent['name']}", f"description: {agent['description']}"]
+    if agent.get("tools"):
+        lines.append(f"tools: {', '.join(agent['tools'])}")
+    if agent.get("model"):
+        lines.append(f"model: {agent['model']}")
+    lines.append("---")
+    body = (agent.get("prompt") or "").rstrip("\n")
+    return "\n".join(lines) + "\n\n" + body + "\n\n" + f"<!-- {_MARKER_TEXT} -->" + "\n"
+
+
 def _render_opencode(agent: dict) -> str:
     """Render an OpenCode project agent.
 
@@ -162,6 +179,7 @@ _FORMAT_RENDERERS: dict[str, Callable[[dict], str]] = {
     "copilot-markdown": _render_copilot,
     "codex-toml": _render_codex,
     "opencode-markdown": _render_opencode,
+    "grok-markdown": _render_grok,
 }
 _ASSISTANTS: dict[str, dict[str, object]] = {
     spec.id: {

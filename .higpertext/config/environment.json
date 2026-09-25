@@ -1,7 +1,7 @@
 {
-    "assistant": "antigravity",
-    "active_profile": "higpertext_mcp",
+    "assistant": "grok",
+    "active_profile": "grok",
     "active_profiles": [
-        "higpertext_mcp"
+        "grok"
     ]
 }

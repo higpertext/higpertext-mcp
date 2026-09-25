@@ -65,6 +65,36 @@ def _write(path: Path, content: str, written: list[str], root: Path) -> None:
     written.append(str(path.relative_to(root)))
 
 
+def _grok_mcp_block() -> str:
+    url = os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/")
+    return (
+        "[mcp_servers.higpertext]\n"
+        f'url = "{url}"\n'
+        "enabled = true\n"
+    )
+
+
+def _ensure_grok_mcp(root: Path, written: list[str]) -> None:
+    """Registra higpertext en `.grok/config.toml` sin reescribir el resto.
+
+    Grok lee MCP de proyecto desde ese archivo. Si la tabla ya existe, se
+    conserva tal cual (igual que `.mcp.json` cuando el server ya está).
+    """
+    path = root / ".grok" / "config.toml"
+    block = _grok_mcp_block()
+    if path.exists():
+        try:
+            current = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValueError(f"{path} no se pudo leer: {exc}") from exc
+        if "[mcp_servers.higpertext]" in current:
+            return
+        separator = "" if current.endswith("\n") else "\n"
+        _write(path, current + separator + "\n" + block, written, root)
+        return
+    _write(path, block, written, root)
+
+
 def _ensure_project_mcp(root: Path, written: list[str]) -> None:
     """Registra higpertext en la configuración MCP común del proyecto.
 
@@ -124,4 +154,9 @@ def render(root: Path, assistants: list[str], profile, caps: list, rules: list) 
             # AGENTS.md is the active project instruction file in OpenCode v2.
             _write(root / "AGENTS.md", content, written, root)
             _write(root / "opencode.json", json.dumps({"mcp": {"higpertext": {"type": "remote", "url": "http://127.0.0.1:8790/mcp/"}}}, indent=2) + "\n", written, root)
+        elif assistant == "grok":
+            # Grok carga `.grok/rules/*.md` además de AGENTS.md. El contrato
+            # del perfil va solo al directorio nativo para no duplicarlo.
+            _write(root / ".grok" / "rules" / f"{profile_name}.md", content, written, root)
+            _ensure_grok_mcp(root, written)
     return {"assistants": selected, "files": written, "capabilities": len(caps), "rules": len(rules)}

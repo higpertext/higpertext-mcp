@@ -196,7 +196,7 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
     """
     result = adapter_renderer.render(
         tmp_path,
-        ["codex", "claude", "gemini", "copilot", "antigravity", "opencode"],
+        ["codex", "claude", "gemini", "copilot", "antigravity", "opencode", "grok"],
         "dev",
         [_GREP_SEARCH],
         [],
@@ -209,6 +209,7 @@ def test_adapter_renderer_matches_migrated_layout_without_subagents(tmp_path):
         "AGENTS.md", "CLAUDE.md", "GEMINI.md", "opencode.json",
         ".claude/rules/dev.md", ".github/copilot-instructions.md",
         ".agents/mcp_config.json", ".agents/settings.json",
+        ".grok/rules/dev.md", ".grok/config.toml",
     }
     assert expected <= set(result["files"])
     assert "common.graph-query" in (tmp_path / "AGENTS.md").read_text()
@@ -251,6 +252,24 @@ def test_adapter_renderer_does_not_rewrite_existing_higpertext_server(tmp_path):
 
     assert json.loads(path.read_text()) == existing
     assert ".mcp.json" not in result["files"]
+
+
+def test_grok_mcp_appends_without_rewriting_existing_config(tmp_path):
+    path = tmp_path / ".grok" / "config.toml"
+    path.parent.mkdir(parents=True)
+    path.write_text('[mcp_servers.other]\nurl = "https://example.test/mcp"\n', encoding="utf-8")
+
+    adapter_renderer.render(tmp_path, ["grok"], "dev", [], [])
+
+    text = path.read_text(encoding="utf-8")
+    assert '[mcp_servers.other]\nurl = "https://example.test/mcp"' in text
+    assert "[mcp_servers.higpertext]" in text
+    assert 'url = "http://127.0.0.1:8790/mcp/"' in text
+    assert (tmp_path / ".grok/rules/dev.md").exists()
+
+    again = adapter_renderer.render(tmp_path, ["grok"], "dev", [], [])
+    assert path.read_text(encoding="utf-8") == text
+    assert ".grok/config.toml" not in again["files"]
 
 
 def test_adapter_rules_use_profile_identity_and_mcp_discovery(tmp_path):

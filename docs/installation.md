@@ -242,6 +242,11 @@ hooks en destinos que no los declaran compatibles.
   JavaScript específico para los hooks clásicos.
 - Antigravity: bridge experimental; no hay aquí un protocolo público estable
   que permita declararlo nativo.
+- Grok: `.grok/rules/<perfil>.md`, `.grok/config.toml`,
+  `.grok/hooks/higpertext.json`, `.grok/skills/` y `.grok/agents/`.
+  El contrato de hooks es el de Claude (`permissionDecision`, `updatedInput`);
+  los matchers se escriben con los nombres nativos (`run_terminal_command`,
+  `read_file`, `search_replace`).
 
 Después de actualizar el catálogo o el profile server, volvé a ejecutar
 `higpertext-render-adapters` y reconectá el cliente MCP.

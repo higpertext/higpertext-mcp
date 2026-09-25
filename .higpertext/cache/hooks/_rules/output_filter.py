@@ -5,8 +5,8 @@ Se invoca como `python3 output_filter.py <archivo>` desde el comando Bash
 reescrito por hook_bash_output_rewrite (PreToolUse). Lee el archivo donde
 quedó redirigido el stdout/stderr real del comando, aplica máscaras de
 secretos y, si sigue siendo largo, lo resume conservando head/tail y las
-líneas con FAIL/ERROR/panic. Imprime el resultado final a stdout — eso es
-lo único que Claude Code captura como output del comando.
+líneas que matchean el patrón de highlights. Imprime el resultado final a
+stdout — eso es lo único que Claude Code captura como output del comando.
 
 Nunca debe fallar en silencio perdiendo el output real: ante cualquier
 excepción, cae a volcar el archivo tal cual (mejor mostrar de más que
@@ -27,12 +27,29 @@ _SECRET_PATTERNS = [
     (r"sk-[a-zA-Z0-9]{20,}", "sk-********[MASKED]"),
 ]
 
-_HIGHLIGHT_PATTERN = re.compile(r"\b(FAIL|ERROR|Error|panic|Traceback|✗|✘|--- FAIL)\b")
+# v2 (2026-09-19): el pattern anterior (\bERROR\b etc, anclado a límites de
+# palabra) NO matcheaba "AssertionError", "undefined reference", "connection
+# refused", "permission denied", "fatal:", etc. — un error real embebido en
+# la porción omitida del medio podía desaparecer sin que ninguna señal lo
+# marcara. Ahora es case-insensitive y por substring (no \b): prioriza sobre-
+# marcar (más líneas en highlights, sin límite de daño — solo ocupan más
+# espacio, tope _MAX_HIGHLIGHTS) antes que dejar pasar un error real sin
+# flaggear. No es exhaustivo — sigue siendo heurístico — pero cubre mucho
+# más terreno que antes.
+_HIGHLIGHT_PATTERN = re.compile(
+    r"fail|error|panic|traceback|exception|assert|undefined reference"
+    r"|cannot |can't |denied|refused|fatal|timeout|unable to|invalid"
+    r"|not found|no such file|segfault|core dumped|unhandled|warn|✗|✘",
+    re.IGNORECASE,
+)
 _MAX_LINE_CHARS = 2000
-_THRESHOLD_CHARS = 4000
-_HEAD_LINES = 15
-_TAIL_LINES = 30
-_MAX_HIGHLIGHTS = 40
+# Threshold subido de 4000 a 10000: truncar es un trade-off (ahorra contexto
+# pero arriesga ocultar algo fuera de head/tail/highlights) — reservarlo para
+# dumps genuinamente grandes en vez de recortar cualquier output moderado.
+_THRESHOLD_CHARS = 10000
+_HEAD_LINES = 20
+_TAIL_LINES = 40
+_MAX_HIGHLIGHTS = 60
 
 
 def mask(text: str) -> str:
@@ -66,11 +83,11 @@ def summarize(text: str) -> str:
     omitted = max(0, total_lines - head_n - tail_n)
 
     sections: list[str] = [
-        f"[HIGPERTEXT OUTPUT GUARD] Output original: {len(text)} caracteres / {total_lines} líneas — resumido para ahorrar contexto.",
+        f"[HIGPERTEXT OUTPUT GUARD] Output original: {len(text)} caracteres / {total_lines} líneas — resumido para ahorrar contexto. Heurístico, no exhaustivo: un error sin palabras clave reconocidas y fuera de head/tail puede no aparecer.",
         "",
     ]
     if highlights:
-        sections.append("── Líneas relevantes (FAIL/ERROR/panic) " + "─" * 10)
+        sections.append("── Líneas relevantes (posibles errores/fallos) " + "─" * 10)
         sections.extend(highlights)
         if truncated_highlights:
             sections.append(f"… ({len(highlights)}+ líneas relevantes, se muestran las primeras {_MAX_HIGHLIGHTS})")
