@@ -92,12 +92,25 @@ def _localize_params(params: dict) -> dict:
 
 
 def _hostify(text: str) -> str:
-    """Inversa de `_localize_params` sobre la salida: el agente recibe rutas host."""
-    mount = os.environ.get("HIGPERTEXT_PROJECTS_MOUNT", "/projects").rstrip("/")
-    host = os.environ.get("HIGPERTEXT_HOST_PROJECTS_ROOT", "").rstrip("/")
-    if not host or not text:
+    """Inversa de `_localize_params` sobre la salida: el agente recibe rutas host.
+
+    Traduce tanto el montaje de proyectos (`/projects/<x>`) como la raíz propia
+    del proceso (`HIGPERTEXT_PROJECT_ROOT`, ej. `/workspace`): un grafo
+    multi-raíz califica archivos con cualquiera de las dos.
+    """
+    if not text:
         return text
-    return text.replace(mount + "/", host + "/")
+    pairs = [
+        (os.environ.get("HIGPERTEXT_PROJECTS_MOUNT", "/projects"), os.environ.get("HIGPERTEXT_HOST_PROJECTS_ROOT", "")),
+        (os.environ.get("HIGPERTEXT_PROJECT_ROOT", ""), os.environ.get("HIGPERTEXT_HOST_PROJECT_ROOT", "")),
+    ]
+    for local, host in pairs:
+        local, host = local.rstrip("/"), host.rstrip("/")
+        if local and host and local != host:
+            # Sólo la ruta completa: ni `/projects-old` ni `/x/projects/...`.
+            pattern = rf"(?<![\w./-]){re.escape(local)}(?=/|[\"'\s,\]]|$)"
+            text = re.sub(pattern, lambda _m, h=host: h, text)
+    return text
 
 
 # Separadores y banners puramente visuales ("=====", "╔──", "[*] Buscando en")

@@ -64,6 +64,23 @@ def test_host_paths_are_translated_both_ways(monkeypatch, tmp_path):
     assert dispatch._hostify(f"see {mount}/proj/a.py") == f"see {host}/proj/a.py"
 
 
+def test_hostify_translates_process_root_and_respects_boundaries(monkeypatch):
+    monkeypatch.setenv("HIGPERTEXT_PROJECTS_MOUNT", "/projects")
+    monkeypatch.setenv("HIGPERTEXT_HOST_PROJECTS_ROOT", "/home/u/src")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", "/workspace")
+    monkeypatch.setenv("HIGPERTEXT_HOST_PROJECT_ROOT", "/home/u/src/server")
+
+    out = dispatch._hostify(
+        '{"roots_indexed": ["/workspace", "/projects/web"], "file": "/workspace/app/a.ts", '
+        '"other": "/projects-old/x", "nested": "/data/projects/y"}'
+    )
+
+    assert out == (
+        '{"roots_indexed": ["/home/u/src/server", "/home/u/src/web"], "file": "/home/u/src/server/app/a.ts", '
+        '"other": "/projects-old/x", "nested": "/data/projects/y"}'
+    )
+
+
 def test_request_project_overrides_process_root(monkeypatch, tmp_path):
     host = tmp_path / "host"
     mount = tmp_path / "mount"
