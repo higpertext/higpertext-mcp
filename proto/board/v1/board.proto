@@ -33,11 +33,15 @@ import "google/protobuf/empty.proto";
 // la misma domain.BoardRepository — no hay motivo para 4 conexiones a
 // board.db.
 //
+// Verificación (VerificationService, más abajo): una Task con
+// AcceptanceCriterion solo puede quedar done cuando el server aprobó una
+// corrida rojo→verde de sus escenarios ejecutables. UpdateTask(done=true)
+// y MoveActivity a la columna Done se rechazan (FAILED_PRECONDITION) si
+// alguna Task con criterios no está VERIFICATION_VERIFIED.
+//
 // Fuera de alcance en esta iteración (PoC, deuda técnica aceptada a
-// propósito): no hay mecanismo de roadmap, no hay correlación automática con
-// profile.v1.Activity / profile.v1.LearningEvent, no hay autenticación, y el
-// server NO valida que todos los AcceptanceCriterion de una Task estén
-// done antes de permitir Task.done = true (responsabilidad del caller).
+// propósito): no hay correlación automática con
+// profile.v1.Activity / profile.v1.LearningEvent y no hay autenticación.
 
 // ── Priority ─────────────────────────────────────────────────────────────
 //
@@ -204,14 +208,16 @@ message Task {
   repeated AcceptanceCriterion acceptance_criteria = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  TaskVerification verification = 9;
 }
 
 message AcceptanceCriterion {
   string id = 1;
   string task_id = 2;
   string description = 3;
-  bool done = 4;
+  bool done = 4; // lo marca el server al aprobar la verificación de la Task
   google.protobuf.Timestamp created_at = 5;
+  repeated VerificationScenario scenarios = 6;
 }
 
 // AcceptanceCriterionInput es el shape mínimo para crear un criterio inline
@@ -234,11 +240,183 @@ message ListTasksResponse { repeated Task tasks = 1; } // ordenadas por position
 message UpdateTaskRequest {
   string id = 1;
   string title = 2;
-  bool done = 3; // sin validar contra acceptance_criteria — ver nota de alcance arriba
+  bool done = 3; // true exige verification.state == VERIFICATION_VERIFIED si la task tiene criterios
   int32 position = 4;
 }
 message UpdateTaskResponse { Task task = 1; }
 message DeleteTaskRequest { string id = 1; } // borra en cascada sus AcceptanceCriterion
+
+// ── Verification ─────────────────────────────────────────────────────────
+//
+// Ciclo: ProposeScenarios (agente verificador, reemplaza la spec completa)
+// -> FreezeSpec (fija spec_hash + base_commit + implementer) -> el
+// implementador trabaja -> htx-verify corre cada escenario en base_commit y
+// en el árbol nuevo -> RecordVerification. El server re-evalúa los asserts
+// sobre la salida reportada y exige rojo->verde: un escenario que PASA en
+// base_commit no discrimina y rechaza la corrida.
+//
+// Anti-sesgo (ProposeScenarios devuelve INVALID_ARGUMENT con todas las
+// violaciones): cada criterio necesita >=1 escenario SCENARIO_HAPPY y >=1
+// NEGATIVE/BOUNDARY/ERROR; cada escenario necesita un assert sobre la
+// salida (no solo exit code); se rechazan comandos triviales (true, echo),
+// comandos que enmascaran fallos (|| true, set +e), asserts auto-cumplidos,
+// regex que matchean la salida vacía y escenarios duplicados. El
+// implementer de FreezeSpec no puede ser autor de ningún escenario.
+
+enum ScenarioKind {
+  SCENARIO_KIND_UNSPECIFIED = 0;
+  SCENARIO_HAPPY = 1;
+  SCENARIO_NEGATIVE = 2;
+  SCENARIO_BOUNDARY = 3;
+  SCENARIO_ERROR = 4;
+}
+
+enum VerificationState {
+  VERIFICATION_STATE_UNSPECIFIED = 0; // sin escenarios
+  VERIFICATION_DRAFT = 1;
+  VERIFICATION_FROZEN = 2;
+  VERIFICATION_VERIFIED = 3;
+  VERIFICATION_FAILED = 4; // última corrida rechazada; se puede reintentar
+}
+
+enum VerificationPhase {
+  VERIFICATION_PHASE_UNSPECIFIED = 0;
+  PHASE_BASE = 1; // base_commit, sin el cambio: debe fallar
+  PHASE_HEAD = 2; // árbol nuevo, con el cambio: debe pasar
+}
+
+// VerificationStep: "output" es stdout+stderr combinados.
+// expect_exit_code = 0 es un valor explícito válido.
+message VerificationStep {
+  string name = 1;
+  string command = 2;
+  int32 expect_exit_code = 3;
+  repeated string output_contains = 4;
+  repeated string output_not_contains = 5;
+  string output_regex = 6;
+  int32 timeout_seconds = 7; // 0 = default del runner (120s), máx 600
+}
+
+message VerificationScenario {
+  string id = 1;
+  string task_id = 2;
+  string criterion_id = 3;
+  ScenarioKind kind = 4;
+  string title = 5;
+  // regression: protege comportamiento existente — debe PASAR también en
+  // base_commit. No cuenta para el requisito de rojo del criterio.
+  bool regression = 6;
+  repeated VerificationStep steps = 7;
+  string author = 8;
+  int32 position = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message TaskVerification {
+  VerificationState state = 1;
+  string spec_hash = 2;
+  string base_commit = 3;
+  string implementer = 4;
+  google.protobuf.Timestamp frozen_at = 5;
+  string verified_commit = 6;
+  google.protobuf.Timestamp verified_at = 7;
+}
+
+message VerificationScenarioInput {
+  string criterion_id = 1;
+  ScenarioKind kind = 2;
+  string title = 3;
+  bool regression = 4;
+  repeated VerificationStep steps = 5;
+}
+
+message ProposeScenariosRequest {
+  string task_id = 1;
+  string author = 2; // identidad del agente verificador
+  repeated VerificationScenarioInput scenarios = 3; // spec completa (reemplaza la anterior)
+  bool dry_run = 4; // solo valida, no persiste
+}
+message ProposeScenariosResponse {
+  Task task = 1;
+  string spec_hash = 2;
+}
+
+message FreezeSpecRequest {
+  string task_id = 1;
+  string base_commit = 2; // commit SIN el cambio contra el que se exige rojo
+  string implementer = 3; // debe diferir de todos los authors
+}
+message FreezeSpecResponse { Task task = 1; }
+
+message UnfreezeSpecRequest {
+  string task_id = 1;
+  string actor = 2;
+  string reason = 3; // obligatorio: queda en el historial
+}
+message UnfreezeSpecResponse { Task task = 1; }
+
+message StepEvidence {
+  string scenario_id = 1;
+  VerificationPhase phase = 2;
+  int32 step_index = 3; // 0-based
+  int32 exit_code = 4;
+  string output = 5; // stdout+stderr, máx 256 KiB
+  bool output_truncated = 6;
+  int64 duration_ms = 7;
+}
+
+message StepResult {
+  string scenario_id = 1;
+  VerificationPhase phase = 2;
+  int32 step_index = 3;
+  int32 exit_code = 4;
+  bool passed = 5; // calculado por el server
+  string detail = 6;
+  string output_sha256 = 7;
+  int64 duration_ms = 8;
+}
+
+message VerificationRun {
+  string id = 1;
+  string task_id = 2;
+  string event = 3; // run | unfreeze
+  string spec_hash = 4;
+  string base_commit = 5;
+  string head_commit = 6;
+  string actor = 7;
+  bool passed = 8;
+  repeated string reasons = 9;
+  repeated StepResult results = 10;
+  google.protobuf.Timestamp created_at = 11;
+}
+
+message RecordVerificationRequest {
+  string task_id = 1;
+  string spec_hash = 2;
+  string base_commit = 3;
+  string head_commit = 4; // sha de HEAD, con sufijo +dirty.<sha> si hay cambios sin commitear
+  string runner = 5;
+  repeated StepEvidence evidence = 6;
+}
+// Una corrida rechazada NO es un error gRPC: queda registrada con
+// passed=false y reasons, y la Task pasa a VERIFICATION_FAILED.
+message RecordVerificationResponse {
+  VerificationRun run = 1;
+  Task task = 2;
+}
+
+message ListVerificationRunsRequest {
+  string task_id = 1;
+  int32 limit = 2; // 0 = todas
+}
+message ListVerificationRunsResponse { repeated VerificationRun runs = 1; }
+
+// ActivityGate: qué impide cerrar una activity. Pensado para hooks/CI.
+message GetActivityGateRequest { string activity_id = 1; }
+message GetActivityGateResponse {
+  bool ready = 1;
+  repeated string blocking = 2; // una línea por Task bloqueante
+}
 
 // ── Servicios ────────────────────────────────────────────────────────────
 
@@ -272,4 +450,13 @@ service TaskService {
   rpc ListTasks(ListTasksRequest) returns (ListTasksResponse);
   rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
   rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
+}
+
+service VerificationService {
+  rpc ProposeScenarios(ProposeScenariosRequest) returns (ProposeScenariosResponse);
+  rpc FreezeSpec(FreezeSpecRequest) returns (FreezeSpecResponse);
+  rpc UnfreezeSpec(UnfreezeSpecRequest) returns (UnfreezeSpecResponse);
+  rpc RecordVerification(RecordVerificationRequest) returns (RecordVerificationResponse);
+  rpc ListVerificationRuns(ListVerificationRunsRequest) returns (ListVerificationRunsResponse);
+  rpc GetActivityGate(GetActivityGateRequest) returns (GetActivityGateResponse);
 }

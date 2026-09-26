@@ -107,8 +107,16 @@ message ListLearningEventsRequest {
   int32 limit = 2;
   string project_id = 3;
   string user_id = 4;
+  google.protobuf.Timestamp created_after = 5; // inclusivo
+  google.protobuf.Timestamp created_before = 6; // exclusivo
+  int32 offset = 7;
 }
 message ListLearningEventsResponse { repeated LearningEvent events = 1; }
+message UpdateLearningEventTagsRequest {
+  string id = 1;
+  repeated string tags = 2;
+}
+message UpdateLearningEventTagsResponse { LearningEvent event = 1; }
 message LearningStat {
   string capability_id = 1;
   int64 successes = 2;
@@ -126,5 +134,6 @@ service LearningService {
   rpc ListClassifications(ListClassificationsRequest) returns (ListClassificationsResponse);
   rpc RecordLearning(RecordLearningEventRequest) returns (RecordLearningEventResponse);
   rpc ListLearningEvents(ListLearningEventsRequest) returns (ListLearningEventsResponse);
+  rpc UpdateLearningEventTags(UpdateLearningEventTagsRequest) returns (UpdateLearningEventTagsResponse);
   rpc GetLearningStats(google.protobuf.Empty) returns (GetLearningStatsResponse);
 }

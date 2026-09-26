@@ -65,6 +65,11 @@ class LearningServiceStub:
                 request_serializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.SerializeToString,
                 response_deserializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.FromString,
                 _registered_method=True)
+        self.UpdateLearningEventTags = channel.unary_unary(
+                '/learning.v1.LearningService/UpdateLearningEventTags',
+                request_serializer=learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsRequest.SerializeToString,
+                response_deserializer=learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsResponse.FromString,
+                _registered_method=True)
         self.GetLearningStats = channel.unary_unary(
                 '/learning.v1.LearningService/GetLearningStats',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
@@ -111,6 +116,12 @@ class LearningServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateLearningEventTags(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetLearningStats(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -149,6 +160,11 @@ def add_LearningServiceServicer_to_server(servicer, server):
                     servicer.ListLearningEvents,
                     request_deserializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.FromString,
                     response_serializer=learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.SerializeToString,
+            ),
+            'UpdateLearningEventTags': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateLearningEventTags,
+                    request_deserializer=learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsRequest.FromString,
+                    response_serializer=learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsResponse.SerializeToString,
             ),
             'GetLearningStats': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLearningStats,
@@ -318,6 +334,33 @@ class LearningService:
             '/learning.v1.LearningService/ListLearningEvents',
             learning_dot_v1_dot_learning__pb2.ListLearningEventsRequest.SerializeToString,
             learning_dot_v1_dot_learning__pb2.ListLearningEventsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateLearningEventTags(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/learning.v1.LearningService/UpdateLearningEventTags',
+            learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsRequest.SerializeToString,
+            learning_dot_v1_dot_learning__pb2.UpdateLearningEventTagsResponse.FromString,
             options,
             channel_credentials,
             insecure,

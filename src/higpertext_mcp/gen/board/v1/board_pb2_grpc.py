@@ -1006,3 +1006,290 @@ class TaskService:
             timeout,
             metadata,
             _registered_method=True)
+
+
+class VerificationServiceStub:
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.ProposeScenarios = channel.unary_unary(
+                '/board.v1.VerificationService/ProposeScenarios',
+                request_serializer=board_dot_v1_dot_board__pb2.ProposeScenariosRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.ProposeScenariosResponse.FromString,
+                _registered_method=True)
+        self.FreezeSpec = channel.unary_unary(
+                '/board.v1.VerificationService/FreezeSpec',
+                request_serializer=board_dot_v1_dot_board__pb2.FreezeSpecRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.FreezeSpecResponse.FromString,
+                _registered_method=True)
+        self.UnfreezeSpec = channel.unary_unary(
+                '/board.v1.VerificationService/UnfreezeSpec',
+                request_serializer=board_dot_v1_dot_board__pb2.UnfreezeSpecRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.UnfreezeSpecResponse.FromString,
+                _registered_method=True)
+        self.RecordVerification = channel.unary_unary(
+                '/board.v1.VerificationService/RecordVerification',
+                request_serializer=board_dot_v1_dot_board__pb2.RecordVerificationRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.RecordVerificationResponse.FromString,
+                _registered_method=True)
+        self.ListVerificationRuns = channel.unary_unary(
+                '/board.v1.VerificationService/ListVerificationRuns',
+                request_serializer=board_dot_v1_dot_board__pb2.ListVerificationRunsRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.ListVerificationRunsResponse.FromString,
+                _registered_method=True)
+        self.GetActivityGate = channel.unary_unary(
+                '/board.v1.VerificationService/GetActivityGate',
+                request_serializer=board_dot_v1_dot_board__pb2.GetActivityGateRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.GetActivityGateResponse.FromString,
+                _registered_method=True)
+
+
+class VerificationServiceServicer:
+    """Missing associated documentation comment in .proto file."""
+
+    def ProposeScenarios(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FreezeSpec(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UnfreezeSpec(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RecordVerification(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListVerificationRuns(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetActivityGate(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_VerificationServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'ProposeScenarios': grpc.unary_unary_rpc_method_handler(
+                    servicer.ProposeScenarios,
+                    request_deserializer=board_dot_v1_dot_board__pb2.ProposeScenariosRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.ProposeScenariosResponse.SerializeToString,
+            ),
+            'FreezeSpec': grpc.unary_unary_rpc_method_handler(
+                    servicer.FreezeSpec,
+                    request_deserializer=board_dot_v1_dot_board__pb2.FreezeSpecRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.FreezeSpecResponse.SerializeToString,
+            ),
+            'UnfreezeSpec': grpc.unary_unary_rpc_method_handler(
+                    servicer.UnfreezeSpec,
+                    request_deserializer=board_dot_v1_dot_board__pb2.UnfreezeSpecRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.UnfreezeSpecResponse.SerializeToString,
+            ),
+            'RecordVerification': grpc.unary_unary_rpc_method_handler(
+                    servicer.RecordVerification,
+                    request_deserializer=board_dot_v1_dot_board__pb2.RecordVerificationRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.RecordVerificationResponse.SerializeToString,
+            ),
+            'ListVerificationRuns': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListVerificationRuns,
+                    request_deserializer=board_dot_v1_dot_board__pb2.ListVerificationRunsRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.ListVerificationRunsResponse.SerializeToString,
+            ),
+            'GetActivityGate': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetActivityGate,
+                    request_deserializer=board_dot_v1_dot_board__pb2.GetActivityGateRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.GetActivityGateResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'board.v1.VerificationService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+    server.add_registered_method_handlers('board.v1.VerificationService', rpc_method_handlers)
+
+
+ # This class is part of an EXPERIMENTAL API.
+class VerificationService:
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def ProposeScenarios(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/ProposeScenarios',
+            board_dot_v1_dot_board__pb2.ProposeScenariosRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.ProposeScenariosResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FreezeSpec(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/FreezeSpec',
+            board_dot_v1_dot_board__pb2.FreezeSpecRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.FreezeSpecResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UnfreezeSpec(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/UnfreezeSpec',
+            board_dot_v1_dot_board__pb2.UnfreezeSpecRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.UnfreezeSpecResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RecordVerification(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/RecordVerification',
+            board_dot_v1_dot_board__pb2.RecordVerificationRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.RecordVerificationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListVerificationRuns(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/ListVerificationRuns',
+            board_dot_v1_dot_board__pb2.ListVerificationRunsRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.ListVerificationRunsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetActivityGate(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.VerificationService/GetActivityGate',
+            board_dot_v1_dot_board__pb2.GetActivityGateRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.GetActivityGateResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)

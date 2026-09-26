@@ -51,12 +51,44 @@ def _trace_key(root: Path, trace_id: str) -> str:
     return f"{_TRACE_PREFIX}:{digest}:{trace_id}:events"
 
 
+_TOKEN_METRIC_KEYS = {
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_read_input_tokens",
+    "cache_write_input_tokens",
+    "cache_creation_input_tokens",
+    "output_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+    "context_tokens",
+    "turn_input_tokens",
+    "payload_input_tokens",
+    "payload_output_tokens",
+    "payload_tokens_estimate",
+}
+
+
 def _safe(value: Any) -> Any:
-    """Evita persistir secretos o payloads/salidas ilimitados."""
+    """Evita persistir secretos o payloads/salidas ilimitados.
+
+    Los nombres de campos de uso contienen ``token`` por convención; conservar
+    solo contadores numéricos de una allowlist mantiene métricas sin permitir
+    que un token de credencial termine almacenado.
+    """
     if isinstance(value, str):
         return "[REDACTED]" if any(token in value.lower() for token in ("password=", "token=", "secret=", "authorization:")) else value[:8_000]
     if isinstance(value, dict):
-        return {key: "[REDACTED]" if any(word in key.lower() for word in ("password", "secret", "token", "authorization")) else _safe(item) for key, item in value.items()}
+        safe = {}
+        for key, item in value.items():
+            normalized_key = str(key).lower()
+            if any(word in normalized_key for word in ("password", "secret", "token", "authorization")):
+                if normalized_key in _TOKEN_METRIC_KEYS and isinstance(item, int) and not isinstance(item, bool) and item >= 0:
+                    safe[key] = item
+                else:
+                    safe[key] = "[REDACTED]"
+            else:
+                safe[key] = _safe(item)
+        return safe
     if isinstance(value, list):
         return [_safe(item) for item in value[:100]]
     return value
