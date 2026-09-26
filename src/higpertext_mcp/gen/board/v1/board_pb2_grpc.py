@@ -52,6 +52,11 @@ class BoardServiceStub:
                 request_serializer=board_dot_v1_dot_board__pb2.ListBoardsRequest.SerializeToString,
                 response_deserializer=board_dot_v1_dot_board__pb2.ListBoardsResponse.FromString,
                 _registered_method=True)
+        self.UpdateBoard = channel.unary_unary(
+                '/board.v1.BoardService/UpdateBoard',
+                request_serializer=board_dot_v1_dot_board__pb2.UpdateBoardRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.UpdateBoardResponse.FromString,
+                _registered_method=True)
         self.DeleteBoard = channel.unary_unary(
                 '/board.v1.BoardService/DeleteBoard',
                 request_serializer=board_dot_v1_dot_board__pb2.DeleteBoardRequest.SerializeToString,
@@ -87,6 +92,12 @@ class BoardServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def UpdateBoard(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def DeleteBoard(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -116,6 +127,11 @@ def add_BoardServiceServicer_to_server(servicer, server):
                     servicer.ListBoards,
                     request_deserializer=board_dot_v1_dot_board__pb2.ListBoardsRequest.FromString,
                     response_serializer=board_dot_v1_dot_board__pb2.ListBoardsResponse.SerializeToString,
+            ),
+            'UpdateBoard': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateBoard,
+                    request_deserializer=board_dot_v1_dot_board__pb2.UpdateBoardRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.UpdateBoardResponse.SerializeToString,
             ),
             'DeleteBoard': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteBoard,
@@ -211,6 +227,33 @@ class BoardService:
             '/board.v1.BoardService/ListBoards',
             board_dot_v1_dot_board__pb2.ListBoardsRequest.SerializeToString,
             board_dot_v1_dot_board__pb2.ListBoardsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateBoard(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.BoardService/UpdateBoard',
+            board_dot_v1_dot_board__pb2.UpdateBoardRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.UpdateBoardResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -516,6 +559,16 @@ class ActivityServiceStub:
                 request_serializer=board_dot_v1_dot_board__pb2.MoveActivityRequest.SerializeToString,
                 response_deserializer=board_dot_v1_dot_board__pb2.MoveActivityResponse.FromString,
                 _registered_method=True)
+        self.CreateActivityComment = channel.unary_unary(
+                '/board.v1.ActivityService/CreateActivityComment',
+                request_serializer=board_dot_v1_dot_board__pb2.CreateActivityCommentRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.CreateActivityCommentResponse.FromString,
+                _registered_method=True)
+        self.ListActivityComments = channel.unary_unary(
+                '/board.v1.ActivityService/ListActivityComments',
+                request_serializer=board_dot_v1_dot_board__pb2.ListActivityCommentsRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.ListActivityCommentsResponse.FromString,
+                _registered_method=True)
 
 
 class ActivityServiceServicer:
@@ -557,6 +610,18 @@ class ActivityServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateActivityComment(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListActivityComments(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ActivityServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -589,6 +654,16 @@ def add_ActivityServiceServicer_to_server(servicer, server):
                     servicer.MoveActivity,
                     request_deserializer=board_dot_v1_dot_board__pb2.MoveActivityRequest.FromString,
                     response_serializer=board_dot_v1_dot_board__pb2.MoveActivityResponse.SerializeToString,
+            ),
+            'CreateActivityComment': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateActivityComment,
+                    request_deserializer=board_dot_v1_dot_board__pb2.CreateActivityCommentRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.CreateActivityCommentResponse.SerializeToString,
+            ),
+            'ListActivityComments': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListActivityComments,
+                    request_deserializer=board_dot_v1_dot_board__pb2.ListActivityCommentsRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.ListActivityCommentsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -753,6 +828,60 @@ class ActivityService:
             '/board.v1.ActivityService/MoveActivity',
             board_dot_v1_dot_board__pb2.MoveActivityRequest.SerializeToString,
             board_dot_v1_dot_board__pb2.MoveActivityResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateActivityComment(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.ActivityService/CreateActivityComment',
+            board_dot_v1_dot_board__pb2.CreateActivityCommentRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.CreateActivityCommentResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListActivityComments(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.ActivityService/ListActivityComments',
+            board_dot_v1_dot_board__pb2.ListActivityCommentsRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.ListActivityCommentsResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -314,9 +314,9 @@ message DeleteCapabilityRequest { string id = 1; }
 
 message GetCapabilityScriptRequest { string id = 1; }
 message GetCapabilityScriptResponse {
-  string source_code = 1; // contenido del script fuente, base64
+  string source_code = 1; // contenido del script fuente en texto normal (UTF-8)
   string language = 2;
-  map<string, string> extra_files = 3; // filename -> contenido base64, helpers hermanos importados por el entrypoint (ej. "_report_paths.py")
+  map<string, string> extra_files = 3; // filename -> contenido en texto normal (UTF-8)
 }
 
 message CreateSkillRequest {

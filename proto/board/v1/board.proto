@@ -82,6 +82,16 @@ message CreateBoardRequest {
   string project_id = 3;
 }
 message CreateBoardResponse { Board board = 1; }
+// UpdateBoard renombra/redescribe un board. name es requerido y sigue siendo
+// único por project_id (ALREADY_EXISTS si choca). Ojo: ResolveBoard busca
+// por (project_id, name) — renombrar un board que un caller resuelve por
+// nombre (ej. "roadmap") hace que la próxima ResolveBoard cree uno nuevo.
+message UpdateBoardRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+}
+message UpdateBoardResponse { Board board = 1; }
 message GetBoardRequest { string id = 1; }
 message GetBoardResponse { Board board = 1; }
 message ListBoardsRequest {
@@ -157,6 +167,13 @@ message BoardActivity {
   string parent_id = 14; // WorkItem padre opcional para jerarquías agile
 }
 
+message BoardComment {
+  string id = 1;
+  string board_activity_id = 2;
+  string text = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
 message CreateActivityRequest {
   string board_id = 1;
   string column_id = 2; // vacío = primera columna del board
@@ -183,6 +200,9 @@ message UpdateActivityRequest {
   string assignee_user_id = 4;
   Priority priority = 5;
   repeated string tags = 6;
+  // type: WORK_ITEM_TYPE_UNSPECIFIED (0) conserva el tipo actual, para que
+  // los callers que no lo conocen no lo pisen.
+  WorkItemType type = 7;
 }
 message UpdateActivityResponse { BoardActivity activity = 1; }
 message DeleteActivityRequest { string id = 1; } // borra en cascada Task/AcceptanceCriterion de esa activity
@@ -193,6 +213,14 @@ message MoveActivityRequest {
   int32 position = 3; // posición deseada dentro de target_column_id
 }
 message MoveActivityResponse { BoardActivity activity = 1; }
+
+message CreateActivityCommentRequest {
+  string board_activity_id = 1;
+  string text = 2;
+}
+message CreateActivityCommentResponse { BoardComment comment = 1; }
+message ListActivityCommentsRequest { string board_activity_id = 1; }
+message ListActivityCommentsResponse { repeated BoardComment comments = 1; }
 
 // ── Task ─────────────────────────────────────────────────────────────────
 //
@@ -424,6 +452,7 @@ service BoardService {
   rpc CreateBoard(CreateBoardRequest) returns (CreateBoardResponse);
   rpc GetBoard(GetBoardRequest) returns (GetBoardResponse);
   rpc ListBoards(ListBoardsRequest) returns (ListBoardsResponse);
+  rpc UpdateBoard(UpdateBoardRequest) returns (UpdateBoardResponse);
   rpc DeleteBoard(DeleteBoardRequest) returns (google.protobuf.Empty);
   rpc ResolveBoard(ResolveBoardRequest) returns (ResolveBoardResponse);
 }
@@ -442,6 +471,8 @@ service ActivityService {
   rpc UpdateActivity(UpdateActivityRequest) returns (UpdateActivityResponse);
   rpc DeleteActivity(DeleteActivityRequest) returns (google.protobuf.Empty);
   rpc MoveActivity(MoveActivityRequest) returns (MoveActivityResponse);
+  rpc CreateActivityComment(CreateActivityCommentRequest) returns (CreateActivityCommentResponse);
+  rpc ListActivityComments(ListActivityCommentsRequest) returns (ListActivityCommentsResponse);
 }
 
 service TaskService {
