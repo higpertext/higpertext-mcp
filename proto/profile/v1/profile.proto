@@ -612,7 +612,9 @@ message PlanRepositoryMigrationRequest {}
 message RepositoryMigrationItem {
   string project_id = 1;
   string path = 2;
-  // "create" | "create_local" | "already_bound" | "needs_decision"
+  // "create" | "create_local" | "already_bound" | "needs_decision" | "unreachable"
+  // unreachable = el servidor no ve la ruta (p. ej. no montada en el contenedor):
+  // no se sabe si es un repositorio ni su remote; cuenta como needs_decision.
   string action = 3;
   string remote = 4;
   string reason = 5;
