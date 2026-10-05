@@ -335,18 +335,20 @@ class Project(_message.Message):
     def __init__(self, id: _Optional[str] = ..., root_path: _Optional[str] = ..., root_path_hash: _Optional[str] = ..., name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., paths: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class User(_message.Message):
-    __slots__ = ("id", "identifier", "display_name", "created_at", "updated_at")
+    __slots__ = ("id", "identifier", "display_name", "created_at", "updated_at", "preferred_username")
     ID_FIELD_NUMBER: _ClassVar[int]
     IDENTIFIER_FIELD_NUMBER: _ClassVar[int]
     DISPLAY_NAME_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    PREFERRED_USERNAME_FIELD_NUMBER: _ClassVar[int]
     id: str
     identifier: str
     display_name: str
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., identifier: _Optional[str] = ..., display_name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    preferred_username: str
+    def __init__(self, id: _Optional[str] = ..., identifier: _Optional[str] = ..., display_name: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., preferred_username: _Optional[str] = ...) -> None: ...
 
 class CreateProfileRequest(_message.Message):
     __slots__ = ("name", "description", "system_prompt", "capabilities", "subprofiles", "rules", "hooks_global")
@@ -517,6 +519,29 @@ class GetCapabilityScriptResponse(_message.Message):
     language: str
     extra_files: _containers.ScalarMap[str, str]
     def __init__(self, source_code: _Optional[str] = ..., language: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class UpdateCapabilityScriptRequest(_message.Message):
+    __slots__ = ("id", "source_code", "extra_files")
+    class ExtraFilesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_CODE_FIELD_NUMBER: _ClassVar[int]
+    EXTRA_FILES_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    source_code: str
+    extra_files: _containers.ScalarMap[str, str]
+    def __init__(self, id: _Optional[str] = ..., source_code: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class UpdateCapabilityScriptResponse(_message.Message):
+    __slots__ = ("capability",)
+    CAPABILITY_FIELD_NUMBER: _ClassVar[int]
+    capability: Capability
+    def __init__(self, capability: _Optional[_Union[Capability, _Mapping]] = ...) -> None: ...
 
 class CreateSkillRequest(_message.Message):
     __slots__ = ("id", "name", "description", "content", "version", "enabled", "profiles", "project_id")
@@ -1115,12 +1140,14 @@ class DeleteProjectResponse(_message.Message):
     def __init__(self, message: _Optional[str] = ...) -> None: ...
 
 class ResolveUserRequest(_message.Message):
-    __slots__ = ("identifier", "display_name")
+    __slots__ = ("identifier", "display_name", "preferred_username")
     IDENTIFIER_FIELD_NUMBER: _ClassVar[int]
     DISPLAY_NAME_FIELD_NUMBER: _ClassVar[int]
+    PREFERRED_USERNAME_FIELD_NUMBER: _ClassVar[int]
     identifier: str
     display_name: str
-    def __init__(self, identifier: _Optional[str] = ..., display_name: _Optional[str] = ...) -> None: ...
+    preferred_username: str
+    def __init__(self, identifier: _Optional[str] = ..., display_name: _Optional[str] = ..., preferred_username: _Optional[str] = ...) -> None: ...
 
 class ResolveUserResponse(_message.Message):
     __slots__ = ("user",)

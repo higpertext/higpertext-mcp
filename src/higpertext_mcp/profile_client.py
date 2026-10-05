@@ -364,6 +364,19 @@ async def create_capability(
         return _capability_to_dict(resp.capability)
 
 
+async def update_capability_script(
+    *, id: str, source_code: str, extra_files: dict[str, str] | None = None,
+) -> dict:
+    """Reemplaza el source y el conjunto de helpers de una capability existente."""
+    req = profile_pb2.UpdateCapabilityScriptRequest(
+        id=id, source_code=source_code, extra_files=extra_files or {},
+    )
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.CapabilityServiceStub(channel)
+        resp = await stub.UpdateCapabilityScript(req, timeout=_CALL_TIMEOUT_S)
+        return _capability_to_dict(resp.capability)
+
+
 async def get_capability(capability_id: str) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.CapabilityServiceStub(channel)

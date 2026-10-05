@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import ast
-import base64
 import json
 import sys
 
@@ -282,8 +281,9 @@ _PROFILE_TOOL = types.Tool(
 _CAPABILITY_TOOL = types.Tool(
     name=CAPABILITY_TOOL_NAME,
     description=(
-        "Administra el backend de Capabilities (CapabilityService): crear, consultar el "
-        "source, validar, probar y ejecutar scripts. `run` y `test` sólo aceptan una "
+        "Administra el backend de Capabilities (CapabilityService): crear capabilities y "
+        "actualizar individualmente su source y helpers, consultar, validar, probar y ejecutar scripts. "
+        "`update` conserva la metadata y reemplaza el código por ID. `run` y `test` sólo aceptan una "
         "capability ya autorizada por el perfil activo del proyecto. La ejecución usa "
         "el runner MCP actual; para producción multi-tenant debe envolverse en un worker "
         "aislado. Para que una capability quede visible al agente, agregá su id a un Profile."
@@ -291,14 +291,14 @@ _CAPABILITY_TOOL = types.Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "get", "source", "validate", "test", "run", "list", "delete"]},
-            "id": {"type": "string", "description": "requerido en create/get/source/validate/test/run/delete, ej. 'custom.my-tool'"},
+            "action": {"type": "string", "enum": ["create", "update", "get", "source", "validate", "test", "run", "list", "delete"]},
+            "id": {"type": "string", "description": "requerido en create/update/get/source/validate/test/run/delete, ej. 'custom.my-tool'"},
             "name": {"type": "string"},
             "description": {"type": "string"},
             "entrypoint": {"type": "string", "description": "path relativo identificador, ej. 'capabilities/custom/scripts/my_tool.py' (solo metadata, no se lee del disco)"},
             "language": {"type": "string", "default": "python"},
             "version": {"type": "string", "default": "1.0.0"},
-            "source_code": {"type": "string", "description": "contenido del script en texto plano (requerido en create)"},
+            "source_code": {"type": "string", "description": "contenido del script en texto plano (requerido en create/update)"},
             "extra_files": {"type": "object", "additionalProperties": {"type": "string"}, "description": "helpers hermanos: filename -> contenido en texto plano"},
             "arguments": {"type": "object", "description": "parámetros de la capability para test/run", "additionalProperties": True},
             "include_files": {"type": "boolean", "description": "source/validate: incluye helpers auxiliares"},
@@ -748,6 +748,13 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         extra_files=args.get("extra_files"),
                     )
                     summary = f"Capability '{data['id']}' creada."
+                elif action == "update":
+                    if "source_code" not in args:
+                        raise ValueError("source_code es requerido en update")
+                    data = await profile_client.update_capability_script(
+                        id=args["id"], source_code=args["source_code"], extra_files=args.get("extra_files"),
+                    )
+                    summary = f"Código de capability '{data['id']}' actualizado."
                 elif action == "get":
                     data = await profile_client.get_capability(args["id"])
                     summary = f"Capability '{data['id']}'."
@@ -755,8 +762,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     fetched = await profile_client.get_capability_script(args["id"])
                     if fetched is None:
                         raise ValueError(f"no se pudo obtener el source de '{args['id']}'")
-                    source_b64, language, extra_files_b64 = fetched
-                    source = base64.b64decode(source_b64).decode("utf-8")
+                    source, language, extra_files_text = fetched
                     if language.lower() in {"python", "py"}:
                         try:
                             ast.parse(source, filename=args["id"])
@@ -772,10 +778,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     if action == "source":
                         data["source_code"] = source
                         if args.get("include_files"):
-                            data["extra_files"] = {
-                                filename: base64.b64decode(content).decode("utf-8")
-                                for filename, content in extra_files_b64.items()
-                            }
+                            data["extra_files"] = dict(extra_files_text)
                 elif action in {"test", "run"}:
                     root = discovery.resolve_project_root()
                     allowed = await discovery.allowed_capabilities(root)

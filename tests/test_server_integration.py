@@ -290,7 +290,7 @@ async def test_capability_source_validate_and_run(monkeypatch, tmp_path):
     monkeypatch.setattr(
         server_module.profile_client,
         "get_capability_script",
-        lambda _id: _async_value((base64.b64encode(b"print('ok')").decode(), "python", {})),
+        lambda _id: _async_value(("print('ok')", "python", {})),
     )
 
     async def fake_call(_id, _args, _definition):

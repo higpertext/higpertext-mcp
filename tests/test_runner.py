@@ -1,4 +1,3 @@
-import base64
 
 import pytest
 
@@ -8,8 +7,8 @@ from higpertext_mcp import runner
 @pytest.mark.anyio
 async def test_resolve_script_writes_entrypoint_and_extra_files(monkeypatch, tmp_path):
     async def fake_get_capability_script(capability_id):
-        source = base64.b64encode(b"print('entrypoint')").decode()
-        helper = base64.b64encode(b"def resolve_root():\n    return None\n").decode()
+        source = "print('entrypoint')"
+        helper = "def resolve_root():\n    return None\n"
         return source, "python", {"_report_paths.py": helper}
 
     monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
@@ -30,7 +29,7 @@ async def test_resolve_script_is_cached_per_process(monkeypatch, tmp_path):
 
     async def fake_get_capability_script(capability_id):
         calls.append(capability_id)
-        source = base64.b64encode(b"print(1)").decode()
+        source = "print(1)"
         return source, "python", {}
 
     monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
@@ -50,7 +49,7 @@ async def test_resolve_script_cache_isolated_between_projects(monkeypatch, tmp_p
 
     async def fake_get_capability_script(capability_id):
         calls.append(capability_id)
-        source = base64.b64encode(f"print({len(calls)})".encode()).decode()
+        source = f"print({len(calls)})"
         return source, "python", {}
 
     monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
@@ -75,8 +74,8 @@ async def test_resolve_script_cache_isolated_between_projects(monkeypatch, tmp_p
 @pytest.mark.anyio
 async def test_resolve_script_rejects_helper_path_escape(monkeypatch, tmp_path):
     async def fake_get_capability_script(_capability_id):
-        source = base64.b64encode(b"print(1)").decode()
-        helper = base64.b64encode(b"secret").decode()
+        source = "print(1)"
+        helper = "secret"
         return source, "python", {"../outside.py": helper}
 
     monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
@@ -86,3 +85,21 @@ async def test_resolve_script_rejects_helper_path_escape(monkeypatch, tmp_path):
     with pytest.raises(ValueError, match="fuera del cache"):
         await runner.resolve_script("custom.escape")
     assert not (tmp_path / ".higpertext/cache/outside.py").exists()
+
+
+@pytest.mark.anyio
+async def test_resolve_script_accepts_non_ascii_plain_text(monkeypatch, tmp_path):
+    """El profile server entrega el script en texto plano UTF-8; un script con
+    acentos o guiones largos no debe pasar por base64 (regresión:
+    'string argument should contain only ASCII characters')."""
+    async def fake_get_capability_script(_capability_id):
+        return '"""Audita — párrafos y acentos"""\nprint("ñ")\n', "python", {"_h.py": "X = 'á'\n"}
+
+    monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
+    monkeypatch.setattr(runner.discovery, "resolve_project_root", lambda: tmp_path)
+    runner._script_cache.clear()
+
+    path = await runner.resolve_script("content.quality-auditor")
+
+    assert path.read_text(encoding="utf-8").startswith('"""Audita — párrafos')
+    assert (path.parent / "_h.py").read_text(encoding="utf-8") == "X = 'á'\n"

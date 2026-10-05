@@ -260,6 +260,7 @@ message User {
   string display_name = 3;
   google.protobuf.Timestamp created_at = 4;
   google.protobuf.Timestamp updated_at = 5;
+  string preferred_username = 6;
 }
 
 // ── Requests / Responses ─────────────────────────────────────────────────────
@@ -318,6 +319,12 @@ message GetCapabilityScriptResponse {
   string language = 2;
   map<string, string> extra_files = 3; // filename -> contenido en texto normal (UTF-8)
 }
+message UpdateCapabilityScriptRequest {
+  string id = 1;
+  string source_code = 2; // código nuevo en texto normal (UTF-8)
+  map<string, string> extra_files = 3; // reemplaza los helpers auxiliares actuales
+}
+message UpdateCapabilityScriptResponse { Capability capability = 1; }
 
 message CreateSkillRequest {
   string id = 1;
@@ -549,6 +556,7 @@ message DeleteProjectResponse {
 message ResolveUserRequest {
   string identifier = 1;
   string display_name = 2;
+  string preferred_username = 3;
 }
 message ResolveUserResponse { User user = 1; }
 message ListUsersRequest {}
@@ -631,6 +639,7 @@ service CapabilityService {
   rpc ListCapabilities(ListCapabilitiesRequest) returns (ListCapabilitiesResponse);
   rpc DeleteCapability(DeleteCapabilityRequest) returns (google.protobuf.Empty);
   rpc GetCapabilityScript(GetCapabilityScriptRequest) returns (GetCapabilityScriptResponse);
+  rpc UpdateCapabilityScript(UpdateCapabilityScriptRequest) returns (UpdateCapabilityScriptResponse);
 }
 
 service SkillService {

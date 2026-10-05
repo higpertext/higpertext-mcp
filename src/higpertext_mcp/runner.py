@@ -9,7 +9,6 @@ ningún JSON por-capability, así que no hay razón para duplicarla.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import importlib.util
 import inspect
@@ -79,24 +78,26 @@ async def resolve_script(capability_id: str) -> Path:
     fetched = await profile_client.get_capability_script(capability_id)
     if fetched is None:
         raise RuntimeError(f"no se pudo obtener el script de {capability_id} del profile server")
-    source_code_b64, _language, extra_files = fetched
+    # El proto entrega source_code y extra_files en texto plano UTF-8
+    # (no base64): decodificarlos otra vez rompía con caracteres no-ASCII.
+    source_code, _language, extra_files = fetched
 
     path = _cache_path(root, capability_id)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(base64.b64decode(source_code_b64))
+    path.write_bytes(source_code.encode("utf-8"))
 
     # Helpers hermanos (ej. "_report_paths.py", o subpaquetes como
     # "_parser_language/base.py") van al mismo directorio flat de cache — el
     # import relativo del entrypoint (`from ._report_paths import ...`) los
     # busca junto a sí mismo, sin importar qué otra capability los haya
     # escrito ahí primero (mismo contenido, se pisan sin problema).
-    for filename, content_b64 in extra_files.items():
+    for filename, content in extra_files.items():
         relative = Path(filename)
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError(f"helper de capability fuera del cache permitido: {filename!r}")
         dest = path.parent / relative
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(base64.b64decode(content_b64))
+        dest.write_bytes(content.encode("utf-8"))
 
     _script_cache[cache_key] = path
     return path
