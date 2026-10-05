@@ -680,7 +680,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|list|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar la regla de gobernanza: {exc}"
+                message = f"No se pudo administrar la regla de gobernanza: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == PROFILE_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -732,7 +732,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     await _notify_if_tools_changed(server, state)
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar el profile: {exc}"
+                message = f"No se pudo administrar el profile: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == CAPABILITY_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -822,7 +822,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|get|source|validate|test|run|list|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar la capability: {exc}"
+                message = f"No se pudo administrar la capability: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == HOOK_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -865,7 +865,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|get|list|delete|get_shared_assets|set_shared_assets)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar el hook: {exc}"
+                message = f"No se pudo administrar el hook: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == SKILL_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -911,7 +911,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar la skill: {exc}"
+                message = f"No se pudo administrar la skill: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == AGENT_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -961,7 +961,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|get|list|update|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar el agent: {exc}"
+                message = f"No se pudo administrar el agent: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == GOVERNANCE_EXCEPTION_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
@@ -987,7 +987,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     raise ValueError(f"action inválida: {action!r} (usar create|list|delete)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
-                message = f"No se pudo administrar la excepción de gobernanza: {exc}"
+                message = f"No se pudo administrar la excepción de gobernanza: {profile_client.describe_error(exc)}"
                 return types.CallToolResult(content=[types.TextContent(type="text", text=message)], isError=True, structuredContent={"ok": False, "summary": message, "data": {}})
         if name == CONFIGURE_TOOL_NAME:
             try:

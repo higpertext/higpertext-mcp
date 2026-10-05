@@ -24,6 +24,35 @@ from higpertext_mcp.gen.profile.v1 import profile_pb2, profile_pb2_grpc
 
 _CALL_TIMEOUT_S = 2.0
 
+_UNAVAILABLE_CODES = (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED)
+
+
+class ProfileServerUnavailable(RuntimeError):
+    """El profile server no responde (caído, reiniciando o inalcanzable)."""
+
+
+def is_unavailable(exc: BaseException) -> bool:
+    return isinstance(exc, ProfileServerUnavailable) or (
+        isinstance(exc, grpc.aio.AioRpcError) and exc.code() in _UNAVAILABLE_CODES
+    )
+
+
+def server_down_message() -> str:
+    """Mensaje accionable para un profile server caído. Fijo y sin detalle del
+    backend: también lo ve el usuario cuando un hook niega por esta causa."""
+    return (
+        f"El profile server no responde en {config.profile_server_addr()}. "
+        "Mientras esté caído los hooks y las tools de administración no pueden "
+        "operar. Verifica que esté arriba (docker ps --filter name=profile-server) "
+        "y levántalo (docker start deploy-profile-server-1); luego reintenta."
+    )
+
+
+def describe_error(exc: BaseException) -> str:
+    """Texto para mostrar al usuario: el mensaje accionable si el server está
+    caído; si no, el de la excepción tal cual."""
+    return server_down_message() if is_unavailable(exc) else str(exc)
+
 
 def _warn(message: str) -> None:
     print(f"[higpertext-mcp/profile_client] {message}", file=sys.stderr)
@@ -88,7 +117,9 @@ async def get_capability_script(capability_id: str) -> tuple[str, str, dict[str,
 
 async def get_hook_script(hook_id: str) -> str | None:
     """Código fuente (base64) de un hook. Best-effort: `None` ante cualquier
-    fallo, mismo criterio que `get_capability_script`."""
+    fallo, mismo criterio que `get_capability_script`, salvo un server caído:
+    ese caso levanta `ProfileServerUnavailable` para que el CLI de hooks lo
+    distinga de un hook inexistente."""
     try:
         async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
             stub = profile_pb2_grpc.HookServiceStub(channel)
@@ -96,6 +127,12 @@ async def get_hook_script(hook_id: str) -> str | None:
                 profile_pb2.GetHookScriptRequest(id=hook_id), timeout=_CALL_TIMEOUT_S
             )
             return resp.source_code
+    except grpc.aio.AioRpcError as exc:
+        if exc.code() in _UNAVAILABLE_CODES:
+            _warn(f"profile server no disponible al pedir el hook {hook_id}: {exc.code().name}")
+            raise ProfileServerUnavailable(server_down_message()) from exc
+        _warn(f"no se pudo obtener el script del hook {hook_id}: {exc}")
+        return None
     except Exception as exc:  # noqa: BLE001
         _warn(f"no se pudo obtener el script del hook {hook_id}: {exc}")
         return None

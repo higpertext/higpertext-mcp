@@ -8,7 +8,7 @@ import io
 import json
 import sys
 
-from higpertext_mcp import hook_protocol, hook_runner
+from higpertext_mcp import hook_protocol, hook_runner, profile_client
 
 
 def main() -> None:
@@ -47,15 +47,24 @@ def main() -> None:
             raise RuntimeError("hook reported an evaluation error")
         print(json.dumps(hook_protocol.encode(args.assistant, args.event, output)))
     except Exception as exc:
-        print(f"higpertext hook failed: {type(exc).__name__}", file=sys.stderr)
+        server_down = profile_client.is_unavailable(exc)
+        print(
+            f"higpertext hook failed: {profile_client.server_down_message()}" if server_down
+            else f"higpertext hook failed: {type(exc).__name__}",
+            file=sys.stderr,
+        )
         if args.assistant:
             if args.event == "PreToolUse":
-                denied = {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": "higpertext could not evaluate the configured hook"}}
+                reason = (
+                    f"higpertext could not evaluate the configured hook: {profile_client.server_down_message()}"
+                    if server_down else "higpertext could not evaluate the configured hook"
+                )
+                denied = {"hookSpecificOutput": {"permissionDecision": "deny", "permissionDecisionReason": reason}}
                 print(json.dumps(hook_protocol.encode(args.assistant, args.event, denied)))
             else:
                 print("{}")
         else:
-            print(json.dumps({"continue": True, "error": "could not evaluate hook"}))
+            print(json.dumps({"continue": True, "error": profile_client.server_down_message() if server_down else "could not evaluate hook"}))
 
 
 if __name__ == "__main__":
