@@ -553,6 +553,78 @@ message DeleteProjectResponse {
   string message = 1;
 }
 
+// ── Repositorios (RFC-0020) ──────────────────────────────────────────────────
+// El repositorio es la unidad de identidad; la ruta es solo dónde está clonado.
+
+message Repository {
+  string id = 1;
+  string project_id = 2;
+  string name = 3;
+  // Remote normalizado ("host/org/repo"); vacío = repositorio local sin remote,
+  // que nunca se une a otro por nombre de carpeta.
+  string remote = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  repeated Checkout checkouts = 7;
+}
+
+// Checkout enlaza un repositorio con una ruta concreta en un host.
+message Checkout {
+  string repository_id = 1;
+  string host_id = 2;
+  string path = 3;
+}
+
+message ResolveRepositoryRequest {
+  string path = 1;
+  string remote = 2;  // URL de git en cualquier forma habitual; opcional
+  string host_id = 3; // vacío = HIGPERTEXT_HOST_ID del servidor, o "local"
+}
+message ResolveRepositoryResponse {
+  Repository repository = 1;
+  Checkout checkout = 2;
+  // "binding" | "remote" | "local" | "new"
+  string match = 3;
+  bool created = 4;
+}
+
+message ListRepositoriesRequest { string project_id = 1; } // vacío = todos
+message ListRepositoriesResponse { repeated Repository repositories = 1; }
+
+// Configuración por repositorio: reemplaza a .higpertext/config/environment.json
+// como fuente del perfil activo. Precedencia: repositorio > proyecto > global.
+message RepositoryConfig {
+  string repository_id = 1;
+  string profile = 2; // vacío = hereda del proyecto/global
+  map<string, string> overrides = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+message GetRepositoryConfigRequest { string repository_id = 1; }
+message GetRepositoryConfigResponse { RepositoryConfig config = 1; }
+message SetRepositoryConfigRequest {
+  string repository_id = 1;
+  string profile = 2;
+  map<string, string> overrides = 3;
+}
+message SetRepositoryConfigResponse { RepositoryConfig config = 1; }
+
+message PlanRepositoryMigrationRequest {}
+message RepositoryMigrationItem {
+  string project_id = 1;
+  string path = 2;
+  // "create" | "create_local" | "already_bound" | "needs_decision"
+  string action = 3;
+  string remote = 4;
+  string reason = 5;
+}
+// Solo lectura: no crea ni modifica nada.
+message PlanRepositoryMigrationResponse {
+  repeated RepositoryMigrationItem items = 1;
+  int32 to_create = 2;
+  int32 already_bound = 3;
+  int32 needs_decision = 4;
+}
+
 message ResolveUserRequest {
   string identifier = 1;
   string display_name = 2;
@@ -696,6 +768,12 @@ service ProjectService {
   rpc RemoveProjectPath(RemoveProjectPathRequest) returns (RemoveProjectPathResponse);
   rpc RenameProject(RenameProjectRequest) returns (RenameProjectResponse);
   rpc DeleteProject(DeleteProjectRequest) returns (DeleteProjectResponse);
+  // RFC-0020: repositorio como unidad de identidad.
+  rpc ResolveRepository(ResolveRepositoryRequest) returns (ResolveRepositoryResponse);
+  rpc ListRepositories(ListRepositoriesRequest) returns (ListRepositoriesResponse);
+  rpc GetRepositoryConfig(GetRepositoryConfigRequest) returns (GetRepositoryConfigResponse);
+  rpc SetRepositoryConfig(SetRepositoryConfigRequest) returns (SetRepositoryConfigResponse);
+  rpc PlanRepositoryMigration(PlanRepositoryMigrationRequest) returns (PlanRepositoryMigrationResponse);
 }
 
 service UserService {

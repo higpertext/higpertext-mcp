@@ -1139,6 +1139,152 @@ class DeleteProjectResponse(_message.Message):
     message: str
     def __init__(self, message: _Optional[str] = ...) -> None: ...
 
+class Repository(_message.Message):
+    __slots__ = ("id", "project_id", "name", "remote", "created_at", "updated_at", "checkouts")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    CHECKOUTS_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    project_id: str
+    name: str
+    remote: str
+    created_at: _timestamp_pb2.Timestamp
+    updated_at: _timestamp_pb2.Timestamp
+    checkouts: _containers.RepeatedCompositeFieldContainer[Checkout]
+    def __init__(self, id: _Optional[str] = ..., project_id: _Optional[str] = ..., name: _Optional[str] = ..., remote: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., checkouts: _Optional[_Iterable[_Union[Checkout, _Mapping]]] = ...) -> None: ...
+
+class Checkout(_message.Message):
+    __slots__ = ("repository_id", "host_id", "path")
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    HOST_ID_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    repository_id: str
+    host_id: str
+    path: str
+    def __init__(self, repository_id: _Optional[str] = ..., host_id: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
+
+class ResolveRepositoryRequest(_message.Message):
+    __slots__ = ("path", "remote", "host_id")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_FIELD_NUMBER: _ClassVar[int]
+    HOST_ID_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    remote: str
+    host_id: str
+    def __init__(self, path: _Optional[str] = ..., remote: _Optional[str] = ..., host_id: _Optional[str] = ...) -> None: ...
+
+class ResolveRepositoryResponse(_message.Message):
+    __slots__ = ("repository", "checkout", "match", "created")
+    REPOSITORY_FIELD_NUMBER: _ClassVar[int]
+    CHECKOUT_FIELD_NUMBER: _ClassVar[int]
+    MATCH_FIELD_NUMBER: _ClassVar[int]
+    CREATED_FIELD_NUMBER: _ClassVar[int]
+    repository: Repository
+    checkout: Checkout
+    match: str
+    created: bool
+    def __init__(self, repository: _Optional[_Union[Repository, _Mapping]] = ..., checkout: _Optional[_Union[Checkout, _Mapping]] = ..., match: _Optional[str] = ..., created: _Optional[bool] = ...) -> None: ...
+
+class ListRepositoriesRequest(_message.Message):
+    __slots__ = ("project_id",)
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    def __init__(self, project_id: _Optional[str] = ...) -> None: ...
+
+class ListRepositoriesResponse(_message.Message):
+    __slots__ = ("repositories",)
+    REPOSITORIES_FIELD_NUMBER: _ClassVar[int]
+    repositories: _containers.RepeatedCompositeFieldContainer[Repository]
+    def __init__(self, repositories: _Optional[_Iterable[_Union[Repository, _Mapping]]] = ...) -> None: ...
+
+class RepositoryConfig(_message.Message):
+    __slots__ = ("repository_id", "profile", "overrides", "updated_at")
+    class OverridesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    PROFILE_FIELD_NUMBER: _ClassVar[int]
+    OVERRIDES_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    repository_id: str
+    profile: str
+    overrides: _containers.ScalarMap[str, str]
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, repository_id: _Optional[str] = ..., profile: _Optional[str] = ..., overrides: _Optional[_Mapping[str, str]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class GetRepositoryConfigRequest(_message.Message):
+    __slots__ = ("repository_id",)
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    repository_id: str
+    def __init__(self, repository_id: _Optional[str] = ...) -> None: ...
+
+class GetRepositoryConfigResponse(_message.Message):
+    __slots__ = ("config",)
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    config: RepositoryConfig
+    def __init__(self, config: _Optional[_Union[RepositoryConfig, _Mapping]] = ...) -> None: ...
+
+class SetRepositoryConfigRequest(_message.Message):
+    __slots__ = ("repository_id", "profile", "overrides")
+    class OverridesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    PROFILE_FIELD_NUMBER: _ClassVar[int]
+    OVERRIDES_FIELD_NUMBER: _ClassVar[int]
+    repository_id: str
+    profile: str
+    overrides: _containers.ScalarMap[str, str]
+    def __init__(self, repository_id: _Optional[str] = ..., profile: _Optional[str] = ..., overrides: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class SetRepositoryConfigResponse(_message.Message):
+    __slots__ = ("config",)
+    CONFIG_FIELD_NUMBER: _ClassVar[int]
+    config: RepositoryConfig
+    def __init__(self, config: _Optional[_Union[RepositoryConfig, _Mapping]] = ...) -> None: ...
+
+class PlanRepositoryMigrationRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class RepositoryMigrationItem(_message.Message):
+    __slots__ = ("project_id", "path", "action", "remote", "reason")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    path: str
+    action: str
+    remote: str
+    reason: str
+    def __init__(self, project_id: _Optional[str] = ..., path: _Optional[str] = ..., action: _Optional[str] = ..., remote: _Optional[str] = ..., reason: _Optional[str] = ...) -> None: ...
+
+class PlanRepositoryMigrationResponse(_message.Message):
+    __slots__ = ("items", "to_create", "already_bound", "needs_decision")
+    ITEMS_FIELD_NUMBER: _ClassVar[int]
+    TO_CREATE_FIELD_NUMBER: _ClassVar[int]
+    ALREADY_BOUND_FIELD_NUMBER: _ClassVar[int]
+    NEEDS_DECISION_FIELD_NUMBER: _ClassVar[int]
+    items: _containers.RepeatedCompositeFieldContainer[RepositoryMigrationItem]
+    to_create: int
+    already_bound: int
+    needs_decision: int
+    def __init__(self, items: _Optional[_Iterable[_Union[RepositoryMigrationItem, _Mapping]]] = ..., to_create: _Optional[int] = ..., already_bound: _Optional[int] = ..., needs_decision: _Optional[int] = ...) -> None: ...
+
 class ResolveUserRequest(_message.Message):
     __slots__ = ("identifier", "display_name", "preferred_username")
     IDENTIFIER_FIELD_NUMBER: _ClassVar[int]
