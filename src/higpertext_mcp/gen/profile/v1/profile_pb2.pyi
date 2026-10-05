@@ -1285,6 +1285,78 @@ class PlanRepositoryMigrationResponse(_message.Message):
     needs_decision: int
     def __init__(self, items: _Optional[_Iterable[_Union[RepositoryMigrationItem, _Mapping]]] = ..., to_create: _Optional[int] = ..., already_bound: _Optional[int] = ..., needs_decision: _Optional[int] = ...) -> None: ...
 
+class ApplyRepositoryMigrationRequest(_message.Message):
+    __slots__ = ("confirm",)
+    CONFIRM_FIELD_NUMBER: _ClassVar[int]
+    confirm: bool
+    def __init__(self, confirm: _Optional[bool] = ...) -> None: ...
+
+class RepositoryMigrationResult(_message.Message):
+    __slots__ = ("project_id", "path", "action", "repository_id", "match", "profile", "note", "error")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    MATCH_FIELD_NUMBER: _ClassVar[int]
+    PROFILE_FIELD_NUMBER: _ClassVar[int]
+    NOTE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    path: str
+    action: str
+    repository_id: str
+    match: str
+    profile: str
+    note: str
+    error: str
+    def __init__(self, project_id: _Optional[str] = ..., path: _Optional[str] = ..., action: _Optional[str] = ..., repository_id: _Optional[str] = ..., match: _Optional[str] = ..., profile: _Optional[str] = ..., note: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
+
+class ApplyRepositoryMigrationResponse(_message.Message):
+    __slots__ = ("results", "created", "skipped", "failed", "applied")
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    CREATED_FIELD_NUMBER: _ClassVar[int]
+    SKIPPED_FIELD_NUMBER: _ClassVar[int]
+    FAILED_FIELD_NUMBER: _ClassVar[int]
+    APPLIED_FIELD_NUMBER: _ClassVar[int]
+    results: _containers.RepeatedCompositeFieldContainer[RepositoryMigrationResult]
+    created: int
+    skipped: int
+    failed: int
+    applied: bool
+    def __init__(self, results: _Optional[_Iterable[_Union[RepositoryMigrationResult, _Mapping]]] = ..., created: _Optional[int] = ..., skipped: _Optional[int] = ..., failed: _Optional[int] = ..., applied: _Optional[bool] = ...) -> None: ...
+
+class MergeProjectsRequest(_message.Message):
+    __slots__ = ("source_project_id", "target_project_id", "confirm")
+    SOURCE_PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    TARGET_PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    CONFIRM_FIELD_NUMBER: _ClassVar[int]
+    source_project_id: str
+    target_project_id: str
+    confirm: bool
+    def __init__(self, source_project_id: _Optional[str] = ..., target_project_id: _Optional[str] = ..., confirm: _Optional[bool] = ...) -> None: ...
+
+class ProjectMergeImpact(_message.Message):
+    __slots__ = ("store", "table", "rows")
+    STORE_FIELD_NUMBER: _ClassVar[int]
+    TABLE_FIELD_NUMBER: _ClassVar[int]
+    ROWS_FIELD_NUMBER: _ClassVar[int]
+    store: str
+    table: str
+    rows: int
+    def __init__(self, store: _Optional[str] = ..., table: _Optional[str] = ..., rows: _Optional[int] = ...) -> None: ...
+
+class MergeProjectsResponse(_message.Message):
+    __slots__ = ("impact", "conflicts", "applied", "project")
+    IMPACT_FIELD_NUMBER: _ClassVar[int]
+    CONFLICTS_FIELD_NUMBER: _ClassVar[int]
+    APPLIED_FIELD_NUMBER: _ClassVar[int]
+    PROJECT_FIELD_NUMBER: _ClassVar[int]
+    impact: _containers.RepeatedCompositeFieldContainer[ProjectMergeImpact]
+    conflicts: _containers.RepeatedScalarFieldContainer[str]
+    applied: bool
+    project: Project
+    def __init__(self, impact: _Optional[_Iterable[_Union[ProjectMergeImpact, _Mapping]]] = ..., conflicts: _Optional[_Iterable[str]] = ..., applied: _Optional[bool] = ..., project: _Optional[_Union[Project, _Mapping]] = ...) -> None: ...
+
 class ResolveUserRequest(_message.Message):
     __slots__ = ("identifier", "display_name", "preferred_username")
     IDENTIFIER_FIELD_NUMBER: _ClassVar[int]

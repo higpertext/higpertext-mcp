@@ -625,6 +625,51 @@ message PlanRepositoryMigrationResponse {
   int32 needs_decision = 4;
 }
 
+// Aplica el plan. Solo escribe con confirm=true; sin él devuelve lo que haría.
+// Idempotente: una segunda ejecución encuentra todo ya enlazado. Nunca toca los
+// elementos needs_decision. Importa el perfil activo de .higpertext/config/
+// environment.json a RepositoryConfig si el repositorio aún no tiene perfil.
+message ApplyRepositoryMigrationRequest { bool confirm = 1; }
+message RepositoryMigrationResult {
+  string project_id = 1;
+  string path = 2;
+  string action = 3;        // la del plan
+  string repository_id = 4; // vacío si no se creó ni enlazó
+  string match = 5;         // "new" | "local" | "remote" | "binding"
+  string profile = 6;       // perfil importado de environment.json, si lo hubo
+  string note = 7;          // p. ej. diferencia entre environment.json y el servidor
+  string error = 8;
+}
+message ApplyRepositoryMigrationResponse {
+  repeated RepositoryMigrationResult results = 1;
+  int32 created = 2;
+  int32 skipped = 3;
+  int32 failed = 4;
+  bool applied = 5;
+}
+
+// Fusiona el Project source en target: mueve sus rutas y repositorios y
+// re-asigna su project_id en profile.db, learning.db, board.db y Redis; luego
+// borra source. Sin confirm=true solo devuelve el impacto y los conflictos.
+message MergeProjectsRequest {
+  string source_project_id = 1;
+  string target_project_id = 2;
+  bool confirm = 3;
+}
+message ProjectMergeImpact {
+  string store = 1; // "profile.db" | "learning.db" | "board.db" | "tenancy.db" | "redis"
+  string table = 2; // tabla, o patrón de claves en Redis
+  int64 rows = 3;
+}
+message MergeProjectsResponse {
+  repeated ProjectMergeImpact impact = 1;
+  // Choques que impiden fusionar (mismo nombre de board/flow en ambos, clave de
+  // Redis ya existente en el destino). Con confirm=true y conflictos falla.
+  repeated string conflicts = 2;
+  bool applied = 3;
+  Project project = 4; // el Project destino tras fusionar
+}
+
 message ResolveUserRequest {
   string identifier = 1;
   string display_name = 2;
@@ -774,6 +819,8 @@ service ProjectService {
   rpc GetRepositoryConfig(GetRepositoryConfigRequest) returns (GetRepositoryConfigResponse);
   rpc SetRepositoryConfig(SetRepositoryConfigRequest) returns (SetRepositoryConfigResponse);
   rpc PlanRepositoryMigration(PlanRepositoryMigrationRequest) returns (PlanRepositoryMigrationResponse);
+  rpc ApplyRepositoryMigration(ApplyRepositoryMigrationRequest) returns (ApplyRepositoryMigrationResponse);
+  rpc MergeProjects(MergeProjectsRequest) returns (MergeProjectsResponse);
 }
 
 service UserService {

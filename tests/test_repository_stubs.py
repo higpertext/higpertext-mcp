@@ -9,6 +9,8 @@ REPOSITORY_RPCS = (
     "GetRepositoryConfig",
     "SetRepositoryConfig",
     "PlanRepositoryMigration",
+    "ApplyRepositoryMigration",
+    "MergeProjects",
 )
 
 
@@ -38,3 +40,19 @@ def test_repository_messages_round_trip():
         to_create=1,
     )
     assert plan.items[0].action == "create_local" and plan.to_create == 1
+
+
+def test_apply_migration_and_merge_messages_round_trip():
+    apply_req = profile_pb2.ApplyRepositoryMigrationRequest(confirm=True)
+    assert profile_pb2.ApplyRepositoryMigrationRequest.FromString(apply_req.SerializeToString()).confirm is True
+
+    merge = profile_pb2.MergeProjectsRequest(source_project_id="src", target_project_id="dst", confirm=False)
+    again = profile_pb2.MergeProjectsRequest.FromString(merge.SerializeToString())
+    assert (again.source_project_id, again.target_project_id, again.confirm) == ("src", "dst", False)
+
+    resp = profile_pb2.MergeProjectsResponse(
+        impact=[profile_pb2.ProjectMergeImpact(store="profile.db", table="activities", rows=3)],
+        conflicts=["board.db.boards: 'Roadmap' existe en ambos proyectos"],
+        applied=False,
+    )
+    assert resp.impact[0].rows == 3 and len(resp.conflicts) == 1 and resp.applied is False

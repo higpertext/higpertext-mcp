@@ -1962,6 +1962,16 @@ class ProjectServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationResponse.FromString,
                 _registered_method=True)
+        self.ApplyRepositoryMigration = channel.unary_unary(
+                '/profile.v1.ProjectService/ApplyRepositoryMigration',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationResponse.FromString,
+                _registered_method=True)
+        self.MergeProjects = channel.unary_unary(
+                '/profile.v1.ProjectService/MergeProjects',
+                request_serializer=profile_dot_v1_dot_profile__pb2.MergeProjectsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.MergeProjectsResponse.FromString,
+                _registered_method=True)
 
 
 class ProjectServiceServicer:
@@ -2034,6 +2044,18 @@ class ProjectServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ApplyRepositoryMigration(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def MergeProjects(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ProjectServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -2091,6 +2113,16 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     servicer.PlanRepositoryMigration,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationResponse.SerializeToString,
+            ),
+            'ApplyRepositoryMigration': grpc.unary_unary_rpc_method_handler(
+                    servicer.ApplyRepositoryMigration,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationResponse.SerializeToString,
+            ),
+            'MergeProjects': grpc.unary_unary_rpc_method_handler(
+                    servicer.MergeProjects,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.MergeProjectsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.MergeProjectsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2390,6 +2422,60 @@ class ProjectService:
             '/profile.v1.ProjectService/PlanRepositoryMigration',
             profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.PlanRepositoryMigrationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ApplyRepositoryMigration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ApplyRepositoryMigration',
+            profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ApplyRepositoryMigrationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def MergeProjects(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/MergeProjects',
+            profile_dot_v1_dot_profile__pb2.MergeProjectsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.MergeProjectsResponse.FromString,
             options,
             channel_credentials,
             insecure,
