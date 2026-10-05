@@ -166,7 +166,7 @@ async def _render_profile_rules(root: Path) -> bytes:
     con el hook: una regla creada vía higpertext-governance-rule (MCP) queda
     activa acá en la siguiente invocación del hook, sin re-render ni rebuild.
     """
-    profile = discovery.active_profile(root) or ""
+    profile = await discovery.effective_profile(root) or ""
     try:
         rules = await profile_client.list_governance_rules()
     except Exception:  # noqa: BLE001 — best-effort: sin profile server, sin reglas dinámicas

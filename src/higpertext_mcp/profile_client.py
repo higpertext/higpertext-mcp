@@ -733,6 +733,49 @@ async def resolve_project(root_path: str) -> dict:
         }
 
 
+def _repository_to_dict(r) -> dict:
+    return {
+        "id": r.id,
+        "project_id": r.project_id,
+        "name": r.name,
+        "remote": r.remote,
+        "checkouts": [{"host_id": c.host_id, "path": c.path} for c in r.checkouts],
+    }
+
+
+async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> dict:
+    """RFC-0020: get-or-create del repositorio de una ruta. Una ruta dentro de un
+    repo git se enlaza a la raíz de git; el servidor devuelve `match`
+    ("binding" | "remote" | "local" | "new") y el repositorio (con su project_id)."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.ResolveRepository(
+            profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id), timeout=_CALL_TIMEOUT_S
+        )
+        return {**_repository_to_dict(resp.repository), "match": resp.match, "created": resp.created}
+
+
+async def get_repository_config(repository_id: str) -> dict:
+    """Perfil activo y overrides de un repositorio (vacío = hereda)."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.GetRepositoryConfig(
+            profile_pb2.GetRepositoryConfigRequest(repository_id=repository_id), timeout=_CALL_TIMEOUT_S
+        )
+        return {"repository_id": repository_id, "profile": resp.config.profile, "overrides": dict(resp.config.overrides)}
+
+
+async def set_repository_config(repository_id: str, profile: str, overrides: dict[str, str] | None = None) -> dict:
+    """Reemplaza el perfil y los overrides del repositorio (no hace merge)."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.SetRepositoryConfig(
+            profile_pb2.SetRepositoryConfigRequest(repository_id=repository_id, profile=profile, overrides=overrides or {}),
+            timeout=_CALL_TIMEOUT_S,
+        )
+        return {"repository_id": repository_id, "profile": resp.config.profile, "overrides": dict(resp.config.overrides)}
+
+
 async def list_projects() -> list[dict]:
     """Lista los proyectos registrados en el profile server."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:

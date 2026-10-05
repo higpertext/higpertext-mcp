@@ -182,7 +182,7 @@ async def _record_activity_best_effort(
     # tumbar la respuesta al cliente MCP (cada uno ya maneja sus propios
     # errores internamente — ver memory.py / profile_client.py).
     root = discovery.resolve_project_root()
-    profile = discovery.active_profile(root) or ""
+    profile = await discovery.effective_profile(root) or ""
     status = "success" if result.returncode == 0 and contract_ok else "failure"
     notes = execution.build_memory_notes(capability_id, params, result, contract_ok, contract_errors)
     action = f"Auto-run (MCP): {capability_id}"

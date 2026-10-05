@@ -51,3 +51,14 @@ def oidc_host_header() -> str:
     llega por un nombre interno (keycloak:8080) pero la API exige el issuer público
     (localhost:8081). Vacío = no se fuerza la cabecera."""
     return os.environ.get("HIGPERTEXT_OIDC_HOST_HEADER", "").strip()
+
+
+def profile_source() -> str:
+    """De dónde sale el perfil activo de un repositorio (RFC-0020).
+
+    "server" (por defecto): el RepositoryConfig del servidor, con
+    .higpertext/config/environment.json como respaldo si el servidor no responde
+    o el repositorio aún no tiene perfil allí. "local": solo el archivo, como antes
+    de RFC-0020.
+    """
+    return "local" if os.environ.get("HIGPERTEXT_PROFILE_SOURCE", "").strip().lower() == "local" else "server"

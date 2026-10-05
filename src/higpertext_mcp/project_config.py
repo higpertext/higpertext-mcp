@@ -32,12 +32,13 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def create_project_configuration(root: Path, profile: str) -> dict[str, list[str]]:
+def create_project_configuration(root: Path, profile: str, *, replace_profile: bool = False) -> dict[str, list[str]]:
     """Crea configuración no invasiva y devuelve archivos creados/omitidos.
 
     Nunca reemplaza una selección de perfil o un servidor MCP ya existentes:
     hacerlo podría dejar al proyecto apuntando a otro entorno sin que el
-    usuario lo hubiera pedido. Sí conserva y amplía objetos JSON existentes.
+    usuario lo hubiera pedido. La única excepción es `replace_profile=True`,
+    que el llamador pide de forma explícita para cambiar el perfil activo. Sí conserva y amplía objetos JSON existentes.
     """
     if not profile or not profile.strip():
         raise ValueError("'profile' es obligatorio")
@@ -54,7 +55,7 @@ def create_project_configuration(root: Path, profile: str) -> dict[str, list[str
     environment = _read_object(environment_path)
     assert environment is not None
     current_profile = environment.get("active_profile")
-    if current_profile:
+    if current_profile and not (replace_profile and current_profile != profile.strip()):
         skipped.append(str(environment_path.relative_to(root)))
     else:
         environment["active_profile"] = profile.strip()

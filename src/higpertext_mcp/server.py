@@ -32,6 +32,7 @@ from higpertext_mcp import (
     project_config,
     profile_client,
     render_registry,
+    repository_resolution,
     roadmap_board,
     resources,
     schema,
@@ -116,7 +117,8 @@ _CONFIGURE_TOOL = types.Tool(
     description=(
         "Crea la configuración mínima de higpertext en un proyecto seleccionado: "
         ".higpertext/config/environment.json, mcp_external.json y .mcp.json. "
-        "No sobrescribe una configuración existente. `profile` es obligatorio. "
+        "No sobrescribe una configuración existente (salvo `replace_profile`). `profile` es obligatorio. "
+        "El perfil activo de cada repositorio se guarda en el servidor; environment.json queda como respaldo. "
         "`project_id` y `root_path` son opcionales: si se omiten, usa el proyecto "
         "seleccionado por HIGPERTEXT_PROJECT_ROOT; en un Project multi-ruta, usa "
         "`root_path` para elegir explícitamente cada checkout."
@@ -135,6 +137,15 @@ _CONFIGURE_TOOL = types.Tool(
             "root_path": {
                 "type": "string",
                 "description": "Una ruta registrada del proyecto destino.",
+            },
+            "replace_profile": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "Cambia el perfil activo del repositorio aunque ya tenga uno. El perfil "
+                    "vive en el servidor (RepositoryConfig) y environment.json solo lo refleja: "
+                    "sin esto, un perfil ya guardado en el servidor se conserva."
+                ),
             },
         },
         "required": ["profile"],
@@ -605,7 +616,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     project_id=args.get("project_id", ""),
                 )
                 project_id = _project.get("id", "")
-                profile = discovery.active_profile(root) or ""
+                profile = await discovery.effective_profile(root) or ""
                 profile_data, caps, rules = await profile_client.profile_context(profile)
                 selected = args.get("assistants", [])
                 data = adapter_renderer.render(root, selected, profile_data, caps, rules)
@@ -1002,16 +1013,19 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 else:
                     root = discovery.resolve_project_root()
                     selector = "HIGPERTEXT_PROJECT_ROOT"
+                replace_profile = bool(args.get("replace_profile", False))
                 changes = project_config.create_project_configuration(
-                    root, profile
+                    root, profile, replace_profile=replace_profile
                 )
+                # RFC-0020: el perfil vive en el servidor; el archivo local solo lo refleja.
+                server_sync = await repository_resolution.sync_profile(root, profile, replace=replace_profile)
                 summary = f"Configuración de higpertext generada en {root}."
                 return types.CallToolResult(
                     content=[types.TextContent(type="text", text=summary)],
                     structuredContent={
                         "ok": True,
                         "summary": summary,
-                        "data": {"root": str(root), "selector": selector, "changes": changes},
+                        "data": {"root": str(root), "selector": selector, "changes": changes, "profile_server": server_sync},
                     },
                 )
             except RuntimeError as exc:
@@ -1051,7 +1065,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 else:
                     root = discovery.resolve_project_root()
                     project = {"id": "", "root_path": str(root), "name": root.name}
-                profile = discovery.active_profile(root)
+                profile = await discovery.effective_profile(root)
                 data: dict = {
                     "project": {**project, "local_root": str(root)},
                     "active_profile": profile,

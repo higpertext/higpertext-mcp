@@ -170,6 +170,16 @@ def active_profile(root: Path) -> str | None:
     return env.get("active_profile") or None
 
 
+async def effective_profile(root: Path) -> str | None:
+    """Perfil activo de `root` (RFC-0020): el del servidor (RepositoryConfig) y,
+    si el servidor no responde o el repositorio aún no tiene perfil allí, el de
+    .higpertext/config/environment.json (`active_profile`). Precedencia:
+    repositorio > archivo local."""
+    from higpertext_mcp import repository_resolution
+
+    return await repository_resolution.server_profile(root) or active_profile(root)
+
+
 async def allowed_capabilities(root: Path) -> list[profile_pb2.Capability]:
     """Intersección entre el catálogo del profile server y lo que el perfil activo permite.
 
@@ -180,4 +190,4 @@ async def allowed_capabilities(root: Path) -> list[profile_pb2.Capability]:
     Fail-closed: sin perfil activo, o si el profile server no responde, no se
     expone nada (ver `profile_client.list_allowed_capabilities`).
     """
-    return await profile_client.list_allowed_capabilities(active_profile(root))
+    return await profile_client.list_allowed_capabilities(await effective_profile(root))
