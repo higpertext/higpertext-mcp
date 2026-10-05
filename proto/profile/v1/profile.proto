@@ -242,8 +242,11 @@ message AuditEvent {
 
 message Project {
   string id = 1;
-  string root_path = 2; // ruta primaria (compat) — la primera ruta asociada
-  string root_path_hash = 3; // sha256(root_path)[:16]
+  // RFC-0020: la identidad de un código fuente es su Repository (remote normalizado),
+  // no su ruta. root_path, root_path_hash y paths se conservan por compatibilidad y se
+  // retiran más adelante; usa ListRepositories / Checkout para saber dónde está clonado.
+  string root_path = 2 [deprecated = true]; // ruta primaria (compat) — la primera ruta asociada
+  string root_path_hash = 3 [deprecated = true]; // sha256(root_path)[:16]; solo índice de búsqueda ruta→proyecto, ya no identidad
   string name = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
@@ -251,7 +254,7 @@ message Project {
   // Un proyecto puede depender de más de un repositorio/carpeta física;
   // ResolveProject(root_path) resuelve al mismo Project.ID para cualquiera
   // de estas rutas.
-  repeated string paths = 7;
+  repeated string paths = 7 [deprecated = true];
 }
 
 message User {

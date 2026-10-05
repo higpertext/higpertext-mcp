@@ -52,22 +52,46 @@ def write_env(root, profile):
     (cfg / "environment.json").write_text(json.dumps({"active_profile": profile}))
 
 
+def write_env_again(root, profile):
+    (root / ".higpertext" / "config" / "environment.json").write_text(json.dumps({"active_profile": profile}))
+
+
 async def test_the_server_profile_wins_over_environment_json(tmp_path, server):
     write_env(tmp_path, "viejo_local")
     server.profile = "del_servidor"
     assert await discovery.effective_profile(tmp_path) == "del_servidor"
 
 
-async def test_environment_json_is_the_fallback_when_the_repo_has_no_server_profile(tmp_path, server):
+async def test_environment_json_is_adopted_once_when_the_repo_has_no_server_profile(tmp_path, server):
     write_env(tmp_path, "solo_local")
     server.profile = ""
     assert await discovery.effective_profile(tmp_path) == "solo_local"
+    assert server.profile == "solo_local" and len(server.set_calls) == 1  # se copió al servidor
+
+    # Desde entonces manda el servidor: cambiar el archivo ya no cambia nada.
+    write_env_again(tmp_path, "cambiado_a_mano")
+    repository_resolution.invalidate(tmp_path)
+    assert await discovery.effective_profile(tmp_path) == "solo_local"
+    assert len(server.set_calls) == 1
 
 
-async def test_environment_json_is_the_fallback_when_the_server_is_down(tmp_path, server):
+async def test_with_the_server_down_there_is_no_profile_not_a_guess_from_the_file(tmp_path, server):
     write_env(tmp_path, "solo_local")
     server.down = True
-    assert await discovery.effective_profile(tmp_path) == "solo_local"
+    assert await discovery.effective_profile(tmp_path) is None
+
+
+async def test_the_last_confirmed_profile_survives_a_momentary_server_failure(tmp_path, server):
+    server.profile = "del_servidor"
+    assert await discovery.effective_profile(tmp_path) == "del_servidor"
+    repository_resolution.invalidate_cache_only(tmp_path)  # expira la caché pero conserva el último valor bueno
+    server.down = True
+    assert await discovery.effective_profile(tmp_path) == "del_servidor"
+
+
+async def test_a_server_that_never_answered_has_no_last_good_value(tmp_path, server):
+    server.down = True
+    assert await discovery.effective_profile(tmp_path) is None
 
 
 async def test_deleting_environment_json_does_not_change_what_the_agent_sees(tmp_path, server):
@@ -182,3 +206,19 @@ async def test_sync_profile_is_skipped_with_the_local_source_and_never_reaches_t
     result = await repository_resolution.sync_profile(tmp_path, "x", replace=True)
     assert result["status"] == "skipped"
     assert server.resolved == [] and server.set_calls == []
+
+
+async def test_adoption_loses_to_a_profile_another_process_set_first(tmp_path, server, monkeypatch):
+    write_env(tmp_path, "mio")
+    server.profile = ""
+    original = repository_resolution.profile_client.get_repository_config
+    calls = {"n": 0}
+
+    async def racing(repository_id):
+        calls["n"] += 1
+        if calls["n"] == 2:  # entre la lectura y la adopción, otro proceso fija su perfil
+            server.profile = "del_otro"
+        return await original(repository_id)
+
+    monkeypatch.setattr(repository_resolution.profile_client, "get_repository_config", racing)
+    assert await discovery.effective_profile(tmp_path) == "del_otro"

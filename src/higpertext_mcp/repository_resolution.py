@@ -3,13 +3,17 @@
 Antes, el perfil activo de cada checkout salía de
 `<root>/.higpertext/config/environment.json`: un archivo por carpeta, invisible
 para el servidor. Ahora la fuente es `RepositoryConfig.profile` (precedencia
-repositorio > proyecto > global) y ese archivo queda como respaldo.
+repositorio > proyecto > global).
 
-Fail-open en toda esta capa: si el profile server no responde, o el repositorio
-aún no tiene perfil allí, se devuelve None y el llamador cae al archivo local; un
-servidor caído nunca debe impedir trabajar. Resolver el repositorio es un
-get-or-create en el servidor: un repo nuevo queda registrado (y su Project
-resuelto desde la raíz de git) sin pasos manuales.
+El archivo ya no se lee de forma permanente: si el repositorio aún no tiene perfil
+en el servidor, el del archivo se ADOPTA UNA VEZ (se copia al servidor, ver
+`adopt_legacy_profile`) y desde entonces el servidor manda; cambiar el archivo no
+cambia nada. HIGPERTEXT_PROFILE_SOURCE=local conserva el comportamiento anterior.
+
+Si el profile server no responde, `server_profile` devuelve el último valor bueno
+que se conoció (si lo hay) o None: ante un servidor caído no se inventa un perfil.
+Resolver el repositorio es un get-or-create en el servidor: un repo nuevo queda
+registrado (y su Project resuelto desde la raíz de git) sin pasos manuales.
 """
 from __future__ import annotations
 
@@ -23,6 +27,7 @@ from higpertext_mcp import config, profile_client
 _TTL_S = 30.0       # cuánto se reutiliza una respuesta del servidor
 _NEGATIVE_TTL_S = 5.0  # tras un fallo no se insiste en cada llamada
 _cache: dict[str, tuple[float, str | None]] = {}
+_last_good: dict[str, str | None] = {}  # último valor que el servidor confirmó, por raíz
 
 
 def _warn(message: str) -> None:
@@ -68,8 +73,15 @@ def invalidate(root: Path | None = None) -> None:
     """Descarta lo cacheado (de una raíz o de todas)."""
     if root is None:
         _cache.clear()
+        _last_good.clear()
     else:
         _cache.pop(str(root), None)
+
+
+def invalidate_cache_only(root: Path) -> None:
+    """Expira la caché de TTL de una raíz sin olvidar el último valor bueno (para pruebas
+    y para forzar una relectura que, si falla, conserva lo ya confirmado)."""
+    _cache.pop(str(root), None)
 
 
 async def server_profile(root: Path) -> str | None:
@@ -88,10 +100,25 @@ async def server_profile(root: Path) -> str | None:
         profile = (cfg.get("profile") or "").strip() or None
     except Exception as exc:  # noqa: BLE001 — cualquier fallo de red/servidor
         _warn(f"sin perfil del servidor para {root}: {profile_client.describe_error(exc)}")
-        _cache[key] = (now + _NEGATIVE_TTL_S, None)
-        return None
+        stale = _last_good.get(key)  # un fallo momentáneo no debe dejar al agente sin perfil
+        _cache[key] = (now + _NEGATIVE_TTL_S, stale)
+        return stale
     _cache[key] = (now + _TTL_S, profile)
+    _last_good[key] = profile
     return profile
+
+
+async def adopt_legacy_profile(root: Path, legacy_profile: str) -> str | None:
+    """El repositorio no tiene perfil en el servidor y hay uno en environment.json:
+    se copia al servidor (una sola vez) y se devuelve. Si otro lo fijó mientras
+    tanto, gana el del servidor. Con el servidor caído devuelve None: no se usa un
+    valor que el servidor no ha confirmado."""
+    result = await sync_profile(root, legacy_profile)
+    if result["status"] in ("set", "unchanged"):
+        return result["profile"]
+    if result["status"] == "kept":
+        return result["profile"]
+    return None
 
 
 async def sync_profile(root: Path, profile: str, *, replace: bool = False) -> dict:
