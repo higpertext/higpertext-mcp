@@ -68,7 +68,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
 def test_render_adapters_requires_project_selector_but_accepts_either_form():
     schema = server_module._RENDER_ADAPTERS_TOOL.inputSchema
 
-    assert schema["oneOf"] == [{"required": ["project_id"]}, {"required": ["root_path"]}]
+    assert schema["oneOf"] == [{"required": ["project_id"]}, {"required": ["root_path"]}, {"required": ["repository_id"]}]
     assert "required" not in schema
     assert "project_id" in schema["properties"]
     assert "root_path" in schema["properties"]

@@ -20,7 +20,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from higpertext_mcp import profile_client
+from higpertext_mcp import config, profile_client
 from higpertext_mcp.gen.profile.v1 import profile_pb2
 
 _WORKSPACE_DIR = ".higpertext"
@@ -136,18 +136,53 @@ def resolve_project_root() -> Path:
     return _validate_allowed_root(Path(override).expanduser().resolve())
 
 
-async def resolve_registered_project(*, root_path: str = "", project_id: str = "") -> tuple[Path, dict[str, Any]]:
-    """Resuelve el proyecto destino exclusivamente contra ProjectService."""
-    if root_path and project_id:
-        raise ValueError("root_path y project_id son mutuamente excluyentes")
+def _checkout_containing(requested: Path, registered: set[Path]) -> Path | None:
+    """El checkout registrado que es `requested` o lo contiene (el más profundo)."""
+    candidates = [p for p in registered if requested == p or p in requested.parents]
+    return max(candidates, key=lambda p: len(p.parts)) if candidates else None
+
+
+async def resolve_registered_project(
+    *, root_path: str = "", project_id: str = "", repository_id: str = ""
+) -> tuple[Path, dict[str, Any]]:
+    """Resuelve el proyecto destino exclusivamente contra ProjectService.
+
+    Tres selectores, mutuamente excluyentes (RFC-0020):
+    - `root_path`: cualquier ruta DENTRO de un checkout registrado del proyecto; el
+      destino es ese checkout (no la subcarpeta), porque el repositorio es la unidad.
+    - `repository_id`: por *binding*: el checkout de este host (`host_id`) del
+      repositorio, sin tener que conocer la ruta.
+    - `project_id`: la ruta primaria registrada del proyecto.
+    """
+    if sum(bool(v) for v in (root_path, project_id, repository_id)) > 1:
+        raise ValueError("root_path, project_id y repository_id son mutuamente excluyentes")
     if root_path:
         requested = canonical_project_path(Path(root_path))
         project = await profile_client.resolve_project(str(requested))
         paths = {Path(p).expanduser().resolve() for p in project.get("paths", [])}
         paths.add(Path(project["root_path"]).expanduser().resolve())
-        if requested not in paths:
+        checkout = _checkout_containing(requested, paths)
+        if checkout is None:
             raise ValueError("root_path no pertenece al proyecto resuelto")
-        return local_project_path(requested), project
+        return local_project_path(checkout), project
+    if repository_id:
+        from higpertext_mcp import repository_resolution
+
+        repo = next((r for r in await profile_client.list_repositories() if r.get("id") == repository_id), None)
+        if repo is None:
+            raise ValueError(f"repositorio registrado no encontrado: {repository_id}")
+        host = repository_resolution.host_id()
+        checkouts = repo.get("checkouts", [])
+        mine = [c for c in checkouts if c.get("host_id") == host]
+        if not mine:
+            known = ", ".join(sorted({c.get("host_id", "?") for c in checkouts})) or "ninguno"
+            raise ValueError(f"el repositorio {repository_id} no tiene checkout en este host ({host}); hosts con checkout: {known}")
+        projects = await profile_client.list_projects()
+        project = next((p for p in projects if p.get("id") == repo.get("project_id")), None)
+        if project is None:
+            raise ValueError(f"el proyecto {repo.get('project_id')} del repositorio ya no existe")
+        checkout = _validate_allowed_root(Path(mine[0]["path"]).expanduser().resolve())
+        return local_project_path(checkout), project
     if project_id:
         projects = await profile_client.list_projects()
         project = next((p for p in projects if p.get("id") == project_id), None)
@@ -155,7 +190,7 @@ async def resolve_registered_project(*, root_path: str = "", project_id: str = "
             raise ValueError(f"proyecto registrado no encontrado: {project_id}")
         registered_root = _validate_allowed_root(Path(project["root_path"]).expanduser().resolve())
         return local_project_path(registered_root), project
-    raise ValueError("debe indicar root_path o project_id")
+    raise ValueError("debe indicar root_path, project_id o repository_id")
 
 
 def _read_json(path: Path) -> dict:
@@ -171,13 +206,24 @@ def active_profile(root: Path) -> str | None:
 
 
 async def effective_profile(root: Path) -> str | None:
-    """Perfil activo de `root` (RFC-0020): el del servidor (RepositoryConfig) y,
-    si el servidor no responde o el repositorio aún no tiene perfil allí, el de
-    .higpertext/config/environment.json (`active_profile`). Precedencia:
-    repositorio > archivo local."""
+    """Perfil activo de `root` (RFC-0020): el del servidor (RepositoryConfig).
+
+    Si el repositorio aún no tiene perfil allí y `environment.json` trae uno, se
+    adopta UNA VEZ (se copia al servidor) y desde entonces manda el servidor:
+    cambiar el archivo ya no cambia nada (se cambia con higpertext-configure-project
+    `replace_profile`). Con el servidor caído no hay perfil, salvo el último
+    confirmado. HIGPERTEXT_PROFILE_SOURCE=local restaura la lectura del archivo."""
     from higpertext_mcp import repository_resolution
 
-    return await repository_resolution.server_profile(root) or active_profile(root)
+    if config.profile_source() == "local":
+        return active_profile(root)
+    server = await repository_resolution.server_profile(root)
+    if server:
+        return server
+    legacy = active_profile(root)
+    if not legacy:
+        return None
+    return await repository_resolution.adopt_legacy_profile(root, legacy)
 
 
 async def allowed_capabilities(root: Path) -> list[profile_pb2.Capability]:

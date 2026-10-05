@@ -755,6 +755,14 @@ async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> 
         return {**_repository_to_dict(resp.repository), "match": resp.match, "created": resp.created}
 
 
+async def list_repositories(project_id: str = "") -> list[dict]:
+    """Repositorios con sus checkouts; `project_id` vacío = todos."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.ListRepositories(profile_pb2.ListRepositoriesRequest(project_id=project_id), timeout=_CALL_TIMEOUT_S)
+        return [_repository_to_dict(r) for r in resp.repositories]
+
+
 async def get_repository_config(repository_id: str) -> dict:
     """Perfil activo y overrides de un repositorio (vacío = hereda)."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:

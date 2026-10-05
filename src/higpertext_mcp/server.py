@@ -57,13 +57,14 @@ _SYSTEM_OVERVIEW_TOOL = types.Tool(
     description=(
         "Vista operativa unificada para el menú de higpertext: proyecto, perfil activo, "
         "skills, hooks, capabilities autorizadas y últimos renderizados. En stdio usa "
-        "HIGPERTEXT_PROJECT_ROOT; en HTTP acepta project_id o root_path."
+        "HIGPERTEXT_PROJECT_ROOT; en HTTP acepta project_id, root_path o repository_id."
     ),
     inputSchema={
         "type": "object",
         "properties": {
             "project_id": {"type": "string", "description": "ID de proyecto registrado."},
-            "root_path": {"type": "string", "description": "Ruta registrada del proyecto."},
+            "root_path": {"type": "string", "description": "Ruta registrada del proyecto (o una carpeta dentro de un checkout)."},
+            "repository_id": {"type": "string", "description": "ID de repositorio: usa su checkout en este host."},
             "render_limit": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100},
         },
         "additionalProperties": False,
@@ -136,7 +137,11 @@ _CONFIGURE_TOOL = types.Tool(
             },
             "root_path": {
                 "type": "string",
-                "description": "Una ruta registrada del proyecto destino.",
+                "description": "Una ruta registrada del proyecto destino, o una carpeta dentro de uno de sus checkouts.",
+            },
+            "repository_id": {
+                "type": "string",
+                "description": "ID de un repositorio registrado: se configura su checkout de este host.",
             },
             "replace_profile": {
                 "type": "boolean",
@@ -157,7 +162,7 @@ _RENDER_ADAPTERS_TOOL = types.Tool(
     name=RENDER_ADAPTERS_TOOL_NAME,
     description=(
         "Genera los archivos nativos desde el perfil activo del proyecto seleccionado. "
-        "Requiere exactamente uno de `project_id` o `root_path`; `assistants` solo "
+        "Requiere exactamente uno de `project_id`, `root_path` o `repository_id`; `assistants` solo "
         "filtra los adaptadores a renderizar y no identifica el proyecto. "
         "Si `assistants` se omite o es vacío, renderiza todos los adaptadores."
     ),
@@ -165,10 +170,11 @@ _RENDER_ADAPTERS_TOOL = types.Tool(
         "type": "object",
         "properties": {
             "project_id": {"type": "string", "description": "ID de un proyecto registrado en ProjectService."},
-            "root_path": {"type": "string", "description": "Una ruta registrada del proyecto destino."},
+            "root_path": {"type": "string", "description": "Una ruta registrada del proyecto destino, o una carpeta dentro de uno de sus checkouts."},
+            "repository_id": {"type": "string", "description": "ID de un repositorio registrado: se renderiza en su checkout de este host."},
             "assistants": {"type": "array", "items": {"type": "string", "enum": list(adapter_catalog.SUPPORTED)}, "description": "Adapters a renderizar; vacío significa todos."},
         },
-        "oneOf": [{"required": ["project_id"]}, {"required": ["root_path"]}],
+        "oneOf": [{"required": ["project_id"]}, {"required": ["root_path"]}, {"required": ["repository_id"]}],
         "additionalProperties": False,
     },
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True),
@@ -614,6 +620,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 root, _project = await discovery.resolve_registered_project(
                     root_path=args.get("root_path", ""),
                     project_id=args.get("project_id", ""),
+                    repository_id=args.get("repository_id", ""),
                 )
                 project_id = _project.get("id", "")
                 profile = await discovery.effective_profile(root) or ""
@@ -1004,12 +1011,13 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             try:
                 args = arguments if isinstance(arguments, dict) else {}
                 profile = args.get("profile")
-                if args.get("root_path") or args.get("project_id"):
+                if args.get("root_path") or args.get("project_id") or args.get("repository_id"):
                     root, _project = await discovery.resolve_registered_project(
                         root_path=args.get("root_path", ""),
                         project_id=args.get("project_id", ""),
+                        repository_id=args.get("repository_id", ""),
                     )
-                    selector = "project_id" if args.get("project_id") else "root_path"
+                    selector = "repository_id" if args.get("repository_id") else ("project_id" if args.get("project_id") else "root_path")
                 else:
                     root = discovery.resolve_project_root()
                     selector = "HIGPERTEXT_PROJECT_ROOT"
@@ -1058,9 +1066,11 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         if name == SYSTEM_OVERVIEW_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
             try:
-                if args.get("root_path") or args.get("project_id"):
+                if args.get("root_path") or args.get("project_id") or args.get("repository_id"):
                     root, project = await discovery.resolve_registered_project(
-                        root_path=args.get("root_path", ""), project_id=args.get("project_id", "")
+                        root_path=args.get("root_path", ""),
+                        project_id=args.get("project_id", ""),
+                        repository_id=args.get("repository_id", ""),
                     )
                 else:
                     root = discovery.resolve_project_root()
