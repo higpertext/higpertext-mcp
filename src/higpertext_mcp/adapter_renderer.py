@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 from higpertext_mcp import adapter_catalog, discovery
@@ -124,6 +125,50 @@ def _ensure_grok_mcp(root: Path, written: list[str]) -> None:
     _write(path, block, written, root)
 
 
+def _codex_mcp_block(root: Path) -> str:
+    """Tabla MCP de Codex: el header declara la raíz host del proyecto.
+
+    El gateway HTTP es compartido; sin `X-Higpertext-Project-Root` cae a la raíz
+    de su propio proceso y las capabilities resuelven otro Project.
+    """
+    url = os.environ.get("HIGPERTEXT_MCP_URL", "http://127.0.0.1:8790/mcp/")
+    headers = discovery.mcp_client_headers(root)
+    pairs = ", ".join(f'"{name}" = {json.dumps(value)}' for name, value in headers.items())
+    return (
+        "[mcp_servers.higpertext]\n"
+        f'url = "{url}"\n'
+        "enabled = true\n"
+        f"http_headers = {{ {pairs} }}\n"
+    )
+
+
+_CODEX_TABLE = re.compile(r"^\[mcp_servers\.higpertext\]\n(?:(?!\[).*\n?)*", re.MULTILINE)
+
+
+def _ensure_codex_mcp(root: Path, written: list[str]) -> None:
+    """Registra higpertext con su header de raíz en `.codex/config.toml`.
+
+    Conserva el resto del archivo; si la tabla ya existe la reemplaza para
+    corregir una instalación previa sin header.
+    """
+    path = root / ".codex" / "config.toml"
+    block = _codex_mcp_block(root)
+    if not path.exists():
+        _write(path, block, written, root)
+        return
+    try:
+        current = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ValueError(f"{path} no se pudo leer: {exc}") from exc
+    if _CODEX_TABLE.search(current):
+        updated = _CODEX_TABLE.sub(lambda _m: block, current, count=1)
+    else:
+        separator = "" if current.endswith("\n") else "\n"
+        updated = current + separator + "\n" + block
+    if updated != current:
+        _write(path, updated, written, root)
+
+
 def _ensure_project_mcp(root: Path, written: list[str]) -> None:
     """Registra higpertext en la configuración MCP común del proyecto.
 
@@ -177,6 +222,7 @@ def render(root: Path, assistants: list[str], profile, caps: list, rules: list) 
         if assistant == "codex":
             _write(root / "AGENTS.md", content, written, root)
             _write(root / ".agents" / "mcp_config.json", json.dumps({"mcpServers": {"higpertext": {"type": "http", "url": "http://127.0.0.1:8790/mcp/", "headers": discovery.mcp_client_headers(root)}}}, indent=2) + "\n", written, root)
+            _ensure_codex_mcp(root, written)
         elif assistant == "claude":
             _write(root / ".claude" / "rules" / f"{profile_name}.md", content, written, root)
             _remove_stale_rules(root / ".claude" / "rules", f"{profile_name}.md", removed, root)

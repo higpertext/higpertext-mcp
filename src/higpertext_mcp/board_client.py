@@ -15,6 +15,7 @@ detalles internos de board.db.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import sys
 import threading
 from pathlib import Path
@@ -56,9 +57,13 @@ def run_async(coro: Coroutine[Any, Any, Any]) -> Any:
     result: dict[str, Any] = {}
     error: dict[str, BaseException] = {}
 
+    # Un hilo nuevo no hereda los contextvars: sin esto se pierde la raíz del
+    # request (discovery._request_root) y la capability cae a la raíz del proceso.
+    ctx = contextvars.copy_context()
+
     def _target() -> None:
         try:
-            result["value"] = asyncio.run(coro)
+            result["value"] = ctx.run(asyncio.run, coro)
         except BaseException as exc:  # noqa: BLE001 — se re-lanza en el hilo llamante
             error["exc"] = exc
 
