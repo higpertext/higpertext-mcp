@@ -836,6 +836,11 @@ class HookServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.DeleteHookRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
+        self.SetHookEnabled = channel.unary_unary(
+                '/profile.v1.HookService/SetHookEnabled',
+                request_serializer=profile_dot_v1_dot_profile__pb2.SetHookEnabledRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.SetHookEnabledResponse.FromString,
+                _registered_method=True)
         self.GetHookScript = channel.unary_unary(
                 '/profile.v1.HookService/GetHookScript',
                 request_serializer=profile_dot_v1_dot_profile__pb2.GetHookScriptRequest.SerializeToString,
@@ -875,6 +880,12 @@ class HookServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def DeleteHook(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetHookEnabled(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -920,6 +931,11 @@ def add_HookServiceServicer_to_server(servicer, server):
                     servicer.DeleteHook,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteHookRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'SetHookEnabled': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetHookEnabled,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.SetHookEnabledRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.SetHookEnabledResponse.SerializeToString,
             ),
             'GetHookScript': grpc.unary_unary_rpc_method_handler(
                     servicer.GetHookScript,
@@ -1045,6 +1061,33 @@ class HookService:
             '/profile.v1.HookService/DeleteHook',
             profile_dot_v1_dot_profile__pb2.DeleteHookRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetHookEnabled(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.HookService/SetHookEnabled',
+            profile_dot_v1_dot_profile__pb2.SetHookEnabledRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.SetHookEnabledResponse.FromString,
             options,
             channel_credentials,
             insecure,

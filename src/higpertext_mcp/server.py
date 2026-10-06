@@ -219,13 +219,17 @@ _HOOK_TOOL = types.Tool(
         "compartidas (hook_utils.py, hook_io.py, _rules/*) que todos los hooks importan. "
         "El `command` que termina en .claude/settings.json o .codex/hooks.json es siempre "
         "`higpertext-hook <id>` — ese id resuelve el script en runtime contra esta misma "
-        "base. No hay 'update': para editar, borrá y volvé a crear con el mismo id."
+        "base. No hay 'update' del contenido: para editarlo, borrá y volvé a crear con el mismo "
+        "id. Para activar o desactivar un hook usá `set_enabled` (solo cambia `enabled`: no "
+        "borra ni recrea el hook, así que conserva su código, prioridad y alcance); `list` "
+        "solo trae los habilitados, salvo `include_disabled=true`."
     ),
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "get", "list", "list_global", "delete", "get_shared_assets", "set_shared_assets"]},
-            "id": {"type": "string", "description": "requerido en create/get/delete; el scope global se determina por profiles=[]"},
+            "action": {"type": "string", "enum": ["create", "get", "list", "list_global", "delete", "set_enabled", "get_shared_assets", "set_shared_assets"]},
+            "id": {"type": "string", "description": "requerido en create/get/delete/set_enabled; el scope global se determina por profiles=[]"},
+            "include_disabled": {"type": "boolean", "default": False, "description": "solo para list/list_global: true incluye también los hooks deshabilitados"},
             "event": {"type": "string", "enum": ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "PreCompact"], "description": "requerido en create"},
             "matcher": {"type": "string", "description": "ej. 'Bash', 'Write|Edit', vacío = todos los tools"},
             "description": {"type": "string"},
@@ -860,13 +864,32 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = await profile_client.get_hook(args["id"])
                     summary = f"Hook '{data['id']}'."
                 elif action == "list":
-                    hooks = await profile_client.list_hooks_raw()
+                    # Por defecto solo los habilitados (lo que cablea el render); include_disabled=true
+                    # agrega los deshabilitados para administrarlos o verificar un set_enabled.
+                    hooks = await (
+                        profile_client.list_hooks_raw(include_disabled=True)
+                        if args.get("include_disabled") is True else profile_client.list_hooks_raw()
+                    )
                     data = {"hooks": hooks}
                     summary = f"{len(hooks)} hook(s) en el catálogo."
                 elif action == "list_global":
-                    hooks = [hook for hook in await profile_client.list_hooks_raw() if not hook["profiles"]]
+                    hooks = [
+                        hook for hook in await (
+                            profile_client.list_hooks_raw(include_disabled=True)
+                            if args.get("include_disabled") is True else profile_client.list_hooks_raw()
+                        ) if not hook["profiles"]
+                    ]
                     data = {"hooks": hooks, "scope": "global"}
                     summary = f"{len(hooks)} hook(s) global(es)."
+                elif action == "set_enabled":
+                    # `enabled` es obligatorio aquí (sin el default True de create): un olvido no
+                    # debe activar ni desactivar un hook, y menos uno de la compuerta.
+                    if not args.get("id"):
+                        raise ValueError("set_enabled requiere id")
+                    if not isinstance(args.get("enabled"), bool):
+                        raise ValueError("set_enabled requiere enabled (true|false) explícito")
+                    data = await profile_client.set_hook_enabled(args["id"], args["enabled"])
+                    summary = f"Hook '{data['id']}' {'activado' if data['enabled'] else 'desactivado'}."
                 elif action == "delete":
                     await profile_client.delete_hook(args["id"])
                     data = {"id": args["id"]}
@@ -880,7 +903,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = {"files": list(assets.keys())}
                     summary = f"Bundle compartido reemplazado ({len(assets)} archivo(s))."
                 else:
-                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|delete|get_shared_assets|set_shared_assets)")
+                    raise ValueError(f"action inválida: {action!r} (usar create|get|list|list_global|delete|set_enabled|get_shared_assets|set_shared_assets)")
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar el hook: {profile_client.describe_error(exc)}"

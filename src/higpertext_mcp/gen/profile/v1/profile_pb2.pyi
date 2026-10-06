@@ -676,12 +676,14 @@ class GetHookResponse(_message.Message):
     def __init__(self, hook: _Optional[_Union[HookDefinition, _Mapping]] = ...) -> None: ...
 
 class ListHooksRequest(_message.Message):
-    __slots__ = ("profile", "assistant")
+    __slots__ = ("profile", "assistant", "include_disabled")
     PROFILE_FIELD_NUMBER: _ClassVar[int]
     ASSISTANT_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_DISABLED_FIELD_NUMBER: _ClassVar[int]
     profile: str
     assistant: str
-    def __init__(self, profile: _Optional[str] = ..., assistant: _Optional[str] = ...) -> None: ...
+    include_disabled: bool
+    def __init__(self, profile: _Optional[str] = ..., assistant: _Optional[str] = ..., include_disabled: _Optional[bool] = ...) -> None: ...
 
 class ListHooksResponse(_message.Message):
     __slots__ = ("hooks",)
@@ -694,6 +696,20 @@ class DeleteHookRequest(_message.Message):
     ID_FIELD_NUMBER: _ClassVar[int]
     id: str
     def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class SetHookEnabledRequest(_message.Message):
+    __slots__ = ("id", "enabled")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    ENABLED_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    enabled: bool
+    def __init__(self, id: _Optional[str] = ..., enabled: _Optional[bool] = ...) -> None: ...
+
+class SetHookEnabledResponse(_message.Message):
+    __slots__ = ("hook",)
+    HOOK_FIELD_NUMBER: _ClassVar[int]
+    hook: HookDefinition
+    def __init__(self, hook: _Optional[_Union[HookDefinition, _Mapping]] = ...) -> None: ...
 
 class GetHookScriptRequest(_message.Message):
     __slots__ = ("id",)

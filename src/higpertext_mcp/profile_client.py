@@ -209,14 +209,28 @@ async def get_hook(hook_id: str) -> dict:
         return _hook_to_dict(resp.hook)
 
 
-async def list_hooks_raw() -> list[dict]:
+async def list_hooks_raw(include_disabled: bool = False) -> list[dict]:
     """Catálogo completo de hooks (sin filtrar por perfil/asistente) — para
     administración, a diferencia de `list_hooks` que sí filtra (usado por
-    hook_renderer.py)."""
+    hook_renderer.py). Por defecto solo los habilitados, que es lo que cablea el
+    render; `include_disabled=True` agrega los deshabilitados (RFC-0025)."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.HookServiceStub(channel)
-        resp = await stub.ListHooks(profile_pb2.ListHooksRequest(), timeout=_CALL_TIMEOUT_S)
+        resp = await stub.ListHooks(
+            profile_pb2.ListHooksRequest(include_disabled=include_disabled), timeout=_CALL_TIMEOUT_S
+        )
         return [_hook_to_dict(h) for h in resp.hooks]
+
+
+async def set_hook_enabled(hook_id: str, enabled: bool) -> dict:
+    """Activa o desactiva un hook cambiando SOLO su `enabled` en el servidor: no se
+    borra ni se recrea, así que conserva su código, prioridad y alcance (RFC-0025)."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.HookServiceStub(channel)
+        resp = await stub.SetHookEnabled(
+            profile_pb2.SetHookEnabledRequest(id=hook_id, enabled=enabled), timeout=_CALL_TIMEOUT_S
+        )
+        return _hook_to_dict(resp.hook)
 
 
 async def delete_hook(hook_id: str) -> None:

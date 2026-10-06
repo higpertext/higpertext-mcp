@@ -384,9 +384,20 @@ message GetHookResponse { HookDefinition hook = 1; }
 message ListHooksRequest {
   string profile = 1;    // vacío = todos los perfiles (incluye siempre los hooks "global", profiles=[])
   string assistant = 2;  // vacío = todos los asistentes
+  // false (por defecto) = solo hooks habilitados, como siempre (lo que cablea el render).
+  // true = incluye los deshabilitados, para administrarlos o verificar un SetHookEnabled.
+  bool include_disabled = 3;
 }
 message ListHooksResponse { repeated HookDefinition hooks = 1; }
 message DeleteHookRequest { string id = 1; }
+// Activa o desactiva un hook cambiando SOLO su columna enabled: no borra ni recrea el
+// hook, así que su código, prioridad y alcance quedan intactos y no hay ventana en la
+// que falte (un hook compartido es fail-closed).
+message SetHookEnabledRequest {
+  string id = 1;
+  bool enabled = 2;
+}
+message SetHookEnabledResponse { HookDefinition hook = 1; }
 
 message GetHookScriptRequest { string id = 1; }
 message GetHookScriptResponse {
@@ -777,6 +788,7 @@ service HookService {
   rpc GetHook(GetHookRequest) returns (GetHookResponse);
   rpc ListHooks(ListHooksRequest) returns (ListHooksResponse);
   rpc DeleteHook(DeleteHookRequest) returns (google.protobuf.Empty);
+  rpc SetHookEnabled(SetHookEnabledRequest) returns (SetHookEnabledResponse);
   rpc GetHookScript(GetHookScriptRequest) returns (GetHookScriptResponse);
 
   rpc SetSharedHookAssets(SetSharedHookAssetsRequest) returns (SetSharedHookAssetsResponse);
