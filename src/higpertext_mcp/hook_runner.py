@@ -183,7 +183,7 @@ async def _render_profile_rules(root: Path) -> bytes:
             "reason": r.description,
         }
         for r in rules
-        if r.pattern and (r.source == "global" or r.source == profile)
+        if (not r.HasField("enabled") or r.enabled) and r.pattern and (r.source == "global" or r.source == profile)
     ]
     return json.dumps({"rules": entries}, ensure_ascii=False, indent=2).encode("utf-8")
 

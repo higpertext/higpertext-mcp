@@ -58,7 +58,7 @@ def _rules(profile, caps: list, rules: list) -> str:
         "- El grafo semántico se consulta mediante las capabilities MCP `common.graph-query` y `common.graph-rebuild`; Redis es la fuente de verdad y no un JSON/Markdown local.",
         "- Los hooks son controles auxiliares de observación/guardrail; la autorización efectiva pertenece al gateway/controlador.",
     ]
-    lines += [f"- [{profile_pb2.Severity.Name(r.severity)}] **{r.id}** — {r.description}" for r in rules]
+    lines += [f"- [{profile_pb2.Severity.Name(r.severity)}] **{r.id}** — {r.description}" for r in rules if (not r.HasField("enabled") or r.enabled)]
     if not rules and not profile_rules:
         lines.append("- No hay reglas de gobernanza activas para este perfil.")
     lines += [

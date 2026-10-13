@@ -103,6 +103,24 @@ async def resolve_script(capability_id: str) -> Path:
     return path
 
 
+async def refresh_script(capability_id: str) -> Path:
+    """Vuelve a bajar el script del profile server y descarta el módulo cargado.
+
+    El cache de proceso conservaba el graph-rebuild anterior, que escribía
+    por project_id + root_hash. Un refresh deja el registro por repository_id
+    en cuanto el server entrega el script nuevo.
+    """
+    root = discovery.resolve_project_root()
+    cache_key = (root, capability_id)
+    previous = _script_cache.pop(cache_key, None)
+    if previous is not None:
+        package = _package_name(previous.parent)
+        full_name = f"{package}.{previous.stem}"
+        sys.modules.pop(full_name, None)
+        sys.modules.pop(package, None)
+    return await resolve_script(capability_id)
+
+
 def _run_module_main(module, call_args: list[str]) -> int:
     """Invoca `module.main(...)` fuera de proceso-de-verdad (mismo intérprete),
     replicando el shim de `capabilities_runner.main_inprocess`: algunas
