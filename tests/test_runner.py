@@ -44,6 +44,23 @@ async def test_resolve_script_is_cached_per_process(monkeypatch, tmp_path):
 
 
 @pytest.mark.anyio
+async def test_refresh_script_replaces_a_stale_graph_rebuild(monkeypatch, tmp_path):
+    sources = iter(["print('root_hash')\n", "print('repository_id')\n"])
+
+    async def fake_get_capability_script(capability_id):
+        return next(sources), "python", {}
+
+    monkeypatch.setattr(runner.profile_client, "get_capability_script", fake_get_capability_script)
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(tmp_path))
+    runner._script_cache.clear()
+
+    stale = await runner.resolve_script("common.graph-rebuild")
+    assert "root_hash" in stale.read_text(encoding="utf-8")
+    fresh = await runner.refresh_script("common.graph-rebuild")
+    assert fresh.read_text(encoding="utf-8") == "print('repository_id')\n"
+
+
+@pytest.mark.anyio
 async def test_resolve_script_cache_isolated_between_projects(monkeypatch, tmp_path):
     calls = []
 
