@@ -18,9 +18,12 @@ registrado (y su Project resuelto desde la raíz de git) sin pasos manuales.
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
+
+import grpc
 
 from higpertext_mcp import config, profile_client
 
@@ -50,23 +53,15 @@ def host_id() -> str:
 
 
 def git_remote(root: Path) -> str:
-    """URL de `[remote "origin"]` en <root>/.git/config, sin ejecutar git. "" si no
-    hay (repo sin remote, no es un repo, o worktree con .git como archivo)."""
+    """Lee el remote origin localmente, incluidos worktrees y submódulos."""
     try:
-        text = (root / ".git" / "config").read_text(encoding="utf-8")
-    except OSError:
+        result = subprocess.run(
+            ["git", "-C", str(root), "remote", "get-url", "origin"],
+            check=False, capture_output=True, text=True, timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
         return ""
-    in_origin = False
-    for raw in text.splitlines():
-        line = raw.strip()
-        if line.startswith("["):
-            in_origin = line == '[remote "origin"]'
-            continue
-        if in_origin and "=" in line:
-            key, _, value = line.partition("=")
-            if key.strip() == "url":
-                return value.strip()
-    return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
 
 
 def invalidate(root: Path | None = None) -> None:
@@ -84,6 +79,19 @@ def invalidate_cache_only(root: Path) -> None:
     _cache.pop(str(root), None)
 
 
+async def _resolve_repository(root: Path, remote: str) -> dict:
+    if not remote:
+        return await profile_client.resolve_repository(str(root), "", host_id())
+    try:
+        return await profile_client.resolve_repository_by_remote(remote)
+    except grpc.aio.AioRpcError as exc:
+        # Compatibilidad durante el despliegue gradual: solo el servidor viejo,
+        # que no conoce el RPC pathless, vuelve al resolver por ruta.
+        if exc.code() != grpc.StatusCode.UNIMPLEMENTED:
+            raise
+        return await profile_client.resolve_repository(str(root), remote, host_id())
+
+
 async def server_profile(root: Path) -> str | None:
     """Perfil activo según el servidor, o None (sin perfil allí, servidor caído, o
     HIGPERTEXT_PROFILE_SOURCE=local)."""
@@ -95,7 +103,8 @@ async def server_profile(root: Path) -> str | None:
     if hit and hit[0] > now:
         return hit[1]
     try:
-        repo = await profile_client.resolve_repository(str(root), git_remote(root), host_id())
+        remote = git_remote(root)
+        repo = await _resolve_repository(root, remote)
         cfg = await profile_client.get_repository_config(repo["id"])
         profile = (cfg.get("profile") or "").strip() or None
     except Exception as exc:  # noqa: BLE001 — cualquier fallo de red/servidor
@@ -134,7 +143,8 @@ async def sync_profile(root: Path, profile: str, *, replace: bool = False) -> di
     if config.profile_source() == "local":
         return {"status": "skipped", "reason": "HIGPERTEXT_PROFILE_SOURCE=local: solo se usa environment.json"}
     try:
-        repo = await profile_client.resolve_repository(str(root), git_remote(root), host_id())
+        remote = git_remote(root)
+        repo = await _resolve_repository(root, remote)
         cfg = await profile_client.get_repository_config(repo["id"])
         current = (cfg.get("profile") or "").strip()
         if current == profile:

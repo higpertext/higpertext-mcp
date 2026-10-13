@@ -198,6 +198,22 @@ class CreateColumnResponse(_message.Message):
     column: Column
     def __init__(self, column: _Optional[_Union[Column, _Mapping]] = ...) -> None: ...
 
+class UpdateColumnRequest(_message.Message):
+    __slots__ = ("board_id", "id", "name")
+    BOARD_ID_FIELD_NUMBER: _ClassVar[int]
+    ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    board_id: str
+    id: str
+    name: str
+    def __init__(self, board_id: _Optional[str] = ..., id: _Optional[str] = ..., name: _Optional[str] = ...) -> None: ...
+
+class UpdateColumnResponse(_message.Message):
+    __slots__ = ("column",)
+    COLUMN_FIELD_NUMBER: _ClassVar[int]
+    column: Column
+    def __init__(self, column: _Optional[_Union[Column, _Mapping]] = ...) -> None: ...
+
 class ListColumnsRequest(_message.Message):
     __slots__ = ("board_id",)
     BOARD_ID_FIELD_NUMBER: _ClassVar[int]
@@ -493,16 +509,20 @@ class ListTasksResponse(_message.Message):
     def __init__(self, tasks: _Optional[_Iterable[_Union[Task, _Mapping]]] = ...) -> None: ...
 
 class UpdateTaskRequest(_message.Message):
-    __slots__ = ("id", "title", "done", "position")
+    __slots__ = ("id", "title", "done", "position", "replace_acceptance_criteria", "acceptance_criteria")
     ID_FIELD_NUMBER: _ClassVar[int]
     TITLE_FIELD_NUMBER: _ClassVar[int]
     DONE_FIELD_NUMBER: _ClassVar[int]
     POSITION_FIELD_NUMBER: _ClassVar[int]
+    REPLACE_ACCEPTANCE_CRITERIA_FIELD_NUMBER: _ClassVar[int]
+    ACCEPTANCE_CRITERIA_FIELD_NUMBER: _ClassVar[int]
     id: str
     title: str
     done: bool
     position: int
-    def __init__(self, id: _Optional[str] = ..., title: _Optional[str] = ..., done: _Optional[bool] = ..., position: _Optional[int] = ...) -> None: ...
+    replace_acceptance_criteria: bool
+    acceptance_criteria: _containers.RepeatedCompositeFieldContainer[AcceptanceCriterionInput]
+    def __init__(self, id: _Optional[str] = ..., title: _Optional[str] = ..., done: _Optional[bool] = ..., position: _Optional[int] = ..., replace_acceptance_criteria: _Optional[bool] = ..., acceptance_criteria: _Optional[_Iterable[_Union[AcceptanceCriterionInput, _Mapping]]] = ...) -> None: ...
 
 class UpdateTaskResponse(_message.Message):
     __slots__ = ("task",)

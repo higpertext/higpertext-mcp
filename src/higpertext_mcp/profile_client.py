@@ -372,6 +372,10 @@ def _capability_to_dict(c: profile_pb2.Capability) -> dict:
         "requires_pat": c.requires_pat,
         "hook_task_id": c.hook_task_id,
         "contract": {"rules": list(c.contract.rules), "success_pattern": c.contract.success_pattern, "on_empty": c.contract.on_empty},
+        "permissions": [
+            {"action": p.action, "level": p.level, "description": p.description}
+            for p in c.permissions
+        ],
     }
 
 
@@ -379,7 +383,7 @@ async def create_capability(
     *, id: str, entrypoint: str, source_code: str, name: str = "", description: str = "",
     version: str = "1.0.0", language: str = "python", parameters: list[dict] | None = None,
     requires_pat: bool = False, hook_task_id: str = "", contract: dict | None = None,
-    extra_files: dict[str, str] | None = None,
+    extra_files: dict[str, str] | None = None, permissions: list[dict] | None = None,
 ) -> dict:
     """Da de alta una capability nueva — el "backend" real que una capability
     ejecuta. `source_code` y los valores de `extra_files` van en texto plano
@@ -408,10 +412,32 @@ async def create_capability(
         language=language, parameters=params, requires_pat=requires_pat, hook_task_id=hook_task_id,
         contract=contract_msg, source_code=base64.b64encode(source_code.encode("utf-8")).decode("ascii"),
         extra_files={k: base64.b64encode(v.encode("utf-8")).decode("ascii") for k, v in (extra_files or {}).items()},
+        permissions=[
+            profile_pb2.CapabilityPermission(
+                action=p.get("action", ""), level=p.get("level", ""), description=p.get("description", "")
+            )
+            for p in (permissions or [])
+        ],
     )
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.CapabilityServiceStub(channel)
         resp = await stub.CreateCapability(req, timeout=_CALL_TIMEOUT_S)
+        return _capability_to_dict(resp.capability)
+
+
+async def set_capability_permissions(capability_id: str, permissions: list[dict]) -> dict:
+    req = profile_pb2.SetCapabilityPermissionsRequest(
+        id=capability_id,
+        permissions=[
+            profile_pb2.CapabilityPermission(
+                action=p.get("action", ""), level=p.get("level", ""), description=p.get("description", "")
+            )
+            for p in permissions
+        ],
+    )
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.CapabilityServiceStub(channel)
+        resp = await stub.SetCapabilityPermissions(req, timeout=_CALL_TIMEOUT_S)
         return _capability_to_dict(resp.capability)
 
 
@@ -733,9 +759,23 @@ async def delete_agent(agent_id: str) -> None:
 async def resolve_project(root_path: str) -> dict:
     """Resuelve (o crea) el Project asociado a root_path — tenancy.db, separada
     de profile.db. Usado para scopear skills/actividad/aprendizaje a "este
-    proyecto puntual" via Skill.project_id."""
+    proyecto puntual" via Skill.project_id. Si el repo ya está registrado,
+    resuelve por remote y no transmite la ruta del checkout."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        from higpertext_mcp.repository_resolution import git_remote
+
+        remote = git_remote(Path(root_path))
+        if remote:
+            try:
+                identity = await stub.ResolveRepositoryByRemote(
+                    profile_pb2.ResolveRepositoryByRemoteRequest(remote=remote), timeout=_CALL_TIMEOUT_S
+                )
+                repo = identity.repository
+                return {"id": repo.project_id, "root_path": "", "root_path_hash": "", "name": repo.name, "paths": []}
+            except grpc.aio.AioRpcError as exc:
+                if exc.code() != grpc.StatusCode.UNIMPLEMENTED:
+                    raise
         resp = await stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=root_path), timeout=_CALL_TIMEOUT_S)
         p = resp.project
         return {
@@ -767,6 +807,39 @@ async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> 
             profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id), timeout=_CALL_TIMEOUT_S
         )
         return {**_repository_to_dict(resp.repository), "match": resp.match, "created": resp.created}
+
+
+async def resolve_repository_by_remote(remote: str) -> dict:
+    """Resuelve la identidad compartida por remote, sin enviar ni guardar el checkout local."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.ResolveRepositoryByRemote(
+            profile_pb2.ResolveRepositoryByRemoteRequest(remote=remote), timeout=_CALL_TIMEOUT_S
+        )
+        repo = resp.repository
+        return {"id": repo.id, "project_id": repo.project_id, "name": repo.name, "remote": repo.remote}
+
+
+def resolve_repository_by_remote_sync(remote: str) -> dict:
+    """Versión síncrona para hooks de sesión que no ejecutan dentro de asyncio."""
+    with grpc.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = stub.ResolveRepositoryByRemote(
+            profile_pb2.ResolveRepositoryByRemoteRequest(remote=remote), timeout=_CALL_TIMEOUT_S
+        )
+        repo = resp.repository
+        return {"id": repo.id, "project_id": repo.project_id, "name": repo.name, "remote": repo.remote}
+
+
+async def register_repository(project_id: str, name: str, remote: str) -> dict:
+    """Registra la identidad compartida de un repositorio sin una ruta local."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        resp = await stub.RegisterRepository(
+            profile_pb2.RegisterRepositoryRequest(project_id=project_id, name=name, remote=remote), timeout=_CALL_TIMEOUT_S
+        )
+        repo = resp.repository
+        return {"id": repo.id, "project_id": repo.project_id, "name": repo.name, "remote": repo.remote, "created": resp.created}
 
 
 async def list_repositories(project_id: str = "") -> list[dict]:
@@ -866,7 +939,8 @@ async def list_hooks(profile: str, assistant: str) -> list[profile_pb2.HookDefin
 
 
 async def record_activity(
-    *, capability_id: str, profile: str, status: str, summary: str = "", tags: list[str] | None = None
+    *, capability_id: str, profile: str, status: str, summary: str = "",
+    tags: list[str] | None = None, user_id: str = ""
 ) -> None:
     """Registra la ejecución en el profile server. Best-effort: nunca levanta excepción."""
     try:
@@ -879,6 +953,7 @@ async def record_activity(
                     status=status,
                     summary=summary,
                     tags=tags or [],
+                    user_id=user_id,
                 ),
                 timeout=_CALL_TIMEOUT_S,
             )

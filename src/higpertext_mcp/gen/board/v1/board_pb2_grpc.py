@@ -333,6 +333,11 @@ class ColumnServiceStub:
                 request_serializer=board_dot_v1_dot_board__pb2.CreateColumnRequest.SerializeToString,
                 response_deserializer=board_dot_v1_dot_board__pb2.CreateColumnResponse.FromString,
                 _registered_method=True)
+        self.UpdateColumn = channel.unary_unary(
+                '/board.v1.ColumnService/UpdateColumn',
+                request_serializer=board_dot_v1_dot_board__pb2.UpdateColumnRequest.SerializeToString,
+                response_deserializer=board_dot_v1_dot_board__pb2.UpdateColumnResponse.FromString,
+                _registered_method=True)
         self.ListColumns = channel.unary_unary(
                 '/board.v1.ColumnService/ListColumns',
                 request_serializer=board_dot_v1_dot_board__pb2.ListColumnsRequest.SerializeToString,
@@ -354,6 +359,12 @@ class ColumnServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def CreateColumn(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateColumn(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -384,6 +395,11 @@ def add_ColumnServiceServicer_to_server(servicer, server):
                     servicer.CreateColumn,
                     request_deserializer=board_dot_v1_dot_board__pb2.CreateColumnRequest.FromString,
                     response_serializer=board_dot_v1_dot_board__pb2.CreateColumnResponse.SerializeToString,
+            ),
+            'UpdateColumn': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateColumn,
+                    request_deserializer=board_dot_v1_dot_board__pb2.UpdateColumnRequest.FromString,
+                    response_serializer=board_dot_v1_dot_board__pb2.UpdateColumnResponse.SerializeToString,
             ),
             'ListColumns': grpc.unary_unary_rpc_method_handler(
                     servicer.ListColumns,
@@ -428,6 +444,33 @@ class ColumnService:
             '/board.v1.ColumnService/CreateColumn',
             board_dot_v1_dot_board__pb2.CreateColumnRequest.SerializeToString,
             board_dot_v1_dot_board__pb2.CreateColumnResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateColumn(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/board.v1.ColumnService/UpdateColumn',
+            board_dot_v1_dot_board__pb2.UpdateColumnRequest.SerializeToString,
+            board_dot_v1_dot_board__pb2.UpdateColumnResponse.FromString,
             options,
             channel_credentials,
             insecure,

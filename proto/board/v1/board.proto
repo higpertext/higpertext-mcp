@@ -127,6 +127,12 @@ message CreateColumnRequest {
   int32 position = 3;
 }
 message CreateColumnResponse { Column column = 1; }
+message UpdateColumnRequest {
+  string board_id = 1;
+  string id = 2;
+  string name = 3;
+}
+message UpdateColumnResponse { Column column = 1; }
 message ListColumnsRequest { string board_id = 1; }
 message ListColumnsResponse { repeated Column columns = 1; } // ordenadas por position asc
 message DeleteColumnRequest { string id = 1; } // borra en cascada BoardActivity/Task/AcceptanceCriterion de esa columna
@@ -270,6 +276,10 @@ message UpdateTaskRequest {
   string title = 2;
   bool done = 3; // true exige verification.state == VERIFICATION_VERIFIED si la task tiene criterios
   int32 position = 4;
+  // Reemplaza acceptance_criteria cuando es true; false conserva los criterios
+  // actuales para que clientes anteriores sigan siendo compatibles.
+  bool replace_acceptance_criteria = 5;
+  repeated AcceptanceCriterionInput acceptance_criteria = 6;
 }
 message UpdateTaskResponse { Task task = 1; }
 message DeleteTaskRequest { string id = 1; } // borra en cascada sus AcceptanceCriterion
@@ -459,6 +469,7 @@ service BoardService {
 
 service ColumnService {
   rpc CreateColumn(CreateColumnRequest) returns (CreateColumnResponse);
+  rpc UpdateColumn(UpdateColumnRequest) returns (UpdateColumnResponse);
   rpc ListColumns(ListColumnsRequest) returns (ListColumnsResponse);
   rpc DeleteColumn(DeleteColumnRequest) returns (google.protobuf.Empty);
   rpc ReorderColumns(ReorderColumnsRequest) returns (ReorderColumnsResponse);

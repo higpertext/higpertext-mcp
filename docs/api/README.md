@@ -21,10 +21,14 @@ consultar cinco catálogos ni reconstruir scopes.
 `higpertext-hook-admin` mantiene el catálogo global separado. Usá
 `{"action":"list_global"}` para consultar únicamente hooks con `profiles=[]`.
 
-`higpertext-capability` permite `create`, `source`, `validate`, `test` y `run`.
+`higpertext-capability` permite `create`, `set_permissions`, `source`, `validate`, `test` y `run`.
 `test`/`run` sólo aceptan capabilities habilitadas por el perfil activo del
 proyecto; una capability existente en el catálogo pero no autorizada no se puede
-ejecutar desde esta superficie administrativa.
+ejecutar desde esta superficie administrativa. Cada capability declara acciones
+con nivel `read`, `write` o `admin`; el catálogo de PAT genera un scope por acción
+y el gateway filtra tanto las tools visibles como cada invocación. Si no declara
+permisos, no obtiene scopes nuevos. Para tools sin selector `action`, se usa la
+acción `invoke`.
 
 La edición persistente de un hook o de una capability existente requiere los
 RPC `UpdateHook`/`UpdateCapability` en `higpertext-server-profile`; el contrato

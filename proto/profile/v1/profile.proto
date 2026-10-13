@@ -57,6 +57,14 @@ message Contract {
   string on_empty = 3; // mensaje/acción sugerida cuando la capability no encuentra resultados
 }
 
+// CapabilityPermission declara el nivel requerido para una acción concreta.
+// Para capabilities sin selector de acción se usa action="invoke".
+message CapabilityPermission {
+  string action = 1;
+  string level = 2; // read | write | admin
+  string description = 3;
+}
+
 message Capability {
   string id = 1; // natural key, ej. "common.session-start"
   string version = 2;
@@ -70,6 +78,7 @@ message Capability {
   Contract contract = 10;
   google.protobuf.Timestamp created_at = 11;
   google.protobuf.Timestamp updated_at = 12;
+  repeated CapabilityPermission permissions = 13;
 }
 
 // ── Skills ─────────────────────────────────────────────────────────────────
@@ -177,6 +186,7 @@ message GovernanceRule {
   // esta regla debe derivarlo de severity (CRITICAL=5, HIGH=4, MEDIUM=3,
   // LOW=1) en vez de asumir "no bloquea" — no confundir con "peso real 0".
   int32 weight = 12;
+  optional bool enabled = 13;
 }
 
 message GovernanceException {
@@ -308,6 +318,7 @@ message CreateCapabilityRequest {
   Contract contract = 10;
   string source_code = 11;             // contenido del script fuente, base64 (opcional en el RPC, obligatorio para poder ejecutarla)
   map<string, string> extra_files = 12; // filename -> contenido base64, helpers hermanos importados por el entrypoint
+  repeated CapabilityPermission permissions = 13;
 }
 message CreateCapabilityResponse { Capability capability = 1; }
 message GetCapabilityRequest { string id = 1; }
@@ -328,6 +339,11 @@ message UpdateCapabilityScriptRequest {
   map<string, string> extra_files = 3; // reemplaza los helpers auxiliares actuales
 }
 message UpdateCapabilityScriptResponse { Capability capability = 1; }
+message SetCapabilityPermissionsRequest {
+  string id = 1;
+  repeated CapabilityPermission permissions = 2;
+}
+message SetCapabilityPermissionsResponse { Capability capability = 1; }
 
 message CreateSkillRequest {
   string id = 1;
@@ -486,6 +502,7 @@ message ListRulesRequest {
 }
 message ListRulesResponse { repeated GovernanceRule rules = 1; }
 message DeleteRuleRequest { string id = 1; }
+message SetRuleEnabledRequest { string id = 1; bool enabled = 2; }
 
 message CreateExceptionRequest {
   string rule_id = 1;
@@ -604,6 +621,64 @@ message ResolveRepositoryResponse {
 
 message ListRepositoriesRequest { string project_id = 1; } // vacío = todos
 message ListRepositoriesResponse { repeated Repository repositories = 1; }
+
+// Registra la identidad compartida del repositorio sin persistir una ruta local.
+message RegisterRepositoryRequest {
+  string project_id = 1;
+  string name = 2;
+  string remote = 3;
+}
+message RegisterRepositoryResponse {
+  Repository repository = 1;
+  bool created = 2;
+}
+message ResolveRepositoryByRemoteRequest { string remote = 1; }
+message ResolveRepositoryByRemoteResponse { Repository repository = 1; }
+
+// Referencias compartidas por identidad canónica: un archivo se nombra por
+// (repository_id, ruta relativa a la raíz del repositorio), nunca por ruta
+// absoluta del host. Ambos repositorios pertenecen al mismo Project.
+message RepositoryReference {
+  string id = 1;
+  string project_id = 2;
+  string source_repository_id = 3;
+  string source_path = 4;  // relativa; vacío = el repositorio entero
+  string target_repository_id = 5;
+  string target_path = 6;  // relativa; vacío = el repositorio entero
+  string kind = 7;         // etiqueta libre, p. ej. "depends_on"
+  string note = 8;
+  google.protobuf.Timestamp created_at = 9;
+}
+message AddRepositoryReferenceRequest {
+  string project_id = 1; // opcional; si se indica debe coincidir con el de los repositorios
+  string source_repository_id = 2;
+  string source_path = 3;
+  string target_repository_id = 4;
+  string target_path = 5;
+  string kind = 6;
+  string note = 7;
+}
+message AddRepositoryReferenceResponse {
+  RepositoryReference reference = 1;
+  bool created = 2; // false = ya existía la misma tupla
+}
+message ListRepositoryReferencesRequest {
+  string project_id = 1;
+  string repository_id = 2; // filtra por cualquiera de los dos extremos
+}
+message ListRepositoryReferencesResponse { repeated RepositoryReference references = 1; }
+message RemoveRepositoryReferenceRequest { string id = 1; }
+message RemoveRepositoryReferenceResponse {}
+// Traduce (repository_id, ruta relativa) a la ruta física del checkout del host.
+message ResolveRepositoryFileRequest {
+  string repository_id = 1;
+  string relative_path = 2;
+  string host_id = 3; // vacío = host del servidor
+}
+message ResolveRepositoryFileResponse {
+  string path = 1;
+  Checkout checkout = 2;
+}
 
 // Configuración por repositorio: reemplaza a .higpertext/config/environment.json
 // como fuente del perfil activo. Precedencia: repositorio > proyecto > global.
@@ -773,6 +848,7 @@ service CapabilityService {
   rpc DeleteCapability(DeleteCapabilityRequest) returns (google.protobuf.Empty);
   rpc GetCapabilityScript(GetCapabilityScriptRequest) returns (GetCapabilityScriptResponse);
   rpc UpdateCapabilityScript(UpdateCapabilityScriptRequest) returns (UpdateCapabilityScriptResponse);
+  rpc SetCapabilityPermissions(SetCapabilityPermissionsRequest) returns (SetCapabilityPermissionsResponse);
 }
 
 service SkillService {
@@ -807,6 +883,7 @@ service GovernanceService {
   rpc CreateRule(CreateRuleRequest) returns (CreateRuleResponse);
   rpc ListRules(ListRulesRequest) returns (ListRulesResponse);
   rpc DeleteRule(DeleteRuleRequest) returns (google.protobuf.Empty);
+  rpc SetRuleEnabled(SetRuleEnabledRequest) returns (GovernanceRule);
 
   rpc CreateException(CreateExceptionRequest) returns (CreateExceptionResponse);
   rpc ListExceptions(ListExceptionsRequest) returns (ListExceptionsResponse);
@@ -833,6 +910,12 @@ service ProjectService {
   // RFC-0020: repositorio como unidad de identidad.
   rpc ResolveRepository(ResolveRepositoryRequest) returns (ResolveRepositoryResponse);
   rpc ListRepositories(ListRepositoriesRequest) returns (ListRepositoriesResponse);
+  rpc RegisterRepository(RegisterRepositoryRequest) returns (RegisterRepositoryResponse);
+  rpc ResolveRepositoryByRemote(ResolveRepositoryByRemoteRequest) returns (ResolveRepositoryByRemoteResponse);
+  rpc AddRepositoryReference(AddRepositoryReferenceRequest) returns (AddRepositoryReferenceResponse);
+  rpc ListRepositoryReferences(ListRepositoryReferencesRequest) returns (ListRepositoryReferencesResponse);
+  rpc RemoveRepositoryReference(RemoveRepositoryReferenceRequest) returns (RemoveRepositoryReferenceResponse);
+  rpc ResolveRepositoryFile(ResolveRepositoryFileRequest) returns (ResolveRepositoryFileResponse);
   rpc GetRepositoryConfig(GetRepositoryConfigRequest) returns (GetRepositoryConfigResponse);
   rpc SetRepositoryConfig(SetRepositoryConfigRequest) returns (SetRepositoryConfigResponse);
   rpc PlanRepositoryMigration(PlanRepositoryMigrationRequest) returns (PlanRepositoryMigrationResponse);

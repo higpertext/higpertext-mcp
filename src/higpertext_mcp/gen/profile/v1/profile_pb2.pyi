@@ -87,8 +87,18 @@ class Contract(_message.Message):
     on_empty: str
     def __init__(self, rules: _Optional[_Iterable[str]] = ..., success_pattern: _Optional[str] = ..., on_empty: _Optional[str] = ...) -> None: ...
 
+class CapabilityPermission(_message.Message):
+    __slots__ = ("action", "level", "description")
+    ACTION_FIELD_NUMBER: _ClassVar[int]
+    LEVEL_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    action: str
+    level: str
+    description: str
+    def __init__(self, action: _Optional[str] = ..., level: _Optional[str] = ..., description: _Optional[str] = ...) -> None: ...
+
 class Capability(_message.Message):
-    __slots__ = ("id", "version", "name", "description", "entrypoint", "language", "parameters", "requires_pat", "hook_task_id", "contract", "created_at", "updated_at")
+    __slots__ = ("id", "version", "name", "description", "entrypoint", "language", "parameters", "requires_pat", "hook_task_id", "contract", "created_at", "updated_at", "permissions")
     ID_FIELD_NUMBER: _ClassVar[int]
     VERSION_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -101,6 +111,7 @@ class Capability(_message.Message):
     CONTRACT_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
     id: str
     version: str
     name: str
@@ -113,7 +124,8 @@ class Capability(_message.Message):
     contract: Contract
     created_at: _timestamp_pb2.Timestamp
     updated_at: _timestamp_pb2.Timestamp
-    def __init__(self, id: _Optional[str] = ..., version: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., entrypoint: _Optional[str] = ..., language: _Optional[str] = ..., parameters: _Optional[_Iterable[_Union[Parameter, _Mapping]]] = ..., requires_pat: _Optional[bool] = ..., hook_task_id: _Optional[str] = ..., contract: _Optional[_Union[Contract, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    permissions: _containers.RepeatedCompositeFieldContainer[CapabilityPermission]
+    def __init__(self, id: _Optional[str] = ..., version: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., entrypoint: _Optional[str] = ..., language: _Optional[str] = ..., parameters: _Optional[_Iterable[_Union[Parameter, _Mapping]]] = ..., requires_pat: _Optional[bool] = ..., hook_task_id: _Optional[str] = ..., contract: _Optional[_Union[Contract, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., permissions: _Optional[_Iterable[_Union[CapabilityPermission, _Mapping]]] = ...) -> None: ...
 
 class Skill(_message.Message):
     __slots__ = ("id", "name", "description", "content", "version", "enabled", "created_at", "updated_at", "profiles", "project_id")
@@ -219,7 +231,7 @@ class Agent(_message.Message):
     def __init__(self, id: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., tools: _Optional[_Iterable[str]] = ..., model: _Optional[str] = ..., prompt: _Optional[str] = ..., permission_mode: _Optional[str] = ..., skills: _Optional[_Iterable[str]] = ..., memory: _Optional[str] = ..., background: _Optional[bool] = ..., color: _Optional[str] = ..., effort: _Optional[str] = ..., profiles: _Optional[_Iterable[str]] = ..., project_id: _Optional[str] = ..., assistants: _Optional[_Iterable[str]] = ..., model_overrides: _Optional[_Mapping[str, str]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class GovernanceRule(_message.Message):
-    __slots__ = ("id", "description", "severity", "scopes", "automated", "capability", "source", "numeric_threshold", "created_at", "updated_at", "pattern", "weight")
+    __slots__ = ("id", "description", "severity", "scopes", "automated", "capability", "source", "numeric_threshold", "created_at", "updated_at", "pattern", "weight", "enabled")
     ID_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     SEVERITY_FIELD_NUMBER: _ClassVar[int]
@@ -232,6 +244,7 @@ class GovernanceRule(_message.Message):
     UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
     PATTERN_FIELD_NUMBER: _ClassVar[int]
     WEIGHT_FIELD_NUMBER: _ClassVar[int]
+    ENABLED_FIELD_NUMBER: _ClassVar[int]
     id: str
     description: str
     severity: Severity
@@ -244,7 +257,8 @@ class GovernanceRule(_message.Message):
     updated_at: _timestamp_pb2.Timestamp
     pattern: str
     weight: int
-    def __init__(self, id: _Optional[str] = ..., description: _Optional[str] = ..., severity: _Optional[_Union[Severity, str]] = ..., scopes: _Optional[_Iterable[_Union[Scope, str]]] = ..., automated: _Optional[bool] = ..., capability: _Optional[str] = ..., source: _Optional[str] = ..., numeric_threshold: _Optional[float] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pattern: _Optional[str] = ..., weight: _Optional[int] = ...) -> None: ...
+    enabled: bool
+    def __init__(self, id: _Optional[str] = ..., description: _Optional[str] = ..., severity: _Optional[_Union[Severity, str]] = ..., scopes: _Optional[_Iterable[_Union[Scope, str]]] = ..., automated: _Optional[bool] = ..., capability: _Optional[str] = ..., source: _Optional[str] = ..., numeric_threshold: _Optional[float] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., pattern: _Optional[str] = ..., weight: _Optional[int] = ..., enabled: _Optional[bool] = ...) -> None: ...
 
 class GovernanceException(_message.Message):
     __slots__ = ("id", "rule_id", "reason", "approver", "profile", "expires", "created_at")
@@ -429,7 +443,7 @@ class DeleteProfileRequest(_message.Message):
     def __init__(self, id: _Optional[str] = ...) -> None: ...
 
 class CreateCapabilityRequest(_message.Message):
-    __slots__ = ("id", "version", "name", "description", "entrypoint", "language", "parameters", "requires_pat", "hook_task_id", "contract", "source_code", "extra_files")
+    __slots__ = ("id", "version", "name", "description", "entrypoint", "language", "parameters", "requires_pat", "hook_task_id", "contract", "source_code", "extra_files", "permissions")
     class ExtraFilesEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -449,6 +463,7 @@ class CreateCapabilityRequest(_message.Message):
     CONTRACT_FIELD_NUMBER: _ClassVar[int]
     SOURCE_CODE_FIELD_NUMBER: _ClassVar[int]
     EXTRA_FILES_FIELD_NUMBER: _ClassVar[int]
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
     id: str
     version: str
     name: str
@@ -461,7 +476,8 @@ class CreateCapabilityRequest(_message.Message):
     contract: Contract
     source_code: str
     extra_files: _containers.ScalarMap[str, str]
-    def __init__(self, id: _Optional[str] = ..., version: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., entrypoint: _Optional[str] = ..., language: _Optional[str] = ..., parameters: _Optional[_Iterable[_Union[Parameter, _Mapping]]] = ..., requires_pat: _Optional[bool] = ..., hook_task_id: _Optional[str] = ..., contract: _Optional[_Union[Contract, _Mapping]] = ..., source_code: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    permissions: _containers.RepeatedCompositeFieldContainer[CapabilityPermission]
+    def __init__(self, id: _Optional[str] = ..., version: _Optional[str] = ..., name: _Optional[str] = ..., description: _Optional[str] = ..., entrypoint: _Optional[str] = ..., language: _Optional[str] = ..., parameters: _Optional[_Iterable[_Union[Parameter, _Mapping]]] = ..., requires_pat: _Optional[bool] = ..., hook_task_id: _Optional[str] = ..., contract: _Optional[_Union[Contract, _Mapping]] = ..., source_code: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ..., permissions: _Optional[_Iterable[_Union[CapabilityPermission, _Mapping]]] = ...) -> None: ...
 
 class CreateCapabilityResponse(_message.Message):
     __slots__ = ("capability",)
@@ -538,6 +554,20 @@ class UpdateCapabilityScriptRequest(_message.Message):
     def __init__(self, id: _Optional[str] = ..., source_code: _Optional[str] = ..., extra_files: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class UpdateCapabilityScriptResponse(_message.Message):
+    __slots__ = ("capability",)
+    CAPABILITY_FIELD_NUMBER: _ClassVar[int]
+    capability: Capability
+    def __init__(self, capability: _Optional[_Union[Capability, _Mapping]] = ...) -> None: ...
+
+class SetCapabilityPermissionsRequest(_message.Message):
+    __slots__ = ("id", "permissions")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    PERMISSIONS_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    permissions: _containers.RepeatedCompositeFieldContainer[CapabilityPermission]
+    def __init__(self, id: _Optional[str] = ..., permissions: _Optional[_Iterable[_Union[CapabilityPermission, _Mapping]]] = ...) -> None: ...
+
+class SetCapabilityPermissionsResponse(_message.Message):
     __slots__ = ("capability",)
     CAPABILITY_FIELD_NUMBER: _ClassVar[int]
     capability: Capability
@@ -945,6 +975,14 @@ class DeleteRuleRequest(_message.Message):
     id: str
     def __init__(self, id: _Optional[str] = ...) -> None: ...
 
+class SetRuleEnabledRequest(_message.Message):
+    __slots__ = ("id", "enabled")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    ENABLED_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    enabled: bool
+    def __init__(self, id: _Optional[str] = ..., enabled: _Optional[bool] = ...) -> None: ...
+
 class CreateExceptionRequest(_message.Message):
     __slots__ = ("rule_id", "reason", "approver", "profile", "expires")
     RULE_ID_FIELD_NUMBER: _ClassVar[int]
@@ -1216,6 +1254,126 @@ class ListRepositoriesResponse(_message.Message):
     REPOSITORIES_FIELD_NUMBER: _ClassVar[int]
     repositories: _containers.RepeatedCompositeFieldContainer[Repository]
     def __init__(self, repositories: _Optional[_Iterable[_Union[Repository, _Mapping]]] = ...) -> None: ...
+
+class RegisterRepositoryRequest(_message.Message):
+    __slots__ = ("project_id", "name", "remote")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    REMOTE_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    name: str
+    remote: str
+    def __init__(self, project_id: _Optional[str] = ..., name: _Optional[str] = ..., remote: _Optional[str] = ...) -> None: ...
+
+class RegisterRepositoryResponse(_message.Message):
+    __slots__ = ("repository", "created")
+    REPOSITORY_FIELD_NUMBER: _ClassVar[int]
+    CREATED_FIELD_NUMBER: _ClassVar[int]
+    repository: Repository
+    created: bool
+    def __init__(self, repository: _Optional[_Union[Repository, _Mapping]] = ..., created: _Optional[bool] = ...) -> None: ...
+
+class ResolveRepositoryByRemoteRequest(_message.Message):
+    __slots__ = ("remote",)
+    REMOTE_FIELD_NUMBER: _ClassVar[int]
+    remote: str
+    def __init__(self, remote: _Optional[str] = ...) -> None: ...
+
+class ResolveRepositoryByRemoteResponse(_message.Message):
+    __slots__ = ("repository",)
+    REPOSITORY_FIELD_NUMBER: _ClassVar[int]
+    repository: Repository
+    def __init__(self, repository: _Optional[_Union[Repository, _Mapping]] = ...) -> None: ...
+
+class RepositoryReference(_message.Message):
+    __slots__ = ("id", "project_id", "source_repository_id", "source_path", "target_repository_id", "target_path", "kind", "note", "created_at")
+    ID_FIELD_NUMBER: _ClassVar[int]
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
+    TARGET_REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    TARGET_PATH_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    NOTE_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    project_id: str
+    source_repository_id: str
+    source_path: str
+    target_repository_id: str
+    target_path: str
+    kind: str
+    note: str
+    created_at: _timestamp_pb2.Timestamp
+    def __init__(self, id: _Optional[str] = ..., project_id: _Optional[str] = ..., source_repository_id: _Optional[str] = ..., source_path: _Optional[str] = ..., target_repository_id: _Optional[str] = ..., target_path: _Optional[str] = ..., kind: _Optional[str] = ..., note: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class AddRepositoryReferenceRequest(_message.Message):
+    __slots__ = ("project_id", "source_repository_id", "source_path", "target_repository_id", "target_path", "kind", "note")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
+    TARGET_REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    TARGET_PATH_FIELD_NUMBER: _ClassVar[int]
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    NOTE_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    source_repository_id: str
+    source_path: str
+    target_repository_id: str
+    target_path: str
+    kind: str
+    note: str
+    def __init__(self, project_id: _Optional[str] = ..., source_repository_id: _Optional[str] = ..., source_path: _Optional[str] = ..., target_repository_id: _Optional[str] = ..., target_path: _Optional[str] = ..., kind: _Optional[str] = ..., note: _Optional[str] = ...) -> None: ...
+
+class AddRepositoryReferenceResponse(_message.Message):
+    __slots__ = ("reference", "created")
+    REFERENCE_FIELD_NUMBER: _ClassVar[int]
+    CREATED_FIELD_NUMBER: _ClassVar[int]
+    reference: RepositoryReference
+    created: bool
+    def __init__(self, reference: _Optional[_Union[RepositoryReference, _Mapping]] = ..., created: _Optional[bool] = ...) -> None: ...
+
+class ListRepositoryReferencesRequest(_message.Message):
+    __slots__ = ("project_id", "repository_id")
+    PROJECT_ID_FIELD_NUMBER: _ClassVar[int]
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    project_id: str
+    repository_id: str
+    def __init__(self, project_id: _Optional[str] = ..., repository_id: _Optional[str] = ...) -> None: ...
+
+class ListRepositoryReferencesResponse(_message.Message):
+    __slots__ = ("references",)
+    REFERENCES_FIELD_NUMBER: _ClassVar[int]
+    references: _containers.RepeatedCompositeFieldContainer[RepositoryReference]
+    def __init__(self, references: _Optional[_Iterable[_Union[RepositoryReference, _Mapping]]] = ...) -> None: ...
+
+class RemoveRepositoryReferenceRequest(_message.Message):
+    __slots__ = ("id",)
+    ID_FIELD_NUMBER: _ClassVar[int]
+    id: str
+    def __init__(self, id: _Optional[str] = ...) -> None: ...
+
+class RemoveRepositoryReferenceResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class ResolveRepositoryFileRequest(_message.Message):
+    __slots__ = ("repository_id", "relative_path", "host_id")
+    REPOSITORY_ID_FIELD_NUMBER: _ClassVar[int]
+    RELATIVE_PATH_FIELD_NUMBER: _ClassVar[int]
+    HOST_ID_FIELD_NUMBER: _ClassVar[int]
+    repository_id: str
+    relative_path: str
+    host_id: str
+    def __init__(self, repository_id: _Optional[str] = ..., relative_path: _Optional[str] = ..., host_id: _Optional[str] = ...) -> None: ...
+
+class ResolveRepositoryFileResponse(_message.Message):
+    __slots__ = ("path", "checkout")
+    PATH_FIELD_NUMBER: _ClassVar[int]
+    CHECKOUT_FIELD_NUMBER: _ClassVar[int]
+    path: str
+    checkout: Checkout
+    def __init__(self, path: _Optional[str] = ..., checkout: _Optional[_Union[Checkout, _Mapping]] = ...) -> None: ...
 
 class RepositoryConfig(_message.Message):
     __slots__ = ("repository_id", "profile", "overrides", "updated_at")

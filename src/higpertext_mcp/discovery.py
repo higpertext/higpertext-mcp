@@ -200,6 +200,20 @@ def _read_json(path: Path) -> dict:
         return {}
 
 
+async def repository_binding(root: Path) -> tuple[str, str]:
+    """Devuelve (repository_id, project_id) del checkout cuya ruta es `root`."""
+    resolved = root.expanduser().resolve()
+    for repo in await profile_client.list_repositories():
+        for checkout in repo.get("checkouts") or []:
+            raw = checkout.get("path") or ""
+            try:
+                if Path(raw).expanduser().resolve() == resolved:
+                    return str(repo.get("id") or ""), str(repo.get("project_id") or "")
+            except OSError:
+                continue
+    return "", ""
+
+
 def active_profile(root: Path) -> str | None:
     env = _read_json(root / _WORKSPACE_DIR / "config" / "environment.json")
     return env.get("active_profile") or None

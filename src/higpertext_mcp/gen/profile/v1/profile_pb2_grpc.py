@@ -315,6 +315,11 @@ class CapabilityServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptResponse.FromString,
                 _registered_method=True)
+        self.SetCapabilityPermissions = channel.unary_unary(
+                '/profile.v1.CapabilityService/SetCapabilityPermissions',
+                request_serializer=profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsResponse.FromString,
+                _registered_method=True)
 
 
 class CapabilityServiceServicer:
@@ -356,6 +361,12 @@ class CapabilityServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetCapabilityPermissions(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CapabilityServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -388,6 +399,11 @@ def add_CapabilityServiceServicer_to_server(servicer, server):
                     servicer.UpdateCapabilityScript,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptResponse.SerializeToString,
+            ),
+            'SetCapabilityPermissions': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetCapabilityPermissions,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -552,6 +568,33 @@ class CapabilityService:
             '/profile.v1.CapabilityService/UpdateCapabilityScript',
             profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.UpdateCapabilityScriptResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetCapabilityPermissions(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.CapabilityService/SetCapabilityPermissions',
+            profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.SetCapabilityPermissionsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1448,6 +1491,11 @@ class GovernanceServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.DeleteRuleRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
+        self.SetRuleEnabled = channel.unary_unary(
+                '/profile.v1.GovernanceService/SetRuleEnabled',
+                request_serializer=profile_dot_v1_dot_profile__pb2.SetRuleEnabledRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.GovernanceRule.FromString,
+                _registered_method=True)
         self.CreateException = channel.unary_unary(
                 '/profile.v1.GovernanceService/CreateException',
                 request_serializer=profile_dot_v1_dot_profile__pb2.CreateExceptionRequest.SerializeToString,
@@ -1481,6 +1529,12 @@ class GovernanceServiceServicer:
         raise NotImplementedError('Method not implemented!')
 
     def DeleteRule(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetRuleEnabled(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1521,6 +1575,11 @@ def add_GovernanceServiceServicer_to_server(servicer, server):
                     servicer.DeleteRule,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.DeleteRuleRequest.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'SetRuleEnabled': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetRuleEnabled,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.SetRuleEnabledRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.GovernanceRule.SerializeToString,
             ),
             'CreateException': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateException,
@@ -1619,6 +1678,33 @@ class GovernanceService:
             '/profile.v1.GovernanceService/DeleteRule',
             profile_dot_v1_dot_profile__pb2.DeleteRuleRequest.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetRuleEnabled(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.GovernanceService/SetRuleEnabled',
+            profile_dot_v1_dot_profile__pb2.SetRuleEnabledRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.GovernanceRule.FromString,
             options,
             channel_credentials,
             insecure,
@@ -1990,6 +2076,36 @@ class ProjectServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.ListRepositoriesRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.ListRepositoriesResponse.FromString,
                 _registered_method=True)
+        self.RegisterRepository = channel.unary_unary(
+                '/profile.v1.ProjectService/RegisterRepository',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RegisterRepositoryRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RegisterRepositoryResponse.FromString,
+                _registered_method=True)
+        self.ResolveRepositoryByRemote = channel.unary_unary(
+                '/profile.v1.ProjectService/ResolveRepositoryByRemote',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteResponse.FromString,
+                _registered_method=True)
+        self.AddRepositoryReference = channel.unary_unary(
+                '/profile.v1.ProjectService/AddRepositoryReference',
+                request_serializer=profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceResponse.FromString,
+                _registered_method=True)
+        self.ListRepositoryReferences = channel.unary_unary(
+                '/profile.v1.ProjectService/ListRepositoryReferences',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesResponse.FromString,
+                _registered_method=True)
+        self.RemoveRepositoryReference = channel.unary_unary(
+                '/profile.v1.ProjectService/RemoveRepositoryReference',
+                request_serializer=profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceResponse.FromString,
+                _registered_method=True)
+        self.ResolveRepositoryFile = channel.unary_unary(
+                '/profile.v1.ProjectService/ResolveRepositoryFile',
+                request_serializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileResponse.FromString,
+                _registered_method=True)
         self.GetRepositoryConfig = channel.unary_unary(
                 '/profile.v1.ProjectService/GetRepositoryConfig',
                 request_serializer=profile_dot_v1_dot_profile__pb2.GetRepositoryConfigRequest.SerializeToString,
@@ -2069,6 +2185,42 @@ class ProjectServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RegisterRepository(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ResolveRepositoryByRemote(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AddRepositoryReference(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListRepositoryReferences(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RemoveRepositoryReference(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ResolveRepositoryFile(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetRepositoryConfig(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -2141,6 +2293,36 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     servicer.ListRepositories,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.ListRepositoriesRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.ListRepositoriesResponse.SerializeToString,
+            ),
+            'RegisterRepository': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterRepository,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RegisterRepositoryRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RegisterRepositoryResponse.SerializeToString,
+            ),
+            'ResolveRepositoryByRemote': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResolveRepositoryByRemote,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteResponse.SerializeToString,
+            ),
+            'AddRepositoryReference': grpc.unary_unary_rpc_method_handler(
+                    servicer.AddRepositoryReference,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceResponse.SerializeToString,
+            ),
+            'ListRepositoryReferences': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListRepositoryReferences,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesResponse.SerializeToString,
+            ),
+            'RemoveRepositoryReference': grpc.unary_unary_rpc_method_handler(
+                    servicer.RemoveRepositoryReference,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceResponse.SerializeToString,
+            ),
+            'ResolveRepositoryFile': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResolveRepositoryFile,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileResponse.SerializeToString,
             ),
             'GetRepositoryConfig': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRepositoryConfig,
@@ -2384,6 +2566,168 @@ class ProjectService:
             '/profile.v1.ProjectService/ListRepositories',
             profile_dot_v1_dot_profile__pb2.ListRepositoriesRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.ListRepositoriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RegisterRepository(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/RegisterRepository',
+            profile_dot_v1_dot_profile__pb2.RegisterRepositoryRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RegisterRepositoryResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ResolveRepositoryByRemote(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ResolveRepositoryByRemote',
+            profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ResolveRepositoryByRemoteResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AddRepositoryReference(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/AddRepositoryReference',
+            profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.AddRepositoryReferenceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListRepositoryReferences(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ListRepositoryReferences',
+            profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ListRepositoryReferencesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RemoveRepositoryReference(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/RemoveRepositoryReference',
+            profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.RemoveRepositoryReferenceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ResolveRepositoryFile(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/ResolveRepositoryFile',
+            profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.ResolveRepositoryFileResponse.FromString,
             options,
             channel_credentials,
             insecure,

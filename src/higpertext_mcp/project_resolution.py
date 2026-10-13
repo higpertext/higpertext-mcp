@@ -42,6 +42,7 @@ def resolve_project(root: Path) -> ResolvedProject | None:
     """
     try:
         import higpertext_mcp
+        from higpertext_mcp.repository_resolution import git_remote
 
         sys.path.insert(0, str(Path(higpertext_mcp.__file__).parent / "gen"))
         from higpertext_mcp.gen.profile.v1 import profile_pb2, profile_pb2_grpc
@@ -51,6 +52,25 @@ def resolve_project(root: Path) -> ResolvedProject | None:
 
     addr = os.environ.get("HIGPERTEXT_PROFILE_SERVER_ADDR", "localhost:50051")
     try:
+        remote = git_remote(root)
+        if remote:
+            from higpertext_mcp import profile_client
+
+            try:
+                repository = profile_client.resolve_repository_by_remote_sync(remote)
+            except _grpc.RpcError as exc:
+                # Un repositorio remoto no registrado no debe crear un Project a
+                # partir de la ruta personal. Debe incorporarse al Project desde
+                # el catálogo compartido primero.
+                if exc.code() == _grpc.StatusCode.NOT_FOUND:
+                    return None
+                if exc.code() != _grpc.StatusCode.UNIMPLEMENTED:
+                    raise
+            else:
+                return {
+                    "id": repository["project_id"], "root_path": str(root), "root_path_hash": "",
+                    "name": repository["name"], "paths": [],
+                }
         channel = _grpc.insecure_channel(addr)
         stub = profile_pb2_grpc.ProjectServiceStub(channel)
         resp = stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=str(root)), timeout=2)

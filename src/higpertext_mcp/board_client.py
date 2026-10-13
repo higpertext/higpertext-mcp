@@ -120,6 +120,21 @@ def _activity_to_dict(a: board_pb2.BoardActivity) -> dict:
     }
 
 
+def _scenario_to_dict(scenario: board_pb2.VerificationScenario) -> dict:
+    return {
+        "id": scenario.id, "criterion_id": scenario.criterion_id,
+        "kind": board_pb2.ScenarioKind.Name(scenario.kind), "title": scenario.title,
+        "regression": scenario.regression, "author": scenario.author,
+        "steps": [{
+            "name": step.name, "command": step.command,
+            "expect_exit_code": step.expect_exit_code,
+            "output_contains": list(step.output_contains),
+            "output_not_contains": list(step.output_not_contains),
+            "output_regex": step.output_regex, "timeout_seconds": step.timeout_seconds,
+        } for step in scenario.steps],
+    }
+
+
 def _task_to_dict(t: board_pb2.Task) -> dict:
     return {
         "id": t.id,
@@ -128,11 +143,22 @@ def _task_to_dict(t: board_pb2.Task) -> dict:
         "done": t.done,
         "position": t.position,
         "acceptance_criteria": [
-            {"id": c.id, "description": c.description, "done": c.done, "created_at": _timestamp(c.created_at)}
+            {"id": c.id, "description": c.description, "done": c.done,
+             "created_at": _timestamp(c.created_at),
+             "scenarios": [_scenario_to_dict(scenario) for scenario in c.scenarios]}
             for c in t.acceptance_criteria
         ],
         "created_at": _timestamp(t.created_at),
         "updated_at": _timestamp(t.updated_at),
+        "verification": {
+            "state": board_pb2.VerificationState.Name(t.verification.state),
+            "spec_hash": t.verification.spec_hash,
+            "base_commit": t.verification.base_commit,
+            "implementer": t.verification.implementer,
+            "verified_commit": t.verification.verified_commit,
+            "frozen_at": _timestamp(t.verification.frozen_at),
+            "verified_at": _timestamp(t.verification.verified_at),
+        },
     }
 
 
@@ -310,11 +336,24 @@ async def get_task(task_id: str) -> dict:
         return _task_to_dict(resp.task)
 
 
-async def update_task(*, task_id: str, title: str, done: bool, position: int = 0) -> dict:
+async def update_task(
+    *, task_id: str, title: str, done: bool, position: int = 0,
+    acceptance_criteria: list[str] | None = None,
+) -> dict:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.TaskServiceStub(channel)
         resp = await stub.UpdateTask(
-            board_pb2.UpdateTaskRequest(id=task_id, title=title, done=done, position=position),
+            board_pb2.UpdateTaskRequest(
+                id=task_id,
+                title=title,
+                done=done,
+                position=position,
+                replace_acceptance_criteria=acceptance_criteria is not None,
+                acceptance_criteria=[
+                    board_pb2.AcceptanceCriterionInput(description=value)
+                    for value in (acceptance_criteria or [])
+                ],
+            ),
             timeout=_CALL_TIMEOUT_S,
         )
         return _task_to_dict(resp.task)
@@ -324,3 +363,60 @@ async def delete_task(task_id: str) -> None:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.TaskServiceStub(channel)
         await stub.DeleteTask(board_pb2.DeleteTaskRequest(id=task_id), timeout=_CALL_TIMEOUT_S)
+
+
+async def propose_scenarios(*, task_id: str, author: str, scenarios: list[dict], dry_run: bool = False) -> dict:
+    """Propone (o valida sin guardar) escenarios de verificación para la spec completa."""
+    inputs = []
+    for scenario in scenarios:
+        steps = [board_pb2.VerificationStep(
+            name=str(step["name"]), command=str(step["command"]),
+            expect_exit_code=int(step["expect_exit_code"]),
+            output_contains=list(step.get("output_contains", [])),
+            output_not_contains=list(step.get("output_not_contains", [])),
+            output_regex=str(step.get("output_regex", "")),
+            timeout_seconds=int(step.get("timeout_seconds", 0)),
+        ) for step in scenario.get("steps", [])]
+        kind = str(scenario["kind"])
+        inputs.append(board_pb2.VerificationScenarioInput(
+            criterion_id=str(scenario["criterion_id"]), kind=board_pb2.ScenarioKind.Value(kind),
+            title=str(scenario["title"]), regression=bool(scenario.get("regression", False)), steps=steps,
+        ))
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.VerificationServiceStub(channel)
+        response = await stub.ProposeScenarios(board_pb2.ProposeScenariosRequest(
+            task_id=task_id, author=author, scenarios=inputs, dry_run=dry_run,
+        ), timeout=_CALL_TIMEOUT_S)
+        return {"task": _task_to_dict(response.task), "spec_hash": response.spec_hash, "dry_run": dry_run}
+
+
+async def freeze_spec(*, task_id: str, base_commit: str, implementer: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.VerificationServiceStub(channel)
+        response = await stub.FreezeSpec(board_pb2.FreezeSpecRequest(
+            task_id=task_id, base_commit=base_commit, implementer=implementer,
+        ), timeout=_CALL_TIMEOUT_S)
+        return {"task": _task_to_dict(response.task)}
+
+
+async def list_verification_runs(*, task_id: str, limit: int = 10) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.VerificationServiceStub(channel)
+        response = await stub.ListVerificationRuns(board_pb2.ListVerificationRunsRequest(
+            task_id=task_id, limit=limit,
+        ), timeout=_CALL_TIMEOUT_S)
+        return {"runs": [{
+            "id": run.id, "task_id": run.task_id, "event": run.event,
+            "phase": board_pb2.VerificationPhase.Name(run.phase), "passed": run.passed,
+            "base_commit": run.base_commit, "head_commit": run.head_commit, "actor": run.actor,
+            "reasons": list(run.reasons), "created_at": _timestamp(run.created_at),
+        } for run in response.runs]}
+
+
+async def get_activity_gate(*, activity_id: str) -> dict:
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.VerificationServiceStub(channel)
+        response = await stub.GetActivityGate(board_pb2.GetActivityGateRequest(
+            activity_id=activity_id,
+        ), timeout=_CALL_TIMEOUT_S)
+        return {"ready": response.ready, "blocking": list(response.blocking)}

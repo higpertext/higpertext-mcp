@@ -239,11 +239,13 @@ async def test_record_activity_reaches_stub(monkeypatch):
     _patch_channel(monkeypatch, activity_stub=activity_stub)
 
     await profile_client.record_activity(
-        capability_id="common.grep-search", profile="dev", status="success", summary="ok"
+        capability_id="common.grep-search", profile="dev", status="success", summary="ok",
+        user_id="user-123",
     )
 
     assert len(activity_stub.recorded) == 1
     assert activity_stub.recorded[0].capability_id == "common.grep-search"
+    assert activity_stub.recorded[0].user_id == "user-123"
 
 
 @pytest.mark.anyio

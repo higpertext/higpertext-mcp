@@ -41,3 +41,70 @@ async def test_migrate_local_roadmap_creates_status_columns_and_tasks(monkeypatc
 async def _async(value):
     return value
 
+
+@pytest.mark.anyio
+async def test_update_task_forwards_acceptance_criteria_replacement(monkeypatch):
+    requests = []
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+    class FakeTaskService:
+        async def UpdateTask(self, request, timeout):
+            requests.append(request)
+            return type("Response", (), {"task": board_client.board_pb2.Task(id=request.id, title=request.title)})()
+
+    monkeypatch.setattr(board_client.grpc.aio, "insecure_channel", lambda *_: FakeChannel())
+    monkeypatch.setattr(board_client.board_pb2_grpc, "TaskServiceStub", lambda _: FakeTaskService())
+
+    await board_client.update_task(task_id="t1", title="Task", done=False, acceptance_criteria=["rollback"])
+    assert requests[-1].replace_acceptance_criteria is True
+    assert [criterion.description for criterion in requests[-1].acceptance_criteria] == ["rollback"]
+
+    await board_client.update_task(task_id="t1", title="Task", done=False)
+    assert requests[-1].replace_acceptance_criteria is False
+    assert list(requests[-1].acceptance_criteria) == []
+
+    await board_client.update_task(task_id="t1", title="Task", done=False, acceptance_criteria=[])
+    assert requests[-1].replace_acceptance_criteria is True
+    assert list(requests[-1].acceptance_criteria) == []
+
+
+@pytest.mark.anyio
+async def test_propose_scenarios_forwards_authenticated_verification_spec(monkeypatch):
+    requests = []
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+    class FakeVerificationService:
+        async def ProposeScenarios(self, request, timeout):
+            requests.append(request)
+            return board_client.board_pb2.ProposeScenariosResponse(
+                task=board_client.board_pb2.Task(id=request.task_id, title="task"), spec_hash="abc123",
+            )
+
+    monkeypatch.setattr(board_client.grpc.aio, "insecure_channel", lambda *_: FakeChannel())
+    monkeypatch.setattr(board_client.board_pb2_grpc, "VerificationServiceStub", lambda _: FakeVerificationService())
+    result = await board_client.propose_scenarios(
+        task_id="task-1", author="user-verified", dry_run=True,
+        scenarios=[{
+            "criterion_id": "criterion-1", "kind": "SCENARIO_HAPPY", "title": "happy path",
+            "steps": [{"name": "run", "command": "go test ./...", "expect_exit_code": 0, "output_contains": ["ok"]}],
+        }],
+    )
+    assert result["spec_hash"] == "abc123"
+    assert result["dry_run"] is True
+    assert requests[0].author == "user-verified"
+    assert requests[0].dry_run is True
+    assert requests[0].scenarios[0].kind == board_client.board_pb2.SCENARIO_HAPPY
+    assert requests[0].scenarios[0].steps[0].expect_exit_code == 0
+    assert list(requests[0].scenarios[0].steps[0].output_contains) == ["ok"]
