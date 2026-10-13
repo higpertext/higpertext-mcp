@@ -293,7 +293,7 @@ async def test_capability_source_validate_and_run(monkeypatch, tmp_path):
         lambda _id: _async_value(("print('ok')", "python", {})),
     )
 
-    async def fake_call(_id, _args, _definition):
+    async def fake_call(_id, _args, _definition, **_kwargs):
         return dispatch.CapabilityResult(ok=True, summary="executed", data={"text": "ok"}, artifacts=[], warnings=[])
 
     monkeypatch.setattr(server_module.dispatch, "call_capability", fake_call)
@@ -768,7 +768,7 @@ async def test_call_tool_returns_structured_content(monkeypatch):
     monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
     _stub_profile_catalog(monkeypatch, {"dev": [_GREP_SEARCH]})
 
-    async def fake_call_capability(*_args):
+    async def fake_call_capability(*_args, **_kwargs):
         return dispatch.CapabilityResult(
             ok=True,
             summary="One match found.",
@@ -823,3 +823,45 @@ async def test_list_resources_exposes_usage_and_memory(monkeypatch):
         read = await client.read_resource("higpertext://session/memory")
         payload = json.loads(read.contents[0].text)
         assert payload == {"entries": []}
+
+
+@pytest.mark.anyio
+async def test_roadmap_propose_scenarios_uses_pat_owner_as_author(monkeypatch):
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(
+        server_module.profile_client, "resolve_project",
+        lambda _root: _async_value({"id": "project-1", "name": "demo", "root_path": str(root)}),
+    )
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-1", user_id="user-verified", scopes=frozenset({"boards.advance"}),
+        profile="", organization_ids=frozenset(), repository_ids=frozenset(),
+    ))
+    received = {}
+
+    async def fake_propose(**kwargs):
+        received.update(kwargs)
+        return {"task": {"id": kwargs["task_id"]}, "spec_hash": "abc123", "dry_run": True}
+
+    monkeypatch.setattr(server_module.board_client, "propose_scenarios", fake_propose)
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        tools = await client.list_tools()
+        board_tool = next(tool for tool in tools.tools if tool.name == "higpertext-roadmap-board")
+        assert "task_propose_scenarios" in board_tool.inputSchema["properties"]["action"]["enum"]
+        result = await client.call_tool("higpertext-roadmap-board", {
+            "action": "task_propose_scenarios", "task_id": "task-1", "author": "spoofed",
+            "dry_run": True, "scenarios": [{
+                "criterion_id": "criterion-1", "kind": "SCENARIO_HAPPY", "title": "happy path",
+                "steps": [{"name": "run", "command": "go test ./...", "expect_exit_code": 0}],
+            }],
+        })
+    assert result.isError is False
+    assert received["author"] == "user-verified"
+    assert received["dry_run"] is True
+    assert result.structuredContent["_higpertext_auth"] == {
+        "user_id": "user-verified", "source": "validated_pat"
+    }

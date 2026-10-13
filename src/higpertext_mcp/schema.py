@@ -46,7 +46,11 @@ _COMMON_PARAMETER_OVERRIDES: dict[str, dict[str, dict[str, Any]]] = {
         "files_only": {"type": "boolean"},
         "json": {"type": "boolean"},
     },
-    "common.graph-rebuild": {"god_threshold": {"type": "integer"}},
+    "common.graph-rebuild": {
+        "god_threshold": {"type": "integer"},
+        "repository_id": {"type": "string"},
+        "project_id": {"type": "string"},
+    },
     "common.grep-search": {
         "include": {"type": "array", "items": {"type": "string"}},
         "extension": {"type": "array", "items": {"type": "string"}},
@@ -261,6 +265,10 @@ def _capability_to_raw(cap: profile_pb2.Capability) -> dict[str, Any]:
         "language": cap.language,
         "parameters": parameters,
         "contract": contract,
+        "permissions": [
+            {"action": p.action, "level": p.level, "description": p.description}
+            for p in cap.permissions
+        ],
         "description": cap.description,
     }
 

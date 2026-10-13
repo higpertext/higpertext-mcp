@@ -25,6 +25,7 @@ def test_params_to_argv_serializes_rich_values_for_legacy_scripts():
 @pytest.mark.anyio
 async def test_call_capability_records_canonical_lifecycle(monkeypatch, tmp_path):
     trace = []
+    recorded_activity = []
 
     async def record_trace_event(root, *, trace_id, event, data=None):
         trace.append(event)
@@ -35,8 +36,8 @@ async def test_call_capability_records_canonical_lifecycle(monkeypatch, tmp_path
     monkeypatch.setattr(dispatch.discovery, "resolve_project_root", lambda: tmp_path)
     monkeypatch.setattr(dispatch.memory, "record_trace_event", record_trace_event)
     monkeypatch.setattr(dispatch.runner, "resolve_script", resolve_script)
-    async def record_activity(*_args, **_kwargs):
-        return None
+    async def record_activity(*_args, **kwargs):
+        recorded_activity.append(kwargs)
 
     monkeypatch.setattr(dispatch, "_record_activity_best_effort", record_activity)
     monkeypatch.setattr(
@@ -45,7 +46,9 @@ async def test_call_capability_records_canonical_lifecycle(monkeypatch, tmp_path
         lambda fn, args: dispatch.execution.ExecutionResult(0, "[SUCCESS] done", ""),
     )
 
-    result = await dispatch.call_capability("example.action", {}, {"parameters": []})
+    result = await dispatch.call_capability(
+        "example.action", {}, {"parameters": []}, user_id="user-123"
+    )
 
     assert result.ok
     assert trace == [
@@ -53,6 +56,7 @@ async def test_call_capability_records_canonical_lifecycle(monkeypatch, tmp_path
         events.EventType.ACTION_STARTED.value,
         events.EventType.ACTION_COMPLETED.value,
     ]
+    assert recorded_activity[0]["user_id"] == "user-123"
 
 
 @pytest.mark.anyio

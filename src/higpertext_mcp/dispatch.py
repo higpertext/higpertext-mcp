@@ -176,7 +176,8 @@ def _summary(output: str, ok: bool) -> str:
 
 
 async def _record_activity_best_effort(
-    capability_id: str, params: dict, result, contract_ok: bool, contract_errors: list
+    capability_id: str, params: dict, result, contract_ok: bool, contract_errors: list,
+    user_id: str = ""
 ) -> None:
     # Best-effort en ambos destinos: ni Redis ni el profile server deben poder
     # tumbar la respuesta al cliente MCP (cada uno ya maneja sus propios
@@ -189,12 +190,15 @@ async def _record_activity_best_effort(
     await asyncio.gather(
         memory.record_memory(root, action=action, status=status, notes=notes),
         profile_client.record_activity(
-            capability_id=capability_id, profile=profile, status=status, summary=notes
+            capability_id=capability_id, profile=profile, status=status, summary=notes,
+            user_id=user_id
         ),
     )
 
 
-async def call_capability(capability_id: str, params: dict, capability_data: dict) -> CapabilityResult:
+async def call_capability(
+    capability_id: str, params: dict, capability_data: dict, *, user_id: str = ""
+) -> CapabilityResult:
     validation = execution.normalize_and_validate_params(capability_data, params)
     if not validation.ok:
         return CapabilityResult(
@@ -207,6 +211,14 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         )
 
     root = discovery.resolve_project_root()
+    if capability_id == "common.graph-rebuild":
+        await runner.refresh_script(capability_id)
+        if not validation.params.get("repository_id"):
+            repository_id, project_id = await discovery.repository_binding(root)
+            if repository_id:
+                validation.params["repository_id"] = repository_id
+            if project_id and not validation.params.get("project_id"):
+                validation.params["project_id"] = project_id
     argv = _params_to_argv(capability_id, _localize_params(validation.params))
     trace_id = tracing.current()
     trace_data = {"capability_id": capability_id, "params": validation.params}
@@ -255,7 +267,7 @@ async def call_capability(capability_id: str, params: dict, capability_data: dic
         error = output or "Capability failed without diagnostic output."
 
     await _record_activity_best_effort(
-        capability_id, validation.params, result, contract_ok, contract_errors
+        capability_id, validation.params, result, contract_ok, contract_errors, user_id=user_id
     )
     terminal_event = (
         events.EventType.ACTION_COMPLETED

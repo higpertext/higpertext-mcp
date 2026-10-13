@@ -19,6 +19,10 @@ import mcp.types as types
 from mcp.server.lowlevel import Server
 from mcp.server.stdio import stdio_server
 
+from higpertext_mcp.http_auth import current_api_token
+from higpertext_mcp import token_permissions
+from higpertext_mcp.token_permissions import filtered_tool, tool_allowed
+
 from higpertext_mcp import (
     annotations,
     adapter_catalog,
@@ -75,10 +79,11 @@ _SYSTEM_OVERVIEW_TOOL = types.Tool(
 _BOARD_TOOL = types.Tool(
     name=BOARD_TOOL_NAME,
     description=(
-        "Flujo completo de roadmap y tablero del proyecto: consulta boards, columnas, "
-        "actividades y tasks; crea/mueve/edita elementos y migra el roadmap JSON "
-        "existente al board persistente. El frontend puede usar esta tool como su "
-        "contrato único de Kanban."
+        "Flujo de roadmap, tasks y verificación del proyecto: consulta boards, columnas, "
+        "actividades, tasks, escenarios, corridas y el gate de cierre; permite proponer "
+        "escenarios (incluye dry_run), congelar una spec y migrar el roadmap al board. "
+        "La ejecución y el registro de evidencia se hacen con htx-verify. Para PAT, el "
+        "autor de escenarios siempre es el user_id validado por rules-api."
     ),
     inputSchema={
         "type": "object",
@@ -86,6 +91,7 @@ _BOARD_TOOL = types.Tool(
             "action": {"type": "string", "enum": [
                 "overview", "list_boards", "create", "update", "delete",
                 "move", "delete_board", "task_create", "task_update", "task_delete", "migrate",
+                "task_propose_scenarios", "task_freeze_spec", "verification_runs", "activity_gate",
             ]},
             "project_id": {"type": "string"},
             "root_path": {"type": "string"},
@@ -104,7 +110,25 @@ _BOARD_TOOL = types.Tool(
             "tags": {"type": "array", "items": {"type": "string"}},
             "assignee_user_id": {"type": "string"},
             "done": {"type": "boolean"},
-            "acceptance_criteria": {"type": "array", "items": {"type": "string"}},
+            "acceptance_criteria": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "En task_update reemplaza la lista completa; omitirla conserva los criterios y [] los limpia. En task_create define los criterios iniciales.",
+            },
+            "author": {"type": "string", "description": "Autor verificador para stdio sin PAT; con PAT autenticado se usa su user_id validado."},
+            "scenarios": {"type": "array", "items": {"type": "object", "properties": {
+                "criterion_id": {"type": "string"},
+                "kind": {"type": "string", "enum": ["SCENARIO_HAPPY", "SCENARIO_NEGATIVE", "SCENARIO_BOUNDARY", "SCENARIO_ERROR"]},
+                "title": {"type": "string"}, "regression": {"type": "boolean"},
+                "steps": {"type": "array", "items": {"type": "object", "properties": {
+                    "name": {"type": "string"}, "command": {"type": "string"}, "expect_exit_code": {"type": "integer"},
+                    "output_contains": {"type": "array", "items": {"type": "string"}},
+                    "output_not_contains": {"type": "array", "items": {"type": "string"}},
+                    "output_regex": {"type": "string"}, "timeout_seconds": {"type": "integer", "minimum": 0, "maximum": 600},
+                }, "required": ["name", "command", "expect_exit_code"], "additionalProperties": False}},
+            }, "required": ["criterion_id", "kind", "title", "steps"], "additionalProperties": False}},
+            "dry_run": {"type": "boolean", "default": False}, "base_commit": {"type": "string"},
+            "implementer": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 100},
             "tasks": {"type": "array", "items": {"type": "string"}},
         },
         "required": ["action"],
@@ -303,7 +327,9 @@ _CAPABILITY_TOOL = types.Tool(
     name=CAPABILITY_TOOL_NAME,
     description=(
         "Administra el backend de Capabilities (CapabilityService): crear capabilities y "
-        "actualizar individualmente su source y helpers, consultar, validar, probar y ejecutar scripts. "
+        "definir permisos por acción (read/write/admin), actualizar individualmente su source y helpers, "
+        "consultar, validar, probar y ejecutar scripts. `set_permissions` reemplaza la matriz completa "
+        "de permisos; envía [] para denegar todas las acciones. "
         "`update` conserva la metadata y reemplaza el código por ID. `run` y `test` sólo aceptan una "
         "capability ya autorizada por el perfil activo del proyecto. La ejecución usa "
         "el runner MCP actual; para producción multi-tenant debe envolverse en un worker "
@@ -312,8 +338,8 @@ _CAPABILITY_TOOL = types.Tool(
     inputSchema={
         "type": "object",
         "properties": {
-            "action": {"type": "string", "enum": ["create", "update", "get", "source", "validate", "test", "run", "list", "delete"]},
-            "id": {"type": "string", "description": "requerido en create/update/get/source/validate/test/run/delete, ej. 'custom.my-tool'"},
+            "action": {"type": "string", "enum": ["create", "update", "set_permissions", "get", "source", "validate", "test", "run", "list", "delete"]},
+            "id": {"type": "string", "description": "requerido en create/update/set_permissions/get/source/validate/test/run/delete, ej. 'custom.my-tool'"},
             "name": {"type": "string"},
             "description": {"type": "string"},
             "entrypoint": {"type": "string", "description": "path relativo identificador, ej. 'capabilities/custom/scripts/my_tool.py' (solo metadata, no se lee del disco)"},
@@ -321,6 +347,15 @@ _CAPABILITY_TOOL = types.Tool(
             "version": {"type": "string", "default": "1.0.0"},
             "source_code": {"type": "string", "description": "contenido del script en texto plano (requerido en create/update)"},
             "extra_files": {"type": "object", "additionalProperties": {"type": "string"}, "description": "helpers hermanos: filename -> contenido en texto plano"},
+            "permissions": {
+                "type": "array",
+                "description": "permisos por acción; requerido en create/set_permissions",
+                "items": {"type": "object", "properties": {
+                    "action": {"type": "string"},
+                    "level": {"type": "string", "enum": ["read", "write", "admin"]},
+                    "description": {"type": "string"},
+                }, "required": ["action", "level"], "additionalProperties": False},
+            },
             "arguments": {"type": "object", "description": "parámetros de la capability para test/run", "additionalProperties": True},
             "include_files": {"type": "boolean", "description": "source/validate: incluye helpers auxiliares"},
             "parameters": {
@@ -576,14 +611,31 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         state["tools"] = await _load_tools()
         state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
         local = [_to_mcp_tool(cap_id, spec) for cap_id, spec in state["tools"].items()]
-        return [_CONFIGURE_TOOL, _SYSTEM_OVERVIEW_TOOL, _BOARD_TOOL, _RENDER_ADAPTERS_TOOL, _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL, _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local, *(await ext_pool.list_tools_merged())]
+        all_tools = [
+            _CONFIGURE_TOOL, _SYSTEM_OVERVIEW_TOOL, _BOARD_TOOL, _RENDER_ADAPTERS_TOOL,
+            _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL,
+            _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local,
+            *(await ext_pool.list_tools_merged()),
+        ]
+        token = current_api_token()
+        if token is None:  # stdio local conserva la selección del perfil
+            return all_tools
+        visible_tools = []
+        for tool in all_tools:
+            capability_id = state["name_to_id"].get(tool.name, "")
+            capability_permissions = state["tools"].get(capability_id).raw.get("permissions", []) if capability_id else None
+            visible = filtered_tool(tool, token, capability_id, capability_permissions)
+            if visible is None:
+                continue
+            if await token_permissions.resource_allowed(token, {}, capability_id, tool.name):
+                visible_tools.append(visible)
+        return visible_tools
 
     # La validación de entrada se hace acá para poder devolver un CallToolResult
     # útil al cliente. La validación automática del SDK corta antes del handler y
     # expone el mensaje crudo de jsonschema (por ejemplo, "no es válido bajo
     # ninguno de los schemas"), que no le indica al modelo cómo corregirse.
-    @server.call_tool(validate_input=False)
-    async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+    async def dispatch_tool(name: str, arguments: dict) -> types.CallToolResult:
         if "name_to_id" not in state:
             state["tools"] = await _load_tools()
             state["name_to_id"] = {_mcp_tool_name(cap_id): cap_id for cap_id in state["tools"]}
@@ -605,6 +657,22 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             )
         }
         capability_id = state["name_to_id"].get(name)
+        token = current_api_token()
+        action = str((arguments or {}).get("action", "")) if isinstance(arguments, dict) else ""
+        resource_id = str((arguments or {}).get("id", "")) if isinstance(arguments, dict) else ""
+        capability_permissions = state["tools"].get(capability_id).raw.get("permissions", []) if capability_id else None
+        if token is not None and (
+            not tool_allowed(name, token, capability_id or "", action, capability_permissions, resource_id)
+            or not await token_permissions.resource_allowed(
+                token, arguments if isinstance(arguments, dict) else {}, capability_id or "", name
+            )
+        ):
+            message = "El token no tiene permiso para esta herramienta o acción."
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text=message)],
+                isError=True,
+                structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
+            )
         if capability_id is not None:
             local_tools[name] = _to_mcp_tool(capability_id, state["tools"][capability_id])
         tool = local_tools.get(name)
@@ -678,7 +746,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         pattern=args.get("pattern", ""),
                     )
                     summary = f"Regla '{rule.id}' creada ({profile_client.profile_pb2.Severity.Name(rule.severity)})."
-                    data = {"id": rule.id, "description": rule.description, "severity": profile_client.profile_pb2.Severity.Name(rule.severity), "scopes": [profile_client.profile_pb2.Scope.Name(s) for s in rule.scopes], "source": rule.source, "pattern": rule.pattern}
+                    data = {"id": rule.id, "description": rule.description, "severity": profile_client.profile_pb2.Severity.Name(rule.severity), "scopes": [profile_client.profile_pb2.Scope.Name(s) for s in rule.scopes], "source": rule.source, "pattern": rule.pattern, "enabled": rule.enabled if rule.HasField("enabled") else True}
                 elif action == "list":
                     rules = await profile_client.list_governance_rules(args.get("scope_filter", ""))
                     summary = f"{len(rules)} regla(s) de gobernanza."
@@ -691,6 +759,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                             "source": r.source,
                             "capability": r.capability,
                             "pattern": r.pattern,
+                            "enabled": r.enabled if r.HasField("enabled") else True,
                         }
                         for r in rules
                     ]}
@@ -767,7 +836,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         version=args.get("version", "1.0.0"), language=args.get("language", "python"),
                         parameters=args.get("parameters"), requires_pat=bool(args.get("requires_pat", False)),
                         hook_task_id=args.get("hook_task_id", ""), contract=args.get("contract"),
-                        extra_files=args.get("extra_files"),
+                        extra_files=args.get("extra_files"), permissions=args.get("permissions"),
                     )
                     summary = f"Capability '{data['id']}' creada."
                 elif action == "update":
@@ -777,6 +846,11 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         id=args["id"], source_code=args["source_code"], extra_files=args.get("extra_files"),
                     )
                     summary = f"Código de capability '{data['id']}' actualizado."
+                elif action == "set_permissions":
+                    if "permissions" not in args:
+                        raise ValueError("permissions es requerido en set_permissions; envía [] para denegar todas las acciones")
+                    data = await profile_client.set_capability_permissions(args["id"], args["permissions"])
+                    summary = f"Permisos de capability '{data['id']}' actualizados."
                 elif action == "get":
                     data = await profile_client.get_capability(args["id"])
                     summary = f"Capability '{data['id']}'."
@@ -813,6 +887,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         capability.id,
                         args.get("arguments") or {},
                         profile_client._capability_to_dict(capability),
+                        user_id=token.user_id if token else "",
                     )
                     summary = f"Capability '{args['id']}' ejecutada en modo {action}: {result.summary}"
                     result_data = result.to_dict()
@@ -841,7 +916,9 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     data = {"id": args["id"]}
                     summary = f"Capability '{args['id']}' borrada."
                 else:
-                    raise ValueError(f"action inválida: {action!r} (usar create|get|source|validate|test|run|list|delete)")
+                    raise ValueError(f"action inválida: {action!r} (usar create|update|set_permissions|get|source|validate|test|run|list|delete)")
+                if action in {"create", "set_permissions", "delete"}:
+                    await _notify_if_tools_changed(server, state)
                 return types.CallToolResult(content=[types.TextContent(type="text", text=summary)], structuredContent={"ok": True, "summary": summary, "data": data})
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo administrar la capability: {profile_client.describe_error(exc)}"
@@ -1220,6 +1297,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     task = await board_client.update_task(
                         task_id=current["id"], title=args.get("title", current["title"]),
                         done=args.get("done", current["done"]), position=args.get("position", current["position"]),
+                        acceptance_criteria=args.get("acceptance_criteria"),
                     )
                     data = {"task": task}
                     summary = f"Task '{task['title']}' actualizada."
@@ -1227,20 +1305,38 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     await board_client.delete_task(args["task_id"])
                     data = {"task_id": args["task_id"]}
                     summary = f"Task '{args['task_id']}' eliminada."
+                elif action == "task_propose_scenarios":
+                    author = token.user_id if token and token.user_id else str(args.get("author", "")).strip()
+                    data = await board_client.propose_scenarios(
+                        task_id=args["task_id"], author=author,
+                        scenarios=args.get("scenarios", []), dry_run=bool(args.get("dry_run", False)),
+                    )
+                    summary = f"Escenarios {'validados' if args.get('dry_run') else 'propuestos'} para la task {args['task_id']} (spec {data['spec_hash'][:12]})."
+                elif action == "task_freeze_spec":
+                    data = await board_client.freeze_spec(
+                        task_id=args["task_id"], base_commit=args["base_commit"], implementer=args["implementer"],
+                    )
+                    summary = f"Spec de la task {args['task_id']} congelada."
+                elif action == "verification_runs":
+                    data = await board_client.list_verification_runs(task_id=args["task_id"], limit=int(args.get("limit", 10)))
+                    summary = f"{len(data['runs'])} corrida(s) de verificación para la task {args['task_id']}."
+                elif action == "activity_gate":
+                    data = await board_client.get_activity_gate(activity_id=args["activity_id"])
+                    summary = "La actividad está lista para Done." if data["ready"] else "La actividad todavía tiene verificaciones pendientes."
                 else:
                     raise ValueError(
-                        "action inválida: usar overview|list_boards|migrate|create|update|delete|move|delete_board|task_create|task_update|task_delete"
+                        "action inválida: usar overview|list_boards|migrate|create|update|delete|move|delete_board|task_create|task_update|task_delete|task_propose_scenarios|task_freeze_spec|verification_runs|activity_gate"
                     )
                 return types.CallToolResult(
                     content=[types.TextContent(type="text", text=summary)],
-                    structuredContent={"ok": True, "summary": summary, "data": data},
+                    structuredContent={"ok": True, "summary": summary, "data": data, "artifacts": [], "warnings": []},
                 )
             except Exception as exc:  # noqa: BLE001
                 message = f"No se pudo operar el roadmap/board: {exc}"
                 return types.CallToolResult(
                     content=[types.TextContent(type="text", text=message)],
                     isError=True,
-                    structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
+                    structuredContent={"ok": False, "summary": message, "data": {}, "artifacts": [], "warnings": [], "error": message},
                 )
         tools = state["tools"]
         capability_id = state.get("name_to_id", {}).get(name)
@@ -1260,12 +1356,34 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     "error": message,
                 },
             )
-        result = await dispatch.call_capability(capability_id, arguments, tools[capability_id].raw)
+        result = await dispatch.call_capability(
+            capability_id, arguments, tools[capability_id].raw,
+            user_id=token.user_id if token else "",
+        )
         await _notify_if_tools_changed(server, state)
         return capability_call_result(result)
 
+    @server.call_tool(validate_input=False)
+    async def call_tool(name: str, arguments: dict) -> types.CallToolResult:
+        result = await dispatch_tool(name, arguments)
+        token = current_api_token()
+        if token is None or not token.user_id:
+            return result
+        # PostToolUse hooks only see the response returned to the MCP client.
+        # Carry the identity established by rules-api so the local session hook
+        # can attribute its Learning summary without trusting a caller argument.
+        identity = {"user_id": token.user_id, "source": "validated_pat"}
+        structured = dict(result.structuredContent or {})
+        structured["_higpertext_auth"] = identity
+        meta = dict(result.meta or {})
+        meta["com.higpertext/authenticated-user"] = identity
+        return result.model_copy(update={"structuredContent": structured, "meta": meta})
+
     @server.list_resources()
     async def list_resources() -> list[types.Resource]:
+        token = current_api_token()
+        if token is not None and not token_permissions.has_permission(token, "audit.view"):
+            return []
         return [
             types.Resource(
                 uri=resources.USAGE_URI,
@@ -1289,6 +1407,9 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
 
     @server.read_resource()
     async def read_resource(uri) -> str:
+        token = current_api_token()
+        if token is not None and not token_permissions.has_permission(token, "audit.view"):
+            raise PermissionError("El token no tiene permiso para leer este recurso.")
         root = discovery.resolve_project_root()
         if str(uri) == resources.USAGE_URI:
             return json.dumps(await resources.summarize_usage(root), ensure_ascii=False)
