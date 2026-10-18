@@ -1118,10 +1118,12 @@ class ListAuditEventsResponse(_message.Message):
     def __init__(self, events: _Optional[_Iterable[_Union[AuditEvent, _Mapping]]] = ...) -> None: ...
 
 class ResolveProjectRequest(_message.Message):
-    __slots__ = ("root_path",)
+    __slots__ = ("root_path", "register")
     ROOT_PATH_FIELD_NUMBER: _ClassVar[int]
+    REGISTER_FIELD_NUMBER: _ClassVar[int]
     root_path: str
-    def __init__(self, root_path: _Optional[str] = ...) -> None: ...
+    register: bool
+    def __init__(self, root_path: _Optional[str] = ..., register: _Optional[bool] = ...) -> None: ...
 
 class ResolveProjectResponse(_message.Message):
     __slots__ = ("project",)
@@ -1222,14 +1224,16 @@ class Checkout(_message.Message):
     def __init__(self, repository_id: _Optional[str] = ..., host_id: _Optional[str] = ..., path: _Optional[str] = ...) -> None: ...
 
 class ResolveRepositoryRequest(_message.Message):
-    __slots__ = ("path", "remote", "host_id")
+    __slots__ = ("path", "remote", "host_id", "register")
     PATH_FIELD_NUMBER: _ClassVar[int]
     REMOTE_FIELD_NUMBER: _ClassVar[int]
     HOST_ID_FIELD_NUMBER: _ClassVar[int]
+    REGISTER_FIELD_NUMBER: _ClassVar[int]
     path: str
     remote: str
     host_id: str
-    def __init__(self, path: _Optional[str] = ..., remote: _Optional[str] = ..., host_id: _Optional[str] = ...) -> None: ...
+    register: bool
+    def __init__(self, path: _Optional[str] = ..., remote: _Optional[str] = ..., host_id: _Optional[str] = ..., register: _Optional[bool] = ...) -> None: ...
 
 class ResolveRepositoryResponse(_message.Message):
     __slots__ = ("repository", "checkout", "match", "created")

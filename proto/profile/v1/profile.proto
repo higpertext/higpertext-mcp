@@ -560,7 +560,12 @@ message ListAuditEventsRequest {
 }
 message ListAuditEventsResponse { repeated AuditEvent events = 1; }
 
-message ResolveProjectRequest { string root_path = 1; }
+message ResolveProjectRequest {
+  string root_path = 1;
+  // false (por defecto): solo resuelve; una ruta sin proyecto responde NOT_FOUND y no se crea nada.
+  // true: registro explícito (lo envía la persona desde Proyectos); crea el proyecto si no existe.
+  bool register = 2;
+}
 message ResolveProjectResponse { Project project = 1; }
 message ListProjectsRequest {}
 message ListProjectsResponse { repeated Project projects = 1; }
@@ -610,6 +615,8 @@ message ResolveRepositoryRequest {
   string path = 1;
   string remote = 2;  // URL de git en cualquier forma habitual; opcional
   string host_id = 3; // vacío = HIGPERTEXT_HOST_ID del servidor, o "local"
+  // false (por defecto): no crea ningún Project; una ruta sin proyecto registrado responde NOT_FOUND.
+  bool register = 4;
 }
 message ResolveRepositoryResponse {
   Repository repository = 1;

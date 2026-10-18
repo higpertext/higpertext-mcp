@@ -34,7 +34,8 @@ def _session_path(root: Path) -> Path:
 
 
 def resolve_project(root: Path) -> ResolvedProject | None:
-    """Resuelve (o crea) el Project vía ProjectService.ResolveProject (tenancy.db).
+    """Resuelve el Project registrado vía ProjectService.ResolveProject (tenancy.db). No crea:
+    una ruta sin proyecto (p. ej. un directorio temporal de pruebas) devuelve `None`.
 
     Best-effort y síncrono a propósito — se llama desde hooks que no corren
     dentro de un event loop asyncio. `None` si el profile-server no responde

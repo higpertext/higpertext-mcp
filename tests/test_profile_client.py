@@ -289,3 +289,32 @@ async def test_record_learning_texts_reaches_learning_service(monkeypatch):
     assert text.tool_name == "Bash"
     assert text.tokens == 1975
     assert text.output_text == "Bash (success), 1975 tokens estimados."
+
+
+class _FakeRpcError(profile_client.grpc.aio.AioRpcError):
+    def __init__(self, code):
+        self._code = code
+
+    def code(self):
+        return self._code
+
+
+@pytest.mark.anyio
+async def test_resolve_project_raises_not_registered_when_the_server_does_not_know_the_path(monkeypatch):
+    """ResolveProject ya no crea: NOT_FOUND se traduce a un error accionable (ValueError)."""
+
+    class Stub:
+        def __init__(self, channel):
+            pass
+
+        async def ResolveProject(self, request, timeout=None):
+            assert request.register is False  # resolver nunca registra
+            raise _FakeRpcError(profile_client.grpc.StatusCode.NOT_FOUND)
+
+    monkeypatch.setattr(profile_client.profile_pb2_grpc, "ProjectServiceStub", Stub)
+    monkeypatch.setattr("higpertext_mcp.repository_resolution.git_remote", lambda path: "")
+
+    with pytest.raises(profile_client.ProjectNotRegisteredError) as info:
+        await profile_client.resolve_project("/tmp/prueba-de-agente")
+    assert isinstance(info.value, ValueError)
+    assert "no está registrado" in str(info.value)

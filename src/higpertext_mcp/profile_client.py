@@ -48,6 +48,17 @@ def server_down_message() -> str:
     )
 
 
+class ProjectNotRegisteredError(ValueError):
+    """La ruta no pertenece a ningún proyecto registrado. El servidor ya no crea proyectos
+    al resolver: los registra una persona desde Proyectos (así los directorios temporales
+    de pruebas no generan proyectos). Hereda de ValueError para entrar en los mismos
+    manejadores que una selección de proyecto inválida."""
+
+    def __init__(self, path: str):
+        super().__init__(f"el proyecto {path!r} no está registrado: regístralo desde Proyectos antes de usarlo")
+        self.path = path
+
+
 def describe_error(exc: BaseException) -> str:
     """Texto para mostrar al usuario: el mensaje accionable si el server está
     caído; si no, el de la excepción tal cual."""
@@ -757,8 +768,8 @@ async def delete_agent(agent_id: str) -> None:
 
 
 async def resolve_project(root_path: str) -> dict:
-    """Resuelve (o crea) el Project asociado a root_path — tenancy.db, separada
-    de profile.db. Usado para scopear skills/actividad/aprendizaje a "este
+    """Resuelve el Project registrado de root_path — tenancy.db, separada de profile.db.
+    No crea nada: una ruta sin proyecto lanza ProjectNotRegisteredError. Usado para scopear skills/actividad/aprendizaje a "este
     proyecto puntual" via Skill.project_id. Si el repo ya está registrado,
     resuelve por remote y no transmite la ruta del checkout."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
@@ -774,9 +785,17 @@ async def resolve_project(root_path: str) -> dict:
                 repo = identity.repository
                 return {"id": repo.project_id, "root_path": "", "root_path_hash": "", "name": repo.name, "paths": []}
             except grpc.aio.AioRpcError as exc:
+                # Un remote que ningún repositorio registrado posee: el proyecto no existe.
+                if exc.code() == grpc.StatusCode.NOT_FOUND:
+                    raise ProjectNotRegisteredError(root_path) from exc
                 if exc.code() != grpc.StatusCode.UNIMPLEMENTED:
                     raise
-        resp = await stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=root_path), timeout=_CALL_TIMEOUT_S)
+        try:
+            resp = await stub.ResolveProject(profile_pb2.ResolveProjectRequest(root_path=root_path), timeout=_CALL_TIMEOUT_S)
+        except grpc.aio.AioRpcError as exc:
+            if exc.code() == grpc.StatusCode.NOT_FOUND:
+                raise ProjectNotRegisteredError(root_path) from exc
+            raise
         p = resp.project
         return {
             "id": p.id,
@@ -798,14 +817,19 @@ def _repository_to_dict(r) -> dict:
 
 
 async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> dict:
-    """RFC-0020: get-or-create del repositorio de una ruta. Una ruta dentro de un
+    """RFC-0020: get-or-create del repositorio de una ruta dentro de un proyecto YA registrado (no crea proyectos). Una ruta dentro de un
     repo git se enlaza a la raíz de git; el servidor devuelve `match`
     ("binding" | "remote" | "local" | "new") y el repositorio (con su project_id)."""
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = profile_pb2_grpc.ProjectServiceStub(channel)
-        resp = await stub.ResolveRepository(
-            profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id), timeout=_CALL_TIMEOUT_S
-        )
+        try:
+            resp = await stub.ResolveRepository(
+                profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id), timeout=_CALL_TIMEOUT_S
+            )
+        except grpc.aio.AioRpcError as exc:
+            if exc.code() == grpc.StatusCode.NOT_FOUND:
+                raise ProjectNotRegisteredError(path) from exc
+            raise
         return {**_repository_to_dict(resp.repository), "match": resp.match, "created": resp.created}
 
 

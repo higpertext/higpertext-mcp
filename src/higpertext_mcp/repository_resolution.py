@@ -85,6 +85,10 @@ async def _resolve_repository(root: Path, remote: str) -> dict:
     try:
         return await profile_client.resolve_repository_by_remote(remote)
     except grpc.aio.AioRpcError as exc:
+        # El remote no pertenece a ningún repositorio registrado: no hay proyecto (y el
+        # servidor ya no lo crea al resolver).
+        if exc.code() == grpc.StatusCode.NOT_FOUND:
+            raise profile_client.ProjectNotRegisteredError(str(root)) from exc
         # Compatibilidad durante el despliegue gradual: solo el servidor viejo,
         # que no conoce el RPC pathless, vuelve al resolver por ruta.
         if exc.code() != grpc.StatusCode.UNIMPLEMENTED:
@@ -107,6 +111,11 @@ async def server_profile(root: Path) -> str | None:
         repo = await _resolve_repository(root, remote)
         cfg = await profile_client.get_repository_config(repo["id"])
         profile = (cfg.get("profile") or "").strip() or None
+    except profile_client.ProjectNotRegisteredError:
+        # Caso normal (p. ej. un directorio temporal de pruebas): sin proyecto no hay perfil
+        # en el servidor y no hay nada que avisar en cada llamada.
+        _cache[key] = (now + _TTL_S, None)
+        return None
     except Exception as exc:  # noqa: BLE001 — cualquier fallo de red/servidor
         _warn(f"sin perfil del servidor para {root}: {profile_client.describe_error(exc)}")
         stale = _last_good.get(key)  # un fallo momentáneo no debe dejar al agente sin perfil
@@ -156,6 +165,8 @@ async def sync_profile(root: Path, profile: str, *, replace: bool = False) -> di
         if current:
             result["previous"] = current
         return result
+    except profile_client.ProjectNotRegisteredError as exc:
+        return {"status": "unregistered", "error": str(exc)}
     except Exception as exc:  # noqa: BLE001
         return {"status": "unreachable", "error": profile_client.describe_error(exc)}
     finally:

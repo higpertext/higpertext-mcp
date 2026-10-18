@@ -222,3 +222,53 @@ async def test_adoption_loses_to_a_profile_another_process_set_first(tmp_path, s
 
     monkeypatch.setattr(repository_resolution.profile_client, "get_repository_config", racing)
     assert await discovery.effective_profile(tmp_path) == "del_otro"
+
+
+async def test_an_unregistered_project_is_a_quiet_no_profile_not_a_warning(tmp_path, server, monkeypatch, capsys):
+    """El servidor ya no crea proyectos al resolver: un directorio temporal de pruebas
+    responde 'no registrado'. Es un caso normal: sin perfil del servidor y sin ruido."""
+
+    async def not_registered(path, remote="", host_id=""):
+        raise repository_resolution.profile_client.ProjectNotRegisteredError(path)
+
+    monkeypatch.setattr(repository_resolution.profile_client, "resolve_repository", not_registered)
+    repository_resolution.invalidate(tmp_path)
+
+    assert await repository_resolution.server_profile(tmp_path) is None
+    assert "sin perfil del servidor" not in capsys.readouterr().err
+
+
+async def test_sync_profile_reports_unregistered_instead_of_unreachable(tmp_path, server, monkeypatch):
+    async def not_registered(path, remote="", host_id=""):
+        raise repository_resolution.profile_client.ProjectNotRegisteredError(path)
+
+    monkeypatch.setattr(repository_resolution.profile_client, "resolve_repository", not_registered)
+    result = await repository_resolution.sync_profile(tmp_path, "dev")
+
+    assert result["status"] == "unregistered"
+    assert "no está registrado" in result["error"]
+    assert server.set_calls == []
+
+
+async def test_an_unregistered_remote_is_not_registered_not_unreachable(tmp_path, server, monkeypatch, capsys):
+    """Un clon con remote que ningún repositorio registrado posee: el servidor responde NOT_FOUND
+    por remote. Debe verse como «no registrado» (sin ruido ni 'unreachable')."""
+    import grpc
+
+    class NotFound(grpc.aio.AioRpcError):
+        def __init__(self):
+            pass
+
+        def code(self):
+            return grpc.StatusCode.NOT_FOUND
+
+    async def by_remote(remote):
+        raise NotFound()
+
+    monkeypatch.setattr(repository_resolution, "git_remote", lambda root: "https://github.com/org/temporal.git")
+    monkeypatch.setattr(repository_resolution.profile_client, "resolve_repository_by_remote", by_remote)
+    repository_resolution.invalidate(tmp_path)
+
+    assert await repository_resolution.server_profile(tmp_path) is None
+    assert "sin perfil del servidor" not in capsys.readouterr().err
+    assert (await repository_resolution.sync_profile(tmp_path, "dev"))["status"] == "unregistered"
