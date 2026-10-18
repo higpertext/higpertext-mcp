@@ -112,7 +112,8 @@ async def test_local_and_external_names_never_collide(monkeypatch):
             names = {t.name for t in tools.tools}
             assert "common-grep-search" in names
             assert "external.common.echo" in names
-            assert len(names) == 13
+            assert len(names) == 14
+            assert "higpertext-dashboard" in names
             assert "higpertext-configure-project" in names
             assert "higpertext-system-overview" in names
             assert "higpertext-roadmap-board" in names

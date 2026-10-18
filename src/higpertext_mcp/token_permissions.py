@@ -8,6 +8,10 @@ from typing import Any
 from higpertext_mcp.http_auth import ApiTokenContext
 
 _READ_ACTIONS = {"get", "list", "list_global", "get_shared_assets", "overview", "list_boards", "status"}
+_DASHBOARD_READ_ACTIONS = {
+    "schema", "templates", "template", "validate", "list", "get", "export", "versions", "version_get",
+}
+_DASHBOARD_WRITE_ACTIONS = {"import", "restore", "delete"}
 _GOVERNANCE_TOOLS = {
     "higpertext-governance-rule", "higpertext-governance-exception",
     "higpertext-profile", "higpertext-capability", "higpertext-hook-admin",
@@ -45,6 +49,14 @@ def required_permission(tool_name: str, action: str = "", capability_id: str = "
         if action in {"verification_runs", "activity_gate"}:
             return "boards.view"
         return "boards.edit" if action else "boards.view"
+    if tool_name == "higpertext-dashboard":
+        # Los dashboards son del usuario, no del repo: lectura y escritura siguen el catálogo de
+        # permisos de organización; query exige además, en rules-api, el permiso de cada entidad.
+        if action in _DASHBOARD_READ_ACTIONS:
+            return "projects.view"
+        if action in _DASHBOARD_WRITE_ACTIONS:
+            return "projects.edit"
+        return "audit.view" if action == "query" else None
     if tool_name in _GOVERNANCE_TOOLS:
         return "governance.view" if action in _READ_ACTIONS else "governance.edit"
     if tool_name.startswith("external."):
@@ -147,7 +159,12 @@ async def resource_allowed(
     """Aplica los límites de repositorio del PAT al proyecto de la solicitud."""
     if not context.repository_ids:
         return True
-    if not capability_id and tool_name not in _PROJECT_TOOLS and not tool_name.startswith("external."):
+    if tool_name == "higpertext-dashboard" and not capability_id:
+        # Solo query toca datos de un proyecto: debe pertenecer a un repositorio permitido por el
+        # PAT. Sin project_id la tool misma rechaza el pedido antes de hacer ninguna llamada.
+        if arguments.get("action") != "query" or not str(arguments.get("project_id", "")):
+            return True
+    elif not capability_id and tool_name not in _PROJECT_TOOLS and not tool_name.startswith("external."):
         return True
     repository_id = str(arguments.get("repository_id", ""))
     if repository_id:

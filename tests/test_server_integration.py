@@ -59,7 +59,7 @@ async def test_list_tools_over_real_protocol(monkeypatch):
     async with create_connected_server_and_client_session(server) as client:
         result = await client.list_tools()
         names = {t.name for t in result.tools}
-        assert names == {"higpertext-configure-project", "higpertext-system-overview", "higpertext-roadmap-board", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "higpertext-agent", "common-grep-search", "git-diff"}
+        assert names == {"higpertext-configure-project", "higpertext-system-overview", "higpertext-roadmap-board", "higpertext-render-adapters", "higpertext-governance-rule", "higpertext-governance-exception", "higpertext-profile", "higpertext-capability", "higpertext-hook-admin", "higpertext-skill", "higpertext-agent", "higpertext-dashboard", "common-grep-search", "git-diff"}
         grep_tool = next(t for t in result.tools if t.name == "common-grep-search")
         assert grep_tool.annotations.readOnlyHint is True
         assert "pattern" in grep_tool.inputSchema["properties"]

@@ -52,6 +52,18 @@ usando tags `roadmap:<phase_id>`. El board persistente vive en
 `higpertext-server-profile`; el JSON local se conserva como fuente de migración
 y respaldo legible.
 
+`higpertext-dashboard` permite a un agente crear, ajustar y consultar dashboards
+definidos por JSON (esquema v2): `schema`, `templates`, `template`, `validate`,
+`list`, `get`, `export`, `import` (upsert idempotente por `uid`), `versions`,
+`version_get`, `restore`, `delete` (exige `confirm: true`) y `query` (fuente de datos
+`agent` o PromQL). Es una tool interna: se lista siempre y se filtra por los scopes del
+PAT (lecturas `projects.view`, escrituras `projects.edit`, `query` `audit.view`). Habla
+con `rules-api` por REST con el bearer de la cuenta de servicio del MCP y la cabecera
+`X-Htx-On-Behalf-Of` con el `user_id` del PAT validado: nunca reenvía el PAT ni toma la
+identidad de los argumentos, y sin un PAT validado (stdio sin token) se rechaza. La
+decisión y el modelo de seguridad están en `higpertext-server-profile`
+(`docs/api/dashboard-mcp.md`).
+
 ## Contrato de resultado de una tool
 
 Los clientes MCP (Claude Code entre ellos) le muestran al modelo el

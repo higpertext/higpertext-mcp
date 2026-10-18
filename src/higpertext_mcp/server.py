@@ -29,6 +29,7 @@ from higpertext_mcp import (
     adapter_renderer,
     agent_renderer,
     board_client,
+    dashboard_tool,
     discovery,
     dispatch,
     external,
@@ -55,6 +56,7 @@ AGENT_TOOL_NAME = "higpertext-agent"
 GOVERNANCE_EXCEPTION_TOOL_NAME = "higpertext-governance-exception"
 SYSTEM_OVERVIEW_TOOL_NAME = "higpertext-system-overview"
 BOARD_TOOL_NAME = "higpertext-roadmap-board"
+DASHBOARD_TOOL_NAME = dashboard_tool.TOOL_NAME
 
 _SYSTEM_OVERVIEW_TOOL = types.Tool(
     name=SYSTEM_OVERVIEW_TOOL_NAME,
@@ -526,6 +528,15 @@ def _mcp_tool_name(capability_id: str) -> str:
     return capability_id.replace(".", "-")
 
 
+_DASHBOARD_TOOL = types.Tool(
+    name=DASHBOARD_TOOL_NAME,
+    description=dashboard_tool.DESCRIPTION,
+    inputSchema=dashboard_tool.INPUT_SCHEMA,
+    # import/restore/delete modifican dashboards y delete es destructivo; las demás acciones solo leen.
+    annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
+)
+
+
 def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
     return types.Tool(
         name=_mcp_tool_name(capability_id),
@@ -614,7 +625,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         all_tools = [
             _CONFIGURE_TOOL, _SYSTEM_OVERVIEW_TOOL, _BOARD_TOOL, _RENDER_ADAPTERS_TOOL,
             _GOVERNANCE_RULE_TOOL, _GOVERNANCE_EXCEPTION_TOOL, _PROFILE_TOOL,
-            _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, *local,
+            _CAPABILITY_TOOL, _HOOK_TOOL, _SKILL_TOOL, _AGENT_TOOL, _DASHBOARD_TOOL, *local,
             *(await ext_pool.list_tools_merged()),
         ]
         token = current_api_token()
@@ -654,6 +665,7 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                 _HOOK_TOOL,
                 _SKILL_TOOL,
                 _AGENT_TOOL,
+                _DASHBOARD_TOOL,
             )
         }
         capability_id = state["name_to_id"].get(name)
@@ -1207,6 +1219,13 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     isError=True,
                     structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
                 )
+        if name == DASHBOARD_TOOL_NAME:
+            outcome = await dashboard_tool.run(arguments if isinstance(arguments, dict) else {}, token)
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text=outcome["summary"])],
+                isError=not outcome["ok"],
+                structuredContent=outcome,
+            )
         if name == BOARD_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
             action = args.get("action")
