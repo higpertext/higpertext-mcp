@@ -1,4 +1,0 @@
-╔─ HIGPERTEXT TELEMETRY ────────────────────────────────────
-║  Sin datos en .higpertext/state/telemetry.jsonl        ║
-║  Inicia una sesión para comenzar a recolectar.         ║
-╚───────────────────────────────────────────────────────────
