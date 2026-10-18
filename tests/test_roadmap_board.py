@@ -75,6 +75,37 @@ async def test_update_task_forwards_acceptance_criteria_replacement(monkeypatch)
 
 
 @pytest.mark.anyio
+async def test_create_comment_trims_and_forwards_to_activity_service(monkeypatch):
+    requests = []
+
+    class FakeChannel:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+    class FakeActivityService:
+        async def CreateActivityComment(self, request, timeout):
+            requests.append(request)
+            comment = board_client.board_pb2.BoardComment(
+                id="c1", board_activity_id=request.board_activity_id, text=request.text,
+            )
+            return type("Response", (), {"comment": comment})()
+
+    monkeypatch.setattr(board_client.grpc.aio, "insecure_channel", lambda *_: FakeChannel())
+    monkeypatch.setattr(board_client.board_pb2_grpc, "ActivityServiceStub", lambda _: FakeActivityService())
+
+    result = await board_client.create_comment(board_activity_id=" a1 ", text="  hola  ")
+
+    assert requests[0].board_activity_id == "a1"
+    assert requests[0].text == "hola"
+    assert result["id"] == "c1"
+    assert result["board_activity_id"] == "a1"
+    assert result["text"] == "hola"
+
+
+@pytest.mark.anyio
 async def test_propose_scenarios_forwards_authenticated_verification_spec(monkeypatch):
     requests = []
 

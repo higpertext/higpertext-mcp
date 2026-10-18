@@ -806,6 +806,7 @@ async def resolve_project(root_path: str) -> dict:
         }
 
 
+
 def _repository_to_dict(r) -> dict:
     return {
         "id": r.id,
@@ -816,7 +817,20 @@ def _repository_to_dict(r) -> dict:
     }
 
 
-async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> dict:
+async def register_project(root_path: str, organization_id: str) -> dict:
+    """Crea o resuelve un Project bajo la organización autorizada del caller."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = profile_pb2_grpc.ProjectServiceStub(channel)
+        response = await stub.ResolveProject(
+            profile_pb2.ResolveProjectRequest(root_path=root_path, register=True),
+            timeout=_CALL_TIMEOUT_S,
+            metadata=(("x-htx-org", organization_id),),
+        )
+        project = response.project
+        return {"id": project.id, "name": project.name}
+
+
+async def resolve_repository(path: str, remote: str = "", host_id: str = "", *, register: bool = False) -> dict:
     """RFC-0020: get-or-create del repositorio de una ruta dentro de un proyecto YA registrado (no crea proyectos). Una ruta dentro de un
     repo git se enlaza a la raíz de git; el servidor devuelve `match`
     ("binding" | "remote" | "local" | "new") y el repositorio (con su project_id)."""
@@ -824,7 +838,8 @@ async def resolve_repository(path: str, remote: str = "", host_id: str = "") -> 
         stub = profile_pb2_grpc.ProjectServiceStub(channel)
         try:
             resp = await stub.ResolveRepository(
-                profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id), timeout=_CALL_TIMEOUT_S
+                profile_pb2.ResolveRepositoryRequest(path=path, remote=remote, host_id=host_id, register=register),
+                timeout=_CALL_TIMEOUT_S,
             )
         except grpc.aio.AioRpcError as exc:
             if exc.code() == grpc.StatusCode.NOT_FOUND:

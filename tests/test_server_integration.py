@@ -865,3 +865,174 @@ async def test_roadmap_propose_scenarios_uses_pat_owner_as_author(monkeypatch):
     assert result.structuredContent["_higpertext_auth"] == {
         "user_id": "user-verified", "source": "validated_pat"
     }
+
+
+@pytest.mark.anyio
+async def test_roadmap_create_makes_inline_tasks_and_comment_action_forwards_text(monkeypatch):
+    # Unificación del roadmap: la tool nativa absorbe phase_create (tasks inline) y comment.
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(
+        server_module.profile_client, "resolve_project",
+        lambda _root: _async_value({"id": "project-1", "name": "demo", "root_path": str(root)}),
+    )
+    monkeypatch.setattr(server_module.board_client, "resolve_board", lambda **_: _async_value({"id": "b1", "name": "Roadmap"}))
+    monkeypatch.setattr(server_module.board_client, "list_columns", lambda _id: _async_value([{"id": "pending", "name": "Pending"}]))
+    monkeypatch.setattr(server_module.board_client, "resolve_column_id", lambda _b, _c: _async_value("pending"))
+    monkeypatch.setattr(
+        server_module.board_client, "create_activity",
+        lambda **kwargs: _async_value({"id": "a1", "title": kwargs["title"]}),
+    )
+    created_tasks = []
+
+    async def fake_create_task(**kwargs):
+        created_tasks.append(kwargs)
+        return {"id": f"t{len(created_tasks)}", "title": kwargs["title"]}
+
+    comments = []
+
+    async def fake_create_comment(**kwargs):
+        comments.append(kwargs)
+        return {"id": "c1", "board_activity_id": kwargs["board_activity_id"], "text": kwargs["text"]}
+
+    monkeypatch.setattr(server_module.board_client, "create_task", fake_create_task)
+    monkeypatch.setattr(server_module.board_client, "create_comment", fake_create_comment)
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        created = await client.call_tool("higpertext-roadmap-board", {
+            "action": "create", "board_name": "Roadmap principal", "title": "Fase",
+            "tasks": ["Primera", "  ", "Segunda"],
+        })
+        commented = await client.call_tool("higpertext-roadmap-board", {
+            "action": "comment", "activity_id": "a1", "text": "avance",
+        })
+        empty = await client.call_tool("higpertext-roadmap-board", {
+            "action": "comment", "activity_id": "a1", "text": "   ",
+        })
+    assert created.isError is False
+    assert [task["title"] for task in created.structuredContent["data"]["tasks"]] == ["Primera", "Segunda"]
+    assert [task["board_activity_id"] for task in created_tasks] == ["a1", "a1"]
+    assert commented.isError is False
+    assert comments == [{"board_activity_id": "a1", "text": "avance"}]
+    assert empty.isError is True
+    assert len(comments) == 1
+
+
+@pytest.mark.anyio
+async def test_org_scoped_token_lists_tools_but_call_still_needs_org_scope(monkeypatch):
+    # Regresión: tools/list llama resource_allowed sin argumentos, así que un PAT ligado a una
+    # organización no veía ninguna tool. La lista depende de scopes; la validación de recurso
+    # sigue en dispatch con los argumentos reales de cada llamada.
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-2", user_id="user-org", scopes=frozenset({"boards.view"}),
+        profile="", organization_ids=frozenset({"org-a"}), repository_ids=frozenset(),
+        project_ids=frozenset({"project-a"}), organization_project_ids={"org-a": frozenset({"project-a"})},
+    ))
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        tools = await client.list_tools()
+        names = {tool.name for tool in tools.tools}
+        assert "higpertext-roadmap-board" in names
+        result = await client.call_tool("higpertext-roadmap-board", {"action": "overview"})
+    assert result.isError is True
+    assert "no tiene permiso" in result.structuredContent["error"]
+
+
+@pytest.mark.anyio
+async def test_native_tools_accept_explicit_organization_id_for_org_scoped_token(monkeypatch):
+    # Las tools nativas publican organization_id (additionalProperties=False las rechazaría sin
+    # el campo) para que un PAT de organización pueda cumplir resource_allowed sin relajarlo.
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-3", user_id="user-org",
+        scopes=frozenset({"boards.view", "governance.view", "governance.edit"}),
+        profile="", organization_ids=frozenset({"org-a"}), repository_ids=frozenset(),
+    ))
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+        for name in ("higpertext-roadmap-board", "higpertext-capability", "higpertext-governance-rule"):
+            assert "organization_id" in tools[name].inputSchema["properties"], name
+        allowed = await client.call_tool("higpertext-roadmap-board", {"action": "overview", "organization_id": "org-a"})
+        foreign = await client.call_tool("higpertext-roadmap-board", {"action": "overview", "organization_id": "org-b"})
+    assert "no tiene permiso" not in str((allowed.structuredContent or {}).get("error", ""))
+    assert foreign.isError is True
+    assert "no tiene permiso" in foreign.structuredContent["error"]
+
+
+@pytest.mark.anyio
+async def test_missing_org_denial_hints_token_organizations_and_overview_lists_them(monkeypatch):
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-4", user_id="user-org", scopes=frozenset({"projects.view", "boards.view"}),
+        profile="", organization_ids=frozenset({"org-a"}), repository_ids=frozenset(),
+    ))
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        denied = await client.call_tool("higpertext-system-overview", {})
+        overview = await client.call_tool("higpertext-system-overview", {"organization_id": "org-a"})
+    # El PAT tiene el scope pero falta la organización: el mensaje indica cuáles puede usar.
+    assert denied.isError is True
+    assert "no tiene permiso" in denied.structuredContent["error"]
+    assert "org-a" in denied.structuredContent["error"]
+    assert overview.isError is False
+    assert overview.structuredContent["data"]["token"] == {"organization_ids": ["org-a"]}
+
+
+@pytest.mark.anyio
+async def test_overview_exposes_manifest_organization_without_granting_access(monkeypatch):
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    (root / ".higpertext").mkdir(exist_ok=True)
+    (root / ".higpertext" / "project.yaml").write_text(
+        "version: 1\nproject:\n  id: project-1\n  name: demo\norganization:\n  id: org-a\n"
+        "repositories:\n- name: dev\n  remote: git@github.com:org/dev.git\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-6", user_id="user-org", scopes=frozenset({"projects.view"}),
+        profile="", organization_ids=frozenset({"org-a"}), repository_ids=frozenset(),
+    ))
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        overview = await client.call_tool("higpertext-system-overview", {"organization_id": "org-a"})
+        # El manifiesto informa la organización, pero no concede acceso sin organization_id.
+        denied = await client.call_tool("higpertext-system-overview", {})
+    assert overview.isError is False
+    assert overview.structuredContent["data"]["project_organization_id"] == "org-a"
+    assert denied.isError is True
+
+
+@pytest.mark.anyio
+async def test_denial_without_scope_does_not_list_organizations(monkeypatch):
+    from higpertext_mcp.http_auth import ApiTokenContext
+
+    root = _make_project("dev")
+    monkeypatch.setenv("HIGPERTEXT_PROJECT_ROOT", str(root))
+    _stub_profile_catalog(monkeypatch, {"dev": []})
+    monkeypatch.setattr(server_module, "current_api_token", lambda: ApiTokenContext(
+        token_id="token-5", user_id="user-org", scopes=frozenset({"boards.view"}),
+        profile="", organization_ids=frozenset({"org-a"}), repository_ids=frozenset(),
+    ))
+    server = server_module.build_server()
+    async with create_connected_server_and_client_session(server) as client:
+        denied = await client.call_tool("higpertext-capability", {"action": "list", "organization_id": "org-a"})
+    assert denied.isError is True
+    assert "org-a" not in denied.structuredContent["error"]

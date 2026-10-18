@@ -320,6 +320,25 @@ async def create_task(*, board_activity_id: str, title: str, acceptance_criteria
         return _task_to_dict(resp.task)
 
 
+async def create_comment(*, board_activity_id: str, text: str) -> dict:
+    """Comentario informativo persistente en una tarjeta (ActivityService.CreateActivityComment)."""
+    async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
+        stub = board_pb2_grpc.ActivityServiceStub(channel)
+        resp = await stub.CreateActivityComment(
+            board_pb2.CreateActivityCommentRequest(
+                board_activity_id=board_activity_id.strip(), text=text.strip(),
+            ),
+            timeout=_CALL_TIMEOUT_S,
+        )
+        comment = resp.comment
+        return {
+            "id": comment.id,
+            "board_activity_id": comment.board_activity_id,
+            "text": comment.text,
+            "created_at": comment.created_at.ToDatetime().isoformat(),
+        }
+
+
 async def list_tasks(board_activity_id: str) -> list[dict]:
     async with grpc.aio.insecure_channel(config.profile_server_addr()) as channel:
         stub = board_pb2_grpc.TaskServiceStub(channel)

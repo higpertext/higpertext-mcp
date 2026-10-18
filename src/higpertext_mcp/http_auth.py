@@ -8,7 +8,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from starlette.responses import JSONResponse
@@ -24,6 +24,8 @@ class ApiTokenContext:
     profile: str
     organization_ids: frozenset[str]
     repository_ids: frozenset[str]
+    project_ids: frozenset[str] = frozenset()
+    organization_project_ids: dict[str, frozenset[str]] = field(default_factory=dict)
 
 
 _current_token: contextvars.ContextVar[ApiTokenContext | None] = contextvars.ContextVar(
@@ -122,6 +124,11 @@ class ApiTokenAuth:
             profile=str(result.get("profile", "")),
             organization_ids=frozenset(str(item) for item in result.get("organizationIds", [])),
             repository_ids=frozenset(str(item) for item in result.get("repositoryIds", [])),
+            project_ids=frozenset(str(item) for item in result.get("projectIds", [])),
+            organization_project_ids={
+                str(org_id): frozenset(str(project_id) for project_id in project_ids)
+                for org_id, project_ids in (result.get("organizationProjectIds") or {}).items()
+            },
         )
 
     async def __call__(self, scope, receive, send) -> None:

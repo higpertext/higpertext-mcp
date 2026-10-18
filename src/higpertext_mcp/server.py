@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import ast
+import copy
 import json
 import sys
 
@@ -35,6 +36,7 @@ from higpertext_mcp import (
     external,
     hook_renderer,
     project_config,
+    project_manifest,
     profile_client,
     render_registry,
     repository_resolution,
@@ -82,8 +84,10 @@ _BOARD_TOOL = types.Tool(
     name=BOARD_TOOL_NAME,
     description=(
         "Flujo de roadmap, tasks y verificación del proyecto: consulta boards, columnas, "
-        "actividades, tasks, escenarios, corridas y el gate de cierre; permite proponer "
+        "actividades, tasks, escenarios, corridas y el gate de cierre; permite crear work items "
+        "(con `tasks` inline), moverlos de columna, comentar una tarjeta (`comment`), proponer "
         "escenarios (incluye dry_run), congelar una spec y migrar el roadmap al board. "
+        "`overview` resuelve el board por nombre (lo crea si no existe) y devuelve su estado. "
         "La ejecución y el registro de evidencia se hacen con htx-verify. Para PAT, el "
         "autor de escenarios siempre es el user_id validado por rules-api."
     ),
@@ -94,7 +98,9 @@ _BOARD_TOOL = types.Tool(
                 "overview", "list_boards", "create", "update", "delete",
                 "move", "delete_board", "task_create", "task_update", "task_delete", "migrate",
                 "task_propose_scenarios", "task_freeze_spec", "verification_runs", "activity_gate",
+                "comment",
             ]},
+            "text": {"type": "string", "description": "solo para comment: texto del comentario informativo de la tarjeta (activity_id)."},
             "project_id": {"type": "string"},
             "root_path": {"type": "string"},
             "board_name": {"type": "string", "default": "Roadmap"},
@@ -168,6 +174,11 @@ _CONFIGURE_TOOL = types.Tool(
             "repository_id": {
                 "type": "string",
                 "description": "ID de un repositorio registrado: se configura su checkout de este host.",
+            },
+            "register_manifest": {
+                "type": "boolean",
+                "default": False,
+                "description": "Registra explícitamente los remotes de .higpertext/project.yaml bajo un Project y enlaza el checkout actual a este host.",
             },
             "replace_profile": {
                 "type": "boolean",
@@ -536,6 +547,41 @@ _DASHBOARD_TOOL = types.Tool(
     annotations=types.ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False),
 )
 
+_ORGANIZATION_ID_PROPERTY = {
+    "type": "string",
+    "description": (
+        "organización del PAT sobre la que opera la llamada. Un PAT atado a una organización "
+        "exige indicarla de forma explícita (token_permissions.resource_allowed)."
+    ),
+}
+
+
+def _with_organization_id(tool: types.Tool) -> types.Tool:
+    """Publica `organization_id` como argumento opcional de una tool nativa.
+
+    Los schemas nativos usan additionalProperties=False, así que sin este campo un cliente con PAT
+    de organización no puede enviar el dato que resource_allowed exige. La validación de recurso
+    no cambia: sigue fail-closed y solo acepta organizaciones del token.
+    """
+    schema_copy = copy.deepcopy(tool.inputSchema)
+    properties = schema_copy.setdefault("properties", {})
+    properties.setdefault("organization_id", dict(_ORGANIZATION_ID_PROPERTY))
+    return tool.model_copy(update={"inputSchema": schema_copy})
+
+
+_CONFIGURE_TOOL = _with_organization_id(_CONFIGURE_TOOL)
+_SYSTEM_OVERVIEW_TOOL = _with_organization_id(_SYSTEM_OVERVIEW_TOOL)
+_BOARD_TOOL = _with_organization_id(_BOARD_TOOL)
+_RENDER_ADAPTERS_TOOL = _with_organization_id(_RENDER_ADAPTERS_TOOL)
+_GOVERNANCE_RULE_TOOL = _with_organization_id(_GOVERNANCE_RULE_TOOL)
+_GOVERNANCE_EXCEPTION_TOOL = _with_organization_id(_GOVERNANCE_EXCEPTION_TOOL)
+_PROFILE_TOOL = _with_organization_id(_PROFILE_TOOL)
+_CAPABILITY_TOOL = _with_organization_id(_CAPABILITY_TOOL)
+_HOOK_TOOL = _with_organization_id(_HOOK_TOOL)
+_SKILL_TOOL = _with_organization_id(_SKILL_TOOL)
+_AGENT_TOOL = _with_organization_id(_AGENT_TOOL)
+_DASHBOARD_TOOL = _with_organization_id(_DASHBOARD_TOOL)
+
 
 def _to_mcp_tool(capability_id: str, spec: schema.ToolSpec) -> types.Tool:
     return types.Tool(
@@ -635,10 +681,10 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         for tool in all_tools:
             capability_id = state["name_to_id"].get(tool.name, "")
             capability_permissions = state["tools"].get(capability_id).raw.get("permissions", []) if capability_id else None
+            # La lista filtra solo por scopes. resource_allowed necesita los argumentos reales
+            # (organization_id, project_id) y se aplica en dispatch_tool antes de ejecutar.
             visible = filtered_tool(tool, token, capability_id, capability_permissions)
-            if visible is None:
-                continue
-            if await token_permissions.resource_allowed(token, {}, capability_id, tool.name):
+            if visible is not None:
                 visible_tools.append(visible)
         return visible_tools
 
@@ -673,13 +719,23 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
         action = str((arguments or {}).get("action", "")) if isinstance(arguments, dict) else ""
         resource_id = str((arguments or {}).get("id", "")) if isinstance(arguments, dict) else ""
         capability_permissions = state["tools"].get(capability_id).raw.get("permissions", []) if capability_id else None
+        scope_allowed = token is None or tool_allowed(
+            name, token, capability_id or "", action, capability_permissions, resource_id
+        )
         if token is not None and (
-            not tool_allowed(name, token, capability_id or "", action, capability_permissions, resource_id)
+            not scope_allowed
             or not await token_permissions.resource_allowed(
                 token, arguments if isinstance(arguments, dict) else {}, capability_id or "", name
             )
         ):
             message = "El token no tiene permiso para esta herramienta o acción."
+            if scope_allowed and token.organization_ids:
+                # Los scopes alcanzan: lo que falta es la organización. Se indican las del propio
+                # token (no revela nada ajeno) para que el cliente la envíe como organization_id.
+                message += (
+                    " Indica organization_id con una de las organizaciones del token: "
+                    + ", ".join(sorted(token.organization_ids))
+                )
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=message)],
                 isError=True,
@@ -1123,7 +1179,16 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
             try:
                 args = arguments if isinstance(arguments, dict) else {}
                 profile = args.get("profile")
-                if args.get("root_path") or args.get("project_id") or args.get("repository_id"):
+                manifest_registration = None
+                if args.get("register_manifest"):
+                    if args.get("root_path") or args.get("repository_id"):
+                        raise ValueError("register_manifest requiere el checkout seleccionado por el request o HIGPERTEXT_PROJECT_ROOT")
+                    root = discovery.resolve_project_root()
+                    manifest_registration = await project_manifest.register_manifest(
+                        root, str(args.get("organization_id", "")), str(args.get("project_id", ""))
+                    )
+                    selector = "project_manifest"
+                elif args.get("root_path") or args.get("project_id") or args.get("repository_id"):
                     root, _project = await discovery.resolve_registered_project(
                         root_path=args.get("root_path", ""),
                         project_id=args.get("project_id", ""),
@@ -1145,7 +1210,10 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     structuredContent={
                         "ok": True,
                         "summary": summary,
-                        "data": {"root": str(root), "selector": selector, "changes": changes, "profile_server": server_sync},
+                        "data": {
+                            "root": str(root), "selector": selector, "changes": changes,
+                            "profile_server": server_sync, "manifest_registration": manifest_registration,
+                        },
                     },
                 )
             except RuntimeError as exc:
@@ -1175,6 +1243,13 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         "error": {"code": "configuration_error", "message": message},
                     },
                 )
+            except Exception as exc:  # noqa: BLE001 — reporta fallos de ProjectService sin filtrar traceback
+                message = f"No se pudo registrar el manifiesto del proyecto: {profile_client.describe_error(exc)}"
+                return types.CallToolResult(
+                    content=[types.TextContent(type="text", text=message)],
+                    isError=True,
+                    structuredContent={"ok": False, "summary": message, "data": {}, "error": message},
+                )
         if name == SYSTEM_OVERVIEW_TOOL_NAME:
             args = arguments if isinstance(arguments, dict) else {}
             try:
@@ -1197,6 +1272,19 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     "profile": None,
                     "warnings": [],
                 }
+                if token is not None:
+                    # El PAT de organización exige organization_id explícito en cada llamada:
+                    # se publican sus organizaciones para que el agente pueda enviarlo.
+                    data["token"] = {"organization_ids": sorted(token.organization_ids)}
+                # Organización declarada en .higpertext/project.yaml. Es solo informativa: la
+                # autorización sigue exigiendo organization_id explícito y validado contra el token.
+                try:
+                    _manifest_path, manifest = project_manifest.load_manifest(root)
+                    manifest_org = (manifest.get("organization") or {}).get("id", "")
+                except (project_manifest.ProjectManifestError, OSError):
+                    manifest_org = ""
+                if manifest_org:
+                    data["project_organization_id"] = manifest_org
                 if profile:
                     try:
                         data["profile"] = await profile_client.get_profile_bundle(profile)
@@ -1277,8 +1365,15 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                         tags=args.get("tags", []), item_type=args.get("item_type", "ROADMAP"),
                         parent_id=args.get("parent_id", ""),
                     )
-                    data = {"board": board, "activity": activity}
+                    created_tasks = [
+                        await board_client.create_task(board_activity_id=activity["id"], title=task_title)
+                        for task_title in (args.get("tasks") or [])
+                        if str(task_title).strip()
+                    ]
+                    data = {"board": board, "activity": activity, "tasks": created_tasks}
                     summary = f"Actividad '{activity['title']}' creada."
+                    if created_tasks:
+                        summary += f" {len(created_tasks)} task(s) creada(s)."
                 elif action == "update":
                     current = await board_client.get_activity(args["activity_id"])
                     activity = await board_client.update_activity(
@@ -1304,6 +1399,16 @@ def build_server(pool: external.ExternalServerPool | None = None) -> Server:
                     )
                     data = {"activity": activity}
                     summary = f"Actividad '{activity['title']}' movida a '{args['target']}'."
+                elif action == "comment":
+                    text = str(args.get("text", "")).strip()
+                    if not text:
+                        raise ValueError("comment requiere text no vacío.")
+                    comment = await board_client.create_comment(
+                        board_activity_id=args.get("activity_id") or args.get("board_activity_id", ""),
+                        text=text,
+                    )
+                    data = {"comment": comment}
+                    summary = f"Comentario agregado a la actividad '{comment['board_activity_id']}'."
                 elif action == "task_create":
                     task = await board_client.create_task(
                         board_activity_id=args["board_activity_id"], title=args["title"],

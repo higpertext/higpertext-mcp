@@ -156,9 +156,41 @@ _PROJECT_TOOLS = {
 async def resource_allowed(
     context: ApiTokenContext, arguments: dict[str, Any], capability_id: str = "", tool_name: str = ""
 ) -> bool:
-    """Aplica los límites de repositorio del PAT al proyecto de la solicitud."""
+    """Aplica los límites de organización, proyecto y repositorio del PAT."""
+    organization_id = str(
+        arguments.get("organization_id")
+        or arguments.get("organizationId")
+        or arguments.get("org_id")
+        or arguments.get("orgId")
+        or ""
+    )
+    project_id = str(arguments.get("project_id") or arguments.get("projectId") or "")
+    # Las capabilities globales (ej. common-roadmap-board-status, que solo recibe board_name) no
+    # traen organization_id. Un PAT atado a una sola organización usa esa organización implícita.
+    # Las operaciones con project_id, y las tools locales como higpertext-roadmap-board, siguen
+    # exigiendo organización explícita (fail-closed).
+    if (
+        capability_id and context.organization_ids and not organization_id and not project_id
+        and len(context.organization_ids) == 1
+    ):
+        organization_id = next(iter(context.organization_ids))
+    if context.organization_ids and not organization_id:
+        return False
+    if context.organization_ids and organization_id not in context.organization_ids:
+        return False
+    if organization_id and project_id and context.organization_project_ids:
+        if project_id not in context.organization_project_ids.get(organization_id, frozenset()):
+            return False
+    if context.organization_ids and not context.repository_ids:
+        # An org-only token may call an explicitly scoped organization operation.
+        # Project operations require a project grant from introspection.
+        if project_id:
+            return project_id in context.project_ids
+        return bool(organization_id and organization_id in context.organization_ids)
+    if project_id and context.project_ids and project_id not in context.project_ids:
+        return False
     if not context.repository_ids:
-        return True
+        return not context.organization_ids
     if tool_name == "higpertext-dashboard" and not capability_id:
         # Solo query toca datos de un proyecto: debe pertenecer a un repositorio permitido por el
         # PAT. Sin project_id la tool misma rechaza el pedido antes de hacer ninguna llamada.

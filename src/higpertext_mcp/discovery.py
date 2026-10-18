@@ -131,9 +131,21 @@ def resolve_project_root() -> Path:
     if selected is not None:
         return selected
     override = os.environ.get("HIGPERTEXT_PROJECT_ROOT")
-    if not override:
-        raise RuntimeError("no hay proyecto seleccionado; indique root_path o project_id")
-    return _validate_allowed_root(Path(override).expanduser().resolve())
+    if override:
+        return _validate_allowed_root(Path(override).expanduser().resolve())
+    # En stdio el proceso normalmente hereda el cwd del workspace del cliente.
+    # El manifiesto permite descubrir su raíz sin guardar una ruta de usuario
+    # en la configuración compartida del MCP.
+    try:
+        from higpertext_mcp.project_manifest import load_manifest
+
+        manifest_path, _manifest = load_manifest(Path.cwd())
+        root = manifest_path.parent.parent
+        return _validate_allowed_root(root.resolve())
+    except (OSError, ValueError):
+        raise RuntimeError(
+            "no hay proyecto seleccionado; configure HIGPERTEXT_PROJECT_ROOT o abra un workspace con .higpertext/project.yaml"
+        ) from None
 
 
 def _checkout_containing(requested: Path, registered: set[Path]) -> Path | None:

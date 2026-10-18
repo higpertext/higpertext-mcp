@@ -2041,6 +2041,11 @@ class ProjectServiceStub:
                 request_serializer=profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.SerializeToString,
                 response_deserializer=profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.FromString,
                 _registered_method=True)
+        self.CreateProject = channel.unary_unary(
+                '/profile.v1.ProjectService/CreateProject',
+                request_serializer=profile_dot_v1_dot_profile__pb2.CreateProjectRequest.SerializeToString,
+                response_deserializer=profile_dot_v1_dot_profile__pb2.CreateProjectResponse.FromString,
+                _registered_method=True)
         self.ListProjects = channel.unary_unary(
                 '/profile.v1.ProjectService/ListProjects',
                 request_serializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.SerializeToString,
@@ -2137,6 +2142,12 @@ class ProjectServiceServicer:
     """Missing associated documentation comment in .proto file."""
 
     def ResolveProject(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateProject(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -2259,6 +2270,11 @@ def add_ProjectServiceServicer_to_server(servicer, server):
                     request_deserializer=profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.FromString,
                     response_serializer=profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.SerializeToString,
             ),
+            'CreateProject': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateProject,
+                    request_deserializer=profile_dot_v1_dot_profile__pb2.CreateProjectRequest.FromString,
+                    response_serializer=profile_dot_v1_dot_profile__pb2.CreateProjectResponse.SerializeToString,
+            ),
             'ListProjects': grpc.unary_unary_rpc_method_handler(
                     servicer.ListProjects,
                     request_deserializer=profile_dot_v1_dot_profile__pb2.ListProjectsRequest.FromString,
@@ -2377,6 +2393,33 @@ class ProjectService:
             '/profile.v1.ProjectService/ResolveProject',
             profile_dot_v1_dot_profile__pb2.ResolveProjectRequest.SerializeToString,
             profile_dot_v1_dot_profile__pb2.ResolveProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateProject(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/profile.v1.ProjectService/CreateProject',
+            profile_dot_v1_dot_profile__pb2.CreateProjectRequest.SerializeToString,
+            profile_dot_v1_dot_profile__pb2.CreateProjectResponse.FromString,
             options,
             channel_credentials,
             insecure,
